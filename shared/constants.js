@@ -21,6 +21,29 @@ export const ASH_INSURANCE_RATIO = 0.618; // 61.8% refund en Permadeath
 // 🎨 SISTEMA DE SKINS (NIVELES)
 export const SKIN_LEVEL_REQ = [0, 2, 3, 5, 8, 13]; // Rondas sobrevividas para subir nivel (Fibonacci)
 
+// 🛡️ SISTEMA DE INTEGRIDAD (DURABILIDAD)
+export const MAX_INTEGRITY_BASE = 3; // Integridad inicial de Skins NFT
+export const INTEGRITY_LOSS_PER_DEFEAT = 1; // Daño por derrota
+export const REPAIR_COST_BASE = 50; // $WICK base para reparación
+export const REPAIR_COST_MULTIPLIER = 1.618; // Multiplicador Fibonacci por nivel
+
+// 🤖 PROTOCOL DROID (DEFAULT SKIN)
+export const DEFAULT_SKIN = {
+  name: 'Protocol Droid',
+  integrity: Infinity, // Nunca se quema
+  level: 0,
+  isDefault: true,
+  allowedRooms: ['TRAINING', 'SATOSHI']
+};
+
+// 🏛️ REGLAS DE ACCESO A SALAS
+export const ROOM_ACCESS_RULES = {
+  TRAINING: { allowDefault: true, minLevel: 0, minBet: 0 },
+  SATOSHI: { allowDefault: true, minLevel: 0, minBet: 0.10 },
+  TRADER: { allowDefault: false, minLevel: 1, minBet: 1.00 },
+  WHALE: { allowDefault: false, minLevel: 4, minBet: 10.00 }
+};
+
 // 🔥 ECONOMÍA $WICK
 export const WICK_MINT_RATE_BASE = 10; // 10 $WICK por cada 1 USDT perdido
 export const MARKETPLACE_FEE = 0.05; // 5% fee en transacciones secundarias

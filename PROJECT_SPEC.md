@@ -60,6 +60,29 @@ export const SPLIT_RATIO_ALPHA = 0.618; // 61.8% del pozo
 export const HOUSE_FEE = 0.05; // 5%
 
 export const SKIN_LEVEL_REQ = [0, 2, 3, 5, 8, 13]; // Rondas para subir nivel
+
+// Sistema de Integridad
+export const MAX_INTEGRITY_BASE = 3; // Integridad inicial de Skins NFT
+export const INTEGRITY_LOSS_PER_DEFEAT = 1; // Daño por derrota
+export const REPAIR_COST_BASE = 50; // $WICK base para reparación
+export const REPAIR_COST_MULTIPLIER = 1.618; // Multiplicador Fibonacci por nivel
+
+// Protocol Droid (Default Skin)
+export const DEFAULT_SKIN = {
+  name: 'Protocol Droid',
+  integrity: Infinity,
+  level: 0,
+  isDefault: true,
+  allowedRooms: ['TRAINING', 'SATOSHI']
+};
+
+// Reglas de Acceso a Salas
+export const ROOM_ACCESS_RULES = {
+  TRAINING: { allowDefault: true, minLevel: 0, minBet: 0 },
+  SATOSHI: { allowDefault: true, minLevel: 0, minBet: 0.10 },
+  TRADER: { allowDefault: false, minLevel: 1, minBet: 1.00 },
+  WHALE: { allowDefault: false, minLevel: 4, minBet: 10.00 }
+};
 3.2. La Máquina de Estados (Game Loop)
 Implementa un GameLoop en el servidor que corra independientemente de los usuarios.
 
@@ -118,27 +141,141 @@ IF winners > 0: Repartir NetPool equitativamente entre ganadores.
 IF winners == 0 OR Draw: Mover NetPool a nextRoundPot (Rollover).
 
 4.3. Economía del Token $WICK (Off-Chain)
-Implementar función processLosers(losersArray):
+
+**A. Sistema de Integridad (Durabilidad de Skins)**
+
+Implementar función `processLosers(losersArray)`:
 
 Por cada perdedor:
 
-Calcular mintAmount = betAmount * 10 (Base rate).
+1. Calcular `mintAmount = betAmount * 10` (Base rate).
+2. Actualizar saldo $WICK en DB.
+3. **Verificar tipo de Skin:**
 
-Actualizar saldo $WICK en DB.
+```javascript
+IF skin.isDefault === true:
+    // Protocol Droid: No sufre daño
+    LOG "Protocol Droid usado - Sin daño"
+    
+ELSE IF skin.isDefault === false:
+    // Skin NFT: Reducir Integridad
+    skin.integrity -= INTEGRITY_LOSS_PER_DEFEAT  // -1
+    
+    IF skin.integrity <= 0:
+        // Permadeath: Quema definitiva
+        burnSkin(skin.id)
+        issueAshes(userId, skin)
+    ELSE:
+        // Skin dañada pero sobrevive
+        UPDATE skins SET integrity = skin.integrity WHERE id = skinId
+        NOTIFY player: "⚠️ Skin Dañada: " + integrity + "/" + maxIntegrity
+```
 
-Mecánica Permadeath (Quema de Skin):
+**B. Protocol Droid (Default Skin)**
 
-Identificar la Skin usada.
+Características:
+- **Costo:** Gratis (Incluido con cada cuenta).
+- **Integridad:** Infinita (Nunca se quema).
+- **Acceso:** Solo salas "Training" y "Satoshi" ($0.10).
+- **Restricción:** No puede entrar a salas "Trader" ($1.00+) ni "Whale" ($10.00+).
 
-UPDATE skins SET is_burned = TRUE WHERE id = skinId.
+Schema:
+```javascript
+{
+  id: 'default',
+  name: 'Protocol Droid',
+  isDefault: true,
+  integrity: Infinity,
+  maxIntegrity: Infinity,
+  level: 0,
+  isBurned: false
+}
+```
 
-Seguro de Cenizas:
+**C. Mecánica de Reparación (Token Sink)**
 
-Calcular investmentTotal (Costo lienzo + upgrades).
+Implementar función `repairSkin(userId, skinId)`:
 
-refundAmount = investmentTotal * 0.618.
+```javascript
+// Calcular costo de reparación
+const skin = getSkin(skinId);
+const repairCost = REPAIR_COST_BASE * Math.pow(REPAIR_COST_MULTIPLIER, skin.level);
 
-Acreditar refundAmount en $WICK al usuario.
+// Verificar saldo
+IF userBalance.WICK < repairCost:
+    RETURN error: "Saldo insuficiente"
+
+// Ejecutar reparación
+deductWICK(userId, repairCost);  // Quema tokens
+burnWICK(repairCost);             // Registro de deflación
+UPDATE skins SET integrity = maxIntegrity WHERE id = skinId;
+NOTIFY player: "✅ Skin reparada al 100%"
+```
+
+**Fórmula de Costo:**
+```
+Costo = 50 $WICK × (1.618 ^ nivel)
+
+Ejemplos:
+- Nivel 1: 80.9 $WICK
+- Nivel 2: 130.9 $WICK
+- Nivel 3: 211.8 $WICK
+- Nivel 4: 342.7 $WICK
+```
+
+**D. Seguro de Cenizas (Actualizado)**
+
+Cuando `skin.integrity` llega a 0:
+
+1. Identificar la Skin usada.
+2. `UPDATE skins SET is_burned = TRUE WHERE id = skinId`.
+3. Calcular `investmentTotal` (Costo lienzo + upgrades + reparaciones).
+4. `refundAmount = investmentTotal * 0.618`.
+5. Acreditar `refundAmount` en $WICK al usuario.
+6. Quemar permanentemente `investmentTotal * 0.382`.
+
+**E. Modelo de Datos (Skin Schema)**
+
+```typescript
+interface Skin {
+  id: string;
+  userId: string;
+  name: string;
+  level: number;
+  integrity: number;      // Actual (ej. 2)
+  maxIntegrity: number;   // Máximo (ej. 3)
+  isDefault: boolean;     // True si es Protocol Droid
+  isBurned: boolean;
+  pixelData: string;      // Base64 o JSON
+  totalInvestment: number; // $WICK invertido (lienzo + upgrades + reparaciones)
+  createdAt: Date;
+  burnedAt: Date | null;
+}
+```
+
+**F. Reglas de Acceso a Salas**
+
+Implementar validación en `RoomManager.canUserJoin(userId, roomId)`:
+
+```javascript
+const user = getUser(userId);
+const skin = getActiveSkin(userId);
+const room = getRoom(roomId);
+
+// Verificar reglas de acceso
+const rules = ROOM_ACCESS_RULES[room.tier];
+
+IF skin.isDefault && !rules.allowDefault:
+    RETURN error: "Protocol Droid no puede acceder a esta sala"
+
+IF skin.level < rules.minLevel:
+    RETURN error: "Nivel de Skin insuficiente"
+
+IF user.balance < rules.minBet:
+    RETURN error: "Saldo insuficiente"
+
+RETURN success
+```
 
 5. FRONTEND (PHASER 3)
 5.1. Escena de Juego (GameScene)
