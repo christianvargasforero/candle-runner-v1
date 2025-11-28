@@ -15,7 +15,9 @@ class GameLoop {
         this.currentState = GAME_STATES.WAITING;
         this.roundNumber = 0;
         this.startTime = null;
+        this.phaseStartTime = null;
         this.timeElapsed = 0;
+        this.syncInterval = null; // Intervalo para SYNC_TIME
 
         // Datos de la ronda actual
         this.currentRound = {
@@ -31,11 +33,48 @@ class GameLoop {
      */
     start() {
         console.log('🚀 [GAME LOOP] Iniciando motor de juego...\n');
+        this.startSyncTimer();
         this.runRound();
     }
 
     /**
-     * Ejecuta una ronda completa de 30 segundos
+     * Inicia el temporizador de sincronización (SYNC_TIME cada segundo)
+     */
+    startSyncTimer() {
+        // Emitir SYNC_TIME cada 1 segundo a todos los clientes
+        this.syncInterval = setInterval(() => {
+            const now = Date.now();
+            const phaseElapsed = this.phaseStartTime ? now - this.phaseStartTime : 0;
+
+            let phaseDuration = 0;
+            switch (this.currentState) {
+                case GAME_STATES.BETTING:
+                    phaseDuration = PHASE_BET_TIME;
+                    break;
+                case GAME_STATES.LOCKED:
+                    phaseDuration = PHASE_LOCK_TIME;
+                    break;
+                case GAME_STATES.RESOLVING:
+                    phaseDuration = PHASE_RESOLVE_TIME;
+                    break;
+            }
+
+            const timeLeft = Math.max(0, phaseDuration - phaseElapsed);
+
+            this.io.emit('SYNC_TIME', {
+                state: this.currentState,
+                roundNumber: this.roundNumber,
+                timeLeft: timeLeft,
+                serverTime: now,
+                phaseElapsed: phaseElapsed
+            });
+        }, 1000);
+
+        console.log('⏰ [SYNC] Temporizador de sincronización iniciado (1s interval)\n');
+    }
+
+    /**
+     * Ejecuta una ronda completa de 30 segundos con manejo robusto de errores
      */
     async runRound() {
         this.roundNumber++;
@@ -45,20 +84,37 @@ class GameLoop {
         console.log(`🎯 RONDA #${this.roundNumber} INICIADA`);
         console.log(`${'='.repeat(60)}\n`);
 
-        // FASE 1: BETTING (0s - 10s)
-        await this.phaseBetting();
+        try {
+            // FASE 1: BETTING (0s - 10s)
+            await this.phaseBetting();
 
-        // FASE 2: LOCKED (10s - 25s)
-        await this.phaseLocked();
+            // FASE 2: LOCKED (10s - 25s)
+            await this.phaseLocked();
 
-        // FASE 3: RESOLVING (25s - 30s)
-        await this.phaseResolving();
+            // FASE 3: RESOLVING (25s - 30s)
+            await this.phaseResolving();
 
-        // Reiniciar para la siguiente ronda
-        this.resetRound();
+        } catch (error) {
+            console.error('❌ [ERROR] Error crítico en Game Loop:', error);
+            console.error('📊 Stack trace:', error.stack);
 
-        // Ejecutar siguiente ronda
-        this.runRound();
+            // Emitir error a clientes (opcional, para debugging)
+            this.io.emit('GAME_ERROR', {
+                message: 'Error en el servidor. Reiniciando ronda...',
+                roundNumber: this.roundNumber,
+                timestamp: Date.now()
+            });
+
+        } finally {
+            // SIEMPRE ejecutar cleanup y continuar, incluso si hay error
+            this.resetRound();
+
+            // Pequeña pausa antes de la siguiente ronda en caso de error
+            await this.wait(1000);
+
+            // Ejecutar siguiente ronda
+            this.runRound();
+        }
     }
 
     /**
@@ -67,7 +123,7 @@ class GameLoop {
      */
     async phaseBetting() {
         this.currentState = GAME_STATES.BETTING;
-        const phaseStartTime = Date.now();
+        this.phaseStartTime = Date.now();
 
         console.log('🟢 [FASE 1] BETTING - Posicionamiento Abierto');
         console.log(`⏱️  Duración: ${PHASE_BET_TIME / 1000}s`);
@@ -84,7 +140,7 @@ class GameLoop {
         // Simular el paso del tiempo
         await this.wait(PHASE_BET_TIME);
 
-        const elapsed = Date.now() - phaseStartTime;
+        const elapsed = Date.now() - this.phaseStartTime;
         console.log(`✅ Fase BETTING completada (${elapsed}ms)\n`);
     }
 
@@ -94,7 +150,7 @@ class GameLoop {
      */
     async phaseLocked() {
         this.currentState = GAME_STATES.LOCKED;
-        const phaseStartTime = Date.now();
+        this.phaseStartTime = Date.now();
 
         console.log('🔴 [FASE 2] LOCKED - Cierre Criptográfico');
         console.log(`⏱️  Duración: ${PHASE_LOCK_TIME / 1000}s`);
@@ -110,7 +166,7 @@ class GameLoop {
         // Aquí se renderizará el precio de Bitcoin en tiempo real
         await this.wait(PHASE_LOCK_TIME);
 
-        const elapsed = Date.now() - phaseStartTime;
+        const elapsed = Date.now() - this.phaseStartTime;
         console.log(`✅ Fase LOCKED completada (${elapsed}ms)\n`);
     }
 
@@ -120,7 +176,7 @@ class GameLoop {
      */
     async phaseResolving() {
         this.currentState = GAME_STATES.RESOLVING;
-        const phaseStartTime = Date.now();
+        this.phaseStartTime = Date.now();
 
         console.log('🟡 [FASE 3] RESOLVING - Liquidación');
         console.log(`⏱️  Duración: ${PHASE_RESOLVE_TIME / 1000}s`);
@@ -138,7 +194,7 @@ class GameLoop {
 
         await this.wait(PHASE_RESOLVE_TIME);
 
-        const elapsed = Date.now() - phaseStartTime;
+        const elapsed = Date.now() - this.phaseStartTime;
         console.log(`✅ Fase RESOLVING completada (${elapsed}ms)\n`);
     }
 
