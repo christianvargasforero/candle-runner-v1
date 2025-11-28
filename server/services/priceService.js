@@ -12,6 +12,13 @@ class PriceService {
             kraken: null
         };
 
+        // Timestamps de última actualización
+        this.priceTimestamps = {
+            binance: null,
+            coinbase: null,
+            kraken: null
+        };
+
         // WebSocket connections
         this.connections = {
             binance: null,
@@ -34,6 +41,9 @@ class PriceService {
             kraken: 0
         };
         this.maxReconnectAttempts = 10;
+
+        // Configuración de datos obsoletos (stale data)
+        this.maxPriceAge = 10000; // 10 segundos - Precio obsoleto después de este tiempo
     }
 
     /**
@@ -66,8 +76,16 @@ class PriceService {
             this.connections.binance.on('message', (data) => {
                 try {
                     const trade = JSON.parse(data);
-                    this.prices.binance = parseFloat(trade.p);
-                    // console.log(`💰 [BINANCE] Precio: $${this.prices.binance.toFixed(2)}`);
+                    const price = parseFloat(trade.p);
+
+                    // Validación estricta: Rechazar precios inválidos
+                    if (price > 0 && isFinite(price)) {
+                        this.prices.binance = price;
+                        this.priceTimestamps.binance = Date.now();
+                        // console.log(`💰 [BINANCE] Precio: $${price.toFixed(2)}`);
+                    } else {
+                        console.warn(`⚠️  [BINANCE] Precio inválido recibido: ${price}`);
+                    }
                 } catch (error) {
                     console.error('❌ [BINANCE] Error parseando mensaje:', error.message);
                 }
@@ -120,8 +138,16 @@ class PriceService {
                     const message = JSON.parse(data);
 
                     if (message.type === 'ticker' && message.price) {
-                        this.prices.coinbase = parseFloat(message.price);
-                        // console.log(`💰 [COINBASE] Precio: $${this.prices.coinbase.toFixed(2)}`);
+                        const price = parseFloat(message.price);
+
+                        // Validación estricta: Rechazar precios inválidos
+                        if (price > 0 && isFinite(price)) {
+                            this.prices.coinbase = price;
+                            this.priceTimestamps.coinbase = Date.now();
+                            // console.log(`💰 [COINBASE] Precio: $${price.toFixed(2)}`);
+                        } else {
+                            console.warn(`⚠️  [COINBASE] Precio inválido recibido: ${price}`);
+                        }
                     }
                 } catch (error) {
                     console.error('❌ [COINBASE] Error parseando mensaje:', error.message);
@@ -180,8 +206,16 @@ class PriceService {
                     if (Array.isArray(message) && message[1] && Array.isArray(message[1])) {
                         const trades = message[1];
                         if (trades.length > 0 && trades[0][0]) {
-                            this.prices.kraken = parseFloat(trades[0][0]);
-                            // console.log(`💰 [KRAKEN] Precio: $${this.prices.kraken.toFixed(2)}`);
+                            const price = parseFloat(trades[0][0]);
+
+                            // Validación estricta: Rechazar precios inválidos
+                            if (price > 0 && isFinite(price)) {
+                                this.prices.kraken = price;
+                                this.priceTimestamps.kraken = Date.now();
+                                // console.log(`💰 [KRAKEN] Precio: $${price.toFixed(2)}`);
+                            } else {
+                                console.warn(`⚠️  [KRAKEN] Precio inválido recibido: ${price}`);
+                            }
                         }
                     }
                 } catch (error) {
@@ -229,16 +263,57 @@ class PriceService {
 
     /**
      * Obtiene el precio actual (promedio de exchanges activos)
+     * Valida que los precios sean recientes (no obsoletos) y válidos
      */
     getCurrentPrice() {
+        const now = Date.now();
         const activePrices = [];
+        const staleExchanges = [];
 
-        if (this.prices.binance !== null) activePrices.push(this.prices.binance);
-        if (this.prices.coinbase !== null) activePrices.push(this.prices.coinbase);
-        if (this.prices.kraken !== null) activePrices.push(this.prices.kraken);
+        // Validar Binance
+        if (this.prices.binance !== null && this.prices.binance > 0) {
+            const age = now - (this.priceTimestamps.binance || 0);
+            if (age <= this.maxPriceAge) {
+                activePrices.push(this.prices.binance);
+            } else {
+                staleExchanges.push('Binance');
+                this.prices.binance = null; // Invalidar precio obsoleto
+                this.priceTimestamps.binance = null;
+            }
+        }
 
+        // Validar Coinbase
+        if (this.prices.coinbase !== null && this.prices.coinbase > 0) {
+            const age = now - (this.priceTimestamps.coinbase || 0);
+            if (age <= this.maxPriceAge) {
+                activePrices.push(this.prices.coinbase);
+            } else {
+                staleExchanges.push('Coinbase');
+                this.prices.coinbase = null; // Invalidar precio obsoleto
+                this.priceTimestamps.coinbase = null;
+            }
+        }
+
+        // Validar Kraken
+        if (this.prices.kraken !== null && this.prices.kraken > 0) {
+            const age = now - (this.priceTimestamps.kraken || 0);
+            if (age <= this.maxPriceAge) {
+                activePrices.push(this.prices.kraken);
+            } else {
+                staleExchanges.push('Kraken');
+                this.prices.kraken = null; // Invalidar precio obsoleto
+                this.priceTimestamps.kraken = null;
+            }
+        }
+
+        // Advertir sobre precios obsoletos
+        if (staleExchanges.length > 0) {
+            console.warn(`⚠️  [PRICE SERVICE] Precios obsoletos detectados (>${this.maxPriceAge / 1000}s): ${staleExchanges.join(', ')}`);
+        }
+
+        // Verificar si hay precios válidos disponibles
         if (activePrices.length === 0) {
-            console.warn('⚠️  [PRICE SERVICE] No hay precios disponibles de ningún exchange');
+            console.warn('⚠️  [PRICE SERVICE] No hay precios válidos disponibles de ningún exchange');
             return null;
         }
 
@@ -252,6 +327,11 @@ class PriceService {
                 binance: this.prices.binance,
                 coinbase: this.prices.coinbase,
                 kraken: this.prices.kraken
+            },
+            timestamps: {
+                binance: this.priceTimestamps.binance,
+                coinbase: this.priceTimestamps.coinbase,
+                kraken: this.priceTimestamps.kraken
             }
         };
     }
