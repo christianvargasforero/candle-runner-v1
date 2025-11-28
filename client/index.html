@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Candle Runner - Survival Trading</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+      color: #00ff88;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #00ff88;
+      border-radius: 10px;
+      padding: 30px;
+      box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      text-shadow: 0 0 10px #00ff88;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 30px;
+      font-size: 0.9rem;
+    }
+
+    .status {
+      background: rgba(0, 255, 136, 0.1);
+      border-left: 4px solid #00ff88;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 5px;
+    }
+
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      margin: 8px 0;
+      font-size: 0.95rem;
+    }
+
+    .status-label {
+      color: #888;
+    }
+
+    .status-value {
+      color: #00ff88;
+      font-weight: bold;
+    }
+
+    .phase-indicator {
+      text-align: center;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 10px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+
+    .phase-BETTING {
+      background: rgba(0, 255, 0, 0.2);
+      border: 2px solid #00ff00;
+      color: #00ff00;
+    }
+
+    .phase-LOCKED {
+      background: rgba(255, 0, 0, 0.2);
+      border: 2px solid #ff0000;
+      color: #ff0000;
+    }
+
+    .phase-RESOLVING {
+      background: rgba(255, 215, 0, 0.2);
+      border: 2px solid #ffd700;
+      color: #ffd700;
+    }
+
+    .phase-WAITING {
+      background: rgba(136, 136, 136, 0.2);
+      border: 2px solid #888;
+      color: #888;
+    }
+
+    .console {
+      background: #000;
+      border: 1px solid #333;
+      border-radius: 5px;
+      padding: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+      margin-top: 20px;
+    }
+
+    .console-line {
+      margin: 5px 0;
+      color: #0f0;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      color: #555;
+      font-size: 0.8rem;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🕯️ CANDLE RUNNER</h1>
+    <p class="subtitle">Survival Trading & Creative Economy Protocol v1.0</p>
+
+    <div class="status">
+      <div class="status-item">
+        <span class="status-label">🔌 Conexión:</span>
+        <span class="status-value" id="connection-status">Desconectado</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">🎯 Ronda:</span>
+        <span class="status-value" id="round-number">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-label">⏱️ Tiempo Servidor:</span>
+        <span class="status-value" id="server-time">-</span>
+      </div>
+    </div>
+
+    <div class="phase-indicator phase-WAITING" id="phase-indicator">
+      <div id="phase-text">ESPERANDO...</div>
+    </div>
+
+    <div class="console" id="console">
+      <div class="console-line">🚀 Cliente iniciado. Esperando conexión al servidor...</div>
+    </div>
+
+    <div class="footer">
+      © 2025 Candle Runner Protocol | Fase 1: Skeleton
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Conectar al servidor WebSocket
+    const socket = io();
+    const consoleEl = document.getElementById('console');
+    const connectionStatus = document.getElementById('connection-status');
+    const roundNumber = document.getElementById('round-number');
+    const serverTime = document.getElementById('server-time');
+    const phaseIndicator = document.getElementById('phase-indicator');
+    const phaseText = document.getElementById('phase-text');
+
+    // Función para añadir línea a la consola
+    function addConsoleLog(message) {
+      const line = document.createElement('div');
+      line.className = 'console-line';
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      consoleEl.appendChild(line);
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+
+    // Eventos de conexión
+    socket.on('connect', () => {
+      connectionStatus.textContent = 'Conectado ✓';
+      connectionStatus.style.color = '#00ff88';
+      addConsoleLog('✅ Conectado al servidor');
+    });
+
+    socket.on('disconnect', () => {
+      connectionStatus.textContent = 'Desconectado ✗';
+      connectionStatus.style.color = '#ff0000';
+      addConsoleLog('❌ Desconectado del servidor');
+    });
+
+    // Evento: Estado del juego
+    socket.on('GAME_STATE', (data) => {
+      roundNumber.textContent = `#${data.roundNumber}`;
+      
+      // Actualizar indicador de fase
+      phaseIndicator.className = `phase-indicator phase-${data.state}`;
+      
+      const phaseNames = {
+        'BETTING': '🟢 FASE 1: BETTING - Posicionamiento Abierto',
+        'LOCKED': '🔴 FASE 2: LOCKED - Cierre Criptográfico',
+        'RESOLVING': '🟡 FASE 3: RESOLVING - Liquidación',
+        'WAITING': '⚪ ESPERANDO...'
+      };
+      
+      phaseText.textContent = phaseNames[data.state] || data.state;
+      
+      addConsoleLog(`🎮 Estado: ${data.state} | Ronda: #${data.roundNumber} | Tiempo restante: ${data.timeLeft}ms`);
+    });
+
+    // Evento: Sincronización de tiempo
+    socket.on('SYNC_TIME', (data) => {
+      const date = new Date(data.serverTime);
+      serverTime.textContent = date.toLocaleTimeString();
+    });
+
+    // Actualizar tiempo cada segundo
+    setInterval(() => {
+      const now = new Date();
+      serverTime.textContent = now.toLocaleTimeString();
+    }, 1000);
+  </script>
+</body>
+</html>
