@@ -171,6 +171,21 @@
             </div>
         </div>
 
+        <div class="status" style="border-left-color: #ffd700;">
+            <div class="status-item">
+                <span class="status-label">💲 Precio Bitcoin:</span>
+                <span class="status-value" id="current-price">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">📈 Precio Entrada:</span>
+                <span class="status-value" id="start-price">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">🏆 Último Resultado:</span>
+                <span class="status-value" id="last-result">-</span>
+            </div>
+        </div>
+
         <div class="phase-indicator phase-WAITING" id="phase-indicator">
             <div id="phase-text">ESPERANDO...</div>
         </div>
@@ -195,6 +210,11 @@
         const timeLeft = document.getElementById('time-left');
         const phaseIndicator = document.getElementById('phase-indicator');
         const phaseText = document.getElementById('phase-text');
+
+        // Elementos de precio
+        const currentPrice = document.getElementById('current-price');
+        const startPrice = document.getElementById('start-price');
+        const lastResult = document.getElementById('last-result');
 
         // Variables para sincronización de tiempo
         let currentPhaseEndTime = null;
@@ -272,6 +292,12 @@
 
             phaseText.textContent = phaseNames[data.state] || data.state;
 
+            // Actualizar precio de entrada si está disponible
+            if (data.startPrice) {
+                startPrice.textContent = `$${data.startPrice.toFixed(2)}`;
+                startPrice.style.color = '#00ff88';
+            }
+
             addConsoleLog(`🎮 Cambio de fase: ${data.state} | Ronda #${data.roundNumber}`);
         });
 
@@ -307,6 +333,36 @@
         socket.on('GAME_ERROR', (data) => {
             addConsoleLog(`⚠️ ERROR: ${data.message}`);
             console.error('Error del servidor:', data);
+        });
+
+        // Evento: Resultado de la ronda
+        socket.on('ROUND_RESULT', (data) => {
+            // Actualizar precio actual (endPrice)
+            if (data.endPrice) {
+                currentPrice.textContent = `$${data.endPrice.toFixed(2)}`;
+            }
+
+            // Actualizar resultado
+            if (data.result) {
+                const resultEmojis = {
+                    'LONG': '📈 LONG',
+                    'SHORT': '📉 SHORT',
+                    'DRAW': '⚖️ DRAW'
+                };
+
+                const resultColors = {
+                    'LONG': '#00ff00',
+                    'SHORT': '#ff0000',
+                    'DRAW': '#ffd700'
+                };
+
+                lastResult.textContent = resultEmojis[data.result] || data.result;
+                lastResult.style.color = resultColors[data.result] || '#00ff88';
+
+                // Log detallado en consola
+                const changeSymbol = data.priceChange >= 0 ? '+' : '';
+                addConsoleLog(`🏆 Resultado: ${data.result} | Cambio: ${changeSymbol}$${data.priceChange.toFixed(2)} (${changeSymbol}${data.priceChangePercent.toFixed(4)}%)`);
+            }
         });
 
         // Iniciar temporizador local

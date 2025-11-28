@@ -11,6 +11,7 @@ import dotenv from 'dotenv';
 // Importar servicios
 import GameLoop from './services/gameLoop.js';
 import RoomManager from './services/roomManager.js';
+import priceService from './services/priceService.js';
 
 // Configuración de ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -117,6 +118,9 @@ httpServer.listen(PORT, () => {
     console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
     console.log('\n');
 
+    // Iniciar Price Service (Oráculo)
+    priceService.start();
+
     // Iniciar Game Loop
     gameLoop.start();
 });
@@ -130,4 +134,4 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ [ERROR] Promesa rechazada no manejada:', reason);
 });
 
-export { io, roomManager, gameLoop };
+export { io, roomManager, gameLoop, priceService };

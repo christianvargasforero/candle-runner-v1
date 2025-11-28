@@ -9,6 +9,8 @@ import {
     GAME_STATES
 } from '../../shared/constants.js';
 
+import priceService from './priceService.js';
+
 class GameLoop {
     constructor(io) {
         this.io = io; // Socket.io instance
@@ -152,18 +154,28 @@ class GameLoop {
         this.currentState = GAME_STATES.LOCKED;
         this.phaseStartTime = Date.now();
 
-        console.log('🔴 [FASE 2] LOCKED - Cierre Criptográfico');
-        console.log(`⏱️  Duración: ${PHASE_LOCK_TIME / 1000}s`);
-        console.log(`🔒 Estado: Apuestas cerradas, renderizando precio\n`);
+        // Capturar precio de entrada (startPrice)
+        const priceData = priceService.getCurrentPrice();
+        if (priceData) {
+            this.currentRound.startPrice = priceData.price;
+            console.log('🔴 [FASE 2] LOCKED - Cierre Criptográfico');
+            console.log(`⏱️  Duración: ${PHASE_LOCK_TIME / 1000}s`);
+            console.log(`🔒 Estado: Apuestas cerradas, renderizando precio`);
+            console.log(`💲 Precio de Entrada: $${this.currentRound.startPrice.toFixed(2)} (${priceData.sources} exchanges)\n`);
+        } else {
+            console.warn('⚠️  [FASE 2] No se pudo obtener precio de entrada');
+            this.currentRound.startPrice = null;
+        }
 
         this.io.emit('GAME_STATE', {
             state: this.currentState,
             roundNumber: this.roundNumber,
             timeLeft: PHASE_LOCK_TIME,
-            serverTime: Date.now()
+            serverTime: Date.now(),
+            startPrice: this.currentRound.startPrice
         });
 
-        // Aquí se renderizará el precio de Bitcoin en tiempo real
+        // Renderizar el precio de Bitcoin en tiempo real
         await this.wait(PHASE_LOCK_TIME);
 
         const elapsed = Date.now() - this.phaseStartTime;
@@ -199,14 +211,63 @@ class GameLoop {
     }
 
     /**
-     * Resuelve la ronda actual (placeholder para Fase 2)
+     * Resuelve la ronda actual con precio final y determina ganadores
      */
     async resolveRound() {
-        // TODO: Implementar en Fase 2 con integración de Binance
-        console.log('📈 Precio Inicial: [Pendiente integración Binance]');
-        console.log('📉 Precio Final: [Pendiente integración Binance]');
-        console.log('🏆 Ganadores: [Pendiente lógica de apuestas]');
-        console.log('💰 Pozo Total: 0 USDT');
+        // Capturar precio de salida (endPrice)
+        const priceData = priceService.getCurrentPrice();
+
+        if (priceData) {
+            this.currentRound.endPrice = priceData.price;
+        } else {
+            console.warn('⚠️  [RESOLVING] No se pudo obtener precio final');
+            this.currentRound.endPrice = null;
+        }
+
+        // Determinar resultado solo si tenemos ambos precios
+        let result = 'DRAW';
+        let priceChange = 0;
+        let priceChangePercent = 0;
+
+        if (this.currentRound.startPrice && this.currentRound.endPrice) {
+            priceChange = this.currentRound.endPrice - this.currentRound.startPrice;
+            priceChangePercent = (priceChange / this.currentRound.startPrice) * 100;
+
+            if (this.currentRound.endPrice > this.currentRound.startPrice) {
+                result = 'LONG';
+            } else if (this.currentRound.endPrice < this.currentRound.startPrice) {
+                result = 'SHORT';
+            } else {
+                result = 'DRAW';
+            }
+
+            // Logs detallados
+            console.log('📊 [RESULTADO DE LA RONDA]');
+            console.log(`📈 Precio Inicial: $${this.currentRound.startPrice.toFixed(2)}`);
+            console.log(`📉 Precio Final: $${this.currentRound.endPrice.toFixed(2)}`);
+            console.log(`📊 Cambio: ${priceChange >= 0 ? '+' : ''}$${priceChange.toFixed(2)} (${priceChangePercent >= 0 ? '+' : ''}${priceChangePercent.toFixed(4)}%)`);
+            console.log(`🏆 Ganador: ${result}`);
+            console.log(`💰 Pozo Total: ${this.currentRound.totalPool} USDT`);
+        } else {
+            console.warn('⚠️  [RESOLVING] No se pudo determinar ganador (precios faltantes)');
+        }
+
+        // Guardar resultado
+        this.currentRound.result = result;
+        this.currentRound.priceChange = priceChange;
+        this.currentRound.priceChangePercent = priceChangePercent;
+
+        // Emitir resultado a todos los clientes
+        this.io.emit('ROUND_RESULT', {
+            roundNumber: this.roundNumber,
+            startPrice: this.currentRound.startPrice,
+            endPrice: this.currentRound.endPrice,
+            result: result,
+            priceChange: priceChange,
+            priceChangePercent: priceChangePercent,
+            totalPool: this.currentRound.totalPool,
+            timestamp: Date.now()
+        });
     }
 
     /**
