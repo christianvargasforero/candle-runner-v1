@@ -68,15 +68,20 @@ export default class UIScene extends Phaser.Scene {
         this.socket.on('USER_PROFILE', (data) => {
             console.log('👤 [PROFILE]', data);
             this.balance = data.balanceUSDT;
-            this.balanceWICK = data.balanceWICK || 0;
-            this.updateBalanceDisplay();
+            this.balanceWICK = data.balanceWICK;
+
+            // Guardar saldo inicial para calcular ganancias
+            if (this.initialBalance === undefined) {
+                this.initialBalance = this.balance;
+            }
 
             if (data.activeSkin) {
                 this.skinIntegrity = data.activeSkin.integrity;
                 this.maxIntegrity = data.activeSkin.maxIntegrity;
                 this.isBurned = data.activeSkin.isBurned;
-                this.updateIntegrityBar();
             }
+            this.updateBalanceDisplay();
+            this.updateIntegrityBar();
         });
 
         // Evento: Estado del juego
@@ -181,7 +186,14 @@ export default class UIScene extends Phaser.Scene {
             console.log('💰 [WITHDRAW]', data);
             this.balance = 0;
             this.updateBalanceDisplay();
-            this.showFloatingText(`✅ Retiro: $${data.amount.toFixed(2)}`, '#00ff88');
+            this.showFloatingText(`✅ Retiro Exitoso!`, '#00ff88');
+
+            // Salir de la sala y volver al menú
+            this.time.delayedCall(2000, () => {
+                this.socket.disconnect();
+                this.scene.stop('GameScene');
+                this.scene.start('MenuScene');
+            });
         });
     }
 
@@ -582,17 +594,34 @@ export default class UIScene extends Phaser.Scene {
             return;
         }
 
+        // Calcular Ganancias/Pérdidas
+        const profit = this.balance - (this.initialBalance || 0);
+        const isProfit = profit >= 0;
+        const profitColor = isProfit ? '#00ff88' : '#ff0000';
+        const profitSign = isProfit ? '+' : '';
+
+        const summaryText = `
+💰 RETIRO DE FONDOS
+
+Saldo Final: $${this.balance.toFixed(2)}
+Saldo Inicial: $${(this.initialBalance || 0).toFixed(2)}
+----------------
+P/L: ${profitSign}$${profit.toFixed(2)}
+        `;
+
         // Mostrar confirmación
         const confirmText = this.add.text(
             this.cameras.main.width / 2,
             this.cameras.main.height / 2,
-            `¿Retirar $${this.balance.toFixed(2)}?\n\nClick para confirmar`,
+            summaryText + '\n\n[ CLICK PARA CONFIRMAR Y SALIR ]',
             {
-                font: 'bold 24px Courier New',
-                fill: '#FFD700',
+                font: 'bold 20px Courier New',
+                fill: profitColor,
                 backgroundColor: '#000000',
-                padding: { x: 20, y: 15 },
-                align: 'center'
+                padding: { x: 30, y: 20 },
+                align: 'center',
+                stroke: '#ffffff',
+                strokeThickness: 2
             }
         ).setOrigin(0.5);
 
