@@ -456,6 +456,20 @@ export default class GameScene extends Phaser.Scene {
         console.log('💀 Plataforma destruida - Jugador caerá');
     }
 
+    createSuccessParticles(x, y) {
+        for (let i = 0; i < 15; i++) {
+            const particle = this.add.circle(x, y, 5, 0xFFD700);
+            this.tweens.add({
+                targets: particle,
+                x: x + Phaser.Math.Between(-80, 80),
+                y: y + Phaser.Math.Between(-60, 60),
+                alpha: 0,
+                duration: 800,
+                onComplete: () => particle.destroy()
+            });
+        }
+    }
+
     cleanupOldCandles() {
         // Eliminar velas que están muy atrás
         while (this.candleHistory.length > 6) {
