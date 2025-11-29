@@ -136,6 +136,7 @@ export default class UIScene extends Phaser.Scene {
             // NO deshabilitar botones - permitir cambiar de decisión
             // Los botones se deshabilitarán automáticamente en fase LOCKED
             this.showFloatingText(`Apuesta: ${data.direction} $${data.amount.toFixed(2)}`, '#FFD700');
+            this.updateBettingButtons();
         });
 
         // Evento: Resultado de apuesta (Ganar/Perder)
@@ -362,8 +363,24 @@ export default class UIScene extends Phaser.Scene {
     updateBettingButtons() {
         const alpha = this.canBet ? 1 : 0.5;
 
+        // Resetear estilos
         this.btnLong.setAlpha(alpha);
         this.btnShort.setAlpha(alpha);
+        this.btnLong.bg.setStrokeStyle(2, 0xffffff);
+        this.btnShort.bg.setStrokeStyle(2, 0xffffff);
+
+        // Resaltar selección si existe y estamos en fase de apuestas
+        if (this.currentBet && this.canBet) {
+            if (this.currentBet.direction === 'LONG') {
+                this.btnLong.bg.setStrokeStyle(4, 0xffffff); // Borde grueso
+                this.btnLong.setAlpha(1);
+                this.btnShort.setAlpha(0.3); // Atenuar el otro
+            } else {
+                this.btnShort.bg.setStrokeStyle(4, 0xffffff); // Borde grueso
+                this.btnShort.setAlpha(1);
+                this.btnLong.setAlpha(0.3); // Atenuar el otro
+            }
+        }
 
         // Desactivar interacción si no se puede apostar
         if (!this.canBet) {
