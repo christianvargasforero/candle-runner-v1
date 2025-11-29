@@ -282,9 +282,9 @@ io.on('connection', async (socket) => {
             return;
         }
 
-        // Calcular costo exponencial (Flat Fee por reparación completa)
-        // Fórmula: 50 * (1.618 ^ Nivel)
-        const cost = Math.floor(50 * Math.pow(1.618, skin.level || 1));
+        // Calcular costo exponencial áureo (White Paper)
+        // Fórmula: 50 * (1.618 ^ nivel)
+        const cost = Math.floor(50 * Math.pow(1.618, skin.level));
         const damage = skin.maxIntegrity - skin.currentIntegrity;
 
         // Verificar saldo WICK

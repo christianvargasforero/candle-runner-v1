@@ -57,6 +57,24 @@ class BusGameLoop {
 
         console.log(`🚌 [BUS LOOP] Instancia creada para bus ${room.id}`);
     }
+        /**
+         * Recupera el estado persistente del bus desde Redis (acumulado, etc)
+         */
+        async recoverState() {
+            try {
+                const key = `bus:${this.room.id}:accumulatedPot`;
+                const value = await redisClient.get(key);
+                if (value !== null) {
+                    this.accumulatedPot = parseFloat(value);
+                    if (isNaN(this.accumulatedPot)) this.accumulatedPot = 0;
+                } else {
+                    this.accumulatedPot = 0;
+                }
+            } catch (err) {
+                console.error(`[RECOVER] Error recuperando accumulatedPot de Redis:`, err);
+                this.accumulatedPot = 0;
+            }
+        }
 
     /**
      * Inicia el ciclo de juego para este bus
@@ -73,6 +91,8 @@ class BusGameLoop {
 
         // Iniciar sincronización
         this.startSyncTimer();
+            // Recuperar estado persistente (acumulado, etc)
+            await this.recoverState();
 
         try {
             // FASE 1: BETTING (0s - 10s)
@@ -350,7 +370,13 @@ class BusGameLoop {
 
             } else {
                 // No hay ganadores (todos perdieron): Rollover
-                this.accumulatedPot += roundPool;
+                    this.accumulatedPot += roundPool;
+                    // Persistir accumulatedPot en Redis
+                    try {
+                        await redisClient.set(`bus:${this.room.id}:accumulatedPot`, this.accumulatedPot.toString());
+                    } catch (err) {
+                        console.error('[REDIS] Error guardando accumulatedPot:', err);
+                    }
                 this.rolloverCount++;
 
                 console.log(`🔄 [ROLLOVER] Sin ganadores. Pozo acumulado: $${this.accumulatedPot.toFixed(2)} (Racha: ${this.rolloverCount})`);

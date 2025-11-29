@@ -203,11 +203,12 @@
             border: 1px solid #00fff9;
             box-shadow: 0 0 50px rgba(0, 255, 249, 0.15);
             overflow-y: auto;
-            transform: scale(0.9);
+            transform: translateY(100vh);
             opacity: 0;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             padding: 0;
             position: relative;
+            backdrop-filter: blur(10px);
         }
 
         /* Decoración Panel */
@@ -219,10 +220,11 @@
             width: 100%;
             height: 4px;
             background: linear-gradient(90deg, #00fff9, #ff00c1);
+            box-shadow: 0 0 10px rgba(0, 255, 249, 0.5);
         }
 
         #profile-overlay.active #profile-panel {
-            transform: scale(1);
+            transform: translateY(0);
             opacity: 1;
         }
 
@@ -379,11 +381,49 @@
             text-transform: uppercase;
         }
 
+        /* Visualización con corazones */
+        .integrity-hearts {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin: 15px 0;
+            font-size: 2rem;
+        }
+
+        .heart-icon {
+            color: #ff0055;
+            text-shadow: 0 0 10px rgba(255, 0, 85, 0.6);
+            transition: all 0.3s;
+            animation: heartbeat 1.5s infinite;
+        }
+
+        .heart-icon.empty {
+            color: #333;
+            text-shadow: none;
+            animation: none;
+        }
+
+        @keyframes heartbeat {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* Barra de Integridad (alternativa/respaldo) */
         .integrity-bar {
-            height: 6px;
+            height: 8px;
             background: #111;
             display: flex;
             gap: 2px;
+            border-radius: 2px;
+            overflow: hidden;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
         }
 
         .integrity-segment {
@@ -464,9 +504,10 @@
             position: relative;
         }
 
-        .skin-card:hover {
+        .skin-card:hover:not(.burned) {
             border-color: #00fff9;
             background: rgba(0, 255, 249, 0.05);
+            transform: translateY(-2px);
         }
 
         .skin-card.active {
@@ -485,6 +526,37 @@
             box-shadow: 0 0 10px #ff00c1;
         }
 
+        /* Skins quemadas - estilo gris/deshabilitado */
+        .skin-card.burned {
+            background: rgba(0, 0, 0, 0.5);
+            border-color: #333;
+            cursor: not-allowed;
+            opacity: 0.5;
+            filter: grayscale(1);
+        }
+
+        .skin-card.burned::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            right: 10%;
+            height: 2px;
+            background: #ff0000;
+            transform: translateY(-50%) rotate(-15deg);
+            box-shadow: 0 0 5px #ff0000;
+        }
+
+        .skin-card.burned .skin-icon {
+            color: #555;
+            text-shadow: none;
+        }
+
+        .skin-card.burned .skin-name {
+            text-decoration: line-through;
+            color: #555;
+        }
+
         .skin-icon {
             font-size: 2rem;
             margin-bottom: 10px;
@@ -493,6 +565,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: all 0.3s;
         }
 
         .skin-card.active .skin-icon {
@@ -514,6 +587,7 @@
             color: #888;
             border: 1px solid #333;
             padding: 1px 4px;
+            background: rgba(0, 0, 0, 0.8);
         }
 
         .skin-status {
@@ -532,6 +606,20 @@
 
         .skin-status.burned {
             color: #ff0000;
+            font-weight: bold;
+            animation: pulse-error 2s infinite;
+        }
+
+        @keyframes pulse-error {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         /* Botón Equipar */
@@ -560,7 +648,7 @@
             top: 30px;
             left: 50%;
             transform: translateX(-50%) translateY(-100px);
-            background: #000;
+            background: rgba(0, 0, 0, 0.95);
             border: 1px solid #00fff9;
             color: #00fff9;
             padding: 15px 30px;
@@ -571,6 +659,10 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            backdrop-filter: blur(10px);
+            border-radius: 2px;
+            max-width: 90%;
+            text-align: center;
         }
 
         #toast-notification.show {
@@ -642,9 +734,11 @@
 
         #profile-panel::-webkit-scrollbar-thumb {
             background: #333;
-            padding: 2px 6px;
             border-radius: 2px;
-            text-transform: uppercase;
+        }
+
+        #profile-panel::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
 
         .status-boarding {
@@ -679,6 +773,83 @@
         .join-btn:hover {
             background: #00ff88;
             color: #000;
+        }
+
+        /* ===================================
+           📱 RESPONSIVE DESIGN (MOBILE)
+           =================================== */
+
+        @media (max-width: 768px) {
+            #profile-toggle-btn {
+                bottom: 20px;
+                right: 20px;
+                width: 56px;
+                height: 56px;
+                font-size: 20px;
+            }
+
+            #profile-panel {
+                max-width: 100%;
+                max-height: 95vh;
+                margin: 0 10px;
+            }
+
+            .profile-header h2 {
+                font-size: 1rem;
+            }
+
+            .balance-section {
+                gap: 10px;
+            }
+
+            .balance-amount {
+                font-size: 1.2rem;
+            }
+
+            .inventory-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: 10px;
+            }
+
+            .skin-icon {
+                font-size: 1.5rem;
+                height: 40px;
+            }
+
+            .skin-name {
+                font-size: 0.7rem;
+            }
+
+            .panel-content {
+                padding: 15px;
+            }
+
+            .active-skin-name {
+                font-size: 1rem;
+            }
+
+            .integrity-hearts {
+                font-size: 1.5rem;
+                gap: 5px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #profile-toggle-btn {
+                bottom: 15px;
+                right: 15px;
+                width: 48px;
+                height: 48px;
+                font-size: 18px;
+            }
+
+            .balance-section {
+                grid-template-columns: 1fr;
+            }
+
+            .inventory-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
     </style>
 </head>
@@ -739,6 +910,11 @@
                             <span>Integridad</span>
                             <span id="integrity-text">100/100</span>
                         </div>
+                        <!-- Visualización con corazones -->
+                        <div class="integrity-hearts" id="integrity-hearts">
+                            <!-- Corazones generados por JS -->
+                        </div>
+                        <!-- Barra de progreso alternativa -->
                         <div class="integrity-bar" id="integrity-bar-visual">
                             <!-- Segmentos generados por JS -->
                         </div>
@@ -780,7 +956,8 @@
                         <h3>// SURVIVAL MECHANICS</h3>
                         <ul>
                             <li><strong>INTEGRITY:</strong> Your life force. If it hits 0, your Skin is
-                                <strong>BURNED</strong> (NFT destroyed).</li>
+                                <strong>BURNED</strong> (NFT destroyed).
+                            </li>
                             <li><strong>REPAIR:</strong> Use earned <strong>$WICK</strong> tokens to repair your Skin
                                 before it's too late.</li>
                             <li><strong>SKINS:</strong> Higher level skins have more Integrity but cost more to repair.
@@ -805,15 +982,15 @@
 
     <!-- 🧠 LÓGICA DEL CENTRO DE COMANDO -->
     <script>
-                // --- MOCKS PARA EVITAR ERRORES DE REFERENCIA DE BUSES (UI ahora en Phaser) ---
-                // Si la UI de buses ya no se usa en el DOM, estas funciones/elementos pueden ser mocks vacíos
-                function renderBusList(buses) {
-                    // Esta función ya no hace nada porque la selección de bus es in-game
-                    // Puedes implementar aquí un log si quieres depurar
-                    // console.log('[MOCK] renderBusList llamada', buses);
-                }
-                // Mock para evitar error si busModalOverlay no existe
-                const busModalOverlay = { classList: { remove: () => {} } };
+        // --- MOCKS PARA EVITAR ERRORES DE REFERENCIA DE BUSES (UI ahora en Phaser) ---
+        // Si la UI de buses ya no se usa en el DOM, estas funciones/elementos pueden ser mocks vacíos
+        function renderBusList(buses) {
+            // Esta función ya no hace nada porque la selección de bus es in-game
+            // Puedes implementar aquí un log si quieres depurar
+            // console.log('[MOCK] renderBusList llamada', buses);
+        }
+        // Mock para evitar error si busModalOverlay no existe
+        const busModalOverlay = { classList: { remove: () => { } } };
         document.addEventListener('DOMContentLoaded', () => {
             // Referencias DOM
             const toggleBtn = document.getElementById('profile-toggle-btn');
@@ -902,7 +1079,7 @@
                 socket.on('ROOM_JOINED', (data) => {
                     console.log('[UI] Joined Room:', data);
                     busModalOverlay.classList.remove('active');
-                    showToast(`[OK] TICKET CONFIRMED: ${data.roomName}`);
+                    showToast(`[OK] TICKET CONFIRMED: ${data.roomName}`, 'success');
                 });
 
                 // Escuchar actualizaciones de perfil
@@ -914,18 +1091,18 @@
 
                 // Escuchar eventos de reparación
                 socket.on('SKIN_REPAIRED', (data) => {
-                    showToast(`[OK] REPAIR SUCCESSFUL (-${data.cost} WICK)`);
+                    showToast(`✅ REPAIR SUCCESSFUL (-${data.cost} WICK)`, 'success');
                     // USER_PROFILE se actualiza automáticamente
                 });
 
                 // Escuchar eventos de equipamiento
                 socket.on('SKIN_EQUIPPED', (data) => {
-                    showToast(data.message);
+                    showToast(`⚡ ${data.message}`, 'success');
                 });
 
                 // Escuchar errores
                 socket.on('GAME_ERROR', (data) => {
-                    showToast(data.message, true);
+                    showToast(`❌ ${data.message}`, 'error');
                 });
             }
 
@@ -967,6 +1144,27 @@
             }
 
             function renderIntegrityBar(current, max) {
+                // 1. Renderizar corazones (hasta 5 corazones)
+                const heartsContainer = document.getElementById('integrity-hearts');
+                const maxHearts = Math.min(max, 5); // Máximo 5 corazones visuales
+                const healthPerHeart = max / maxHearts;
+                const filledHearts = Math.ceil(current / healthPerHeart);
+
+                heartsContainer.innerHTML = '';
+                for (let i = 0; i < maxHearts; i++) {
+                    const heart = document.createElement('i');
+                    heart.className = 'fa-solid fa-heart heart-icon';
+
+                    if (i >= filledHearts) {
+                        heart.classList.add('empty');
+                        heart.classList.remove('fa-solid');
+                        heart.classList.add('fa-regular');
+                    }
+
+                    heartsContainer.appendChild(heart);
+                }
+
+                // 2. Renderizar barra de segmentos (más detallada)
                 integrityBar.innerHTML = '';
                 const segments = 20; // Más segmentos para look más técnico
                 const healthPerSegment = max / segments;
@@ -1043,11 +1241,36 @@
             }
 
             // --- UTILIDADES ---
-            function showToast(message, isError = false) {
-                const icon = isError ? '<i class="fa-solid fa-triangle-exclamation"></i>' : '<i class="fa-solid fa-circle-info"></i>';
+            function showToast(message, type = 'info') {
+                // Tipos: 'info', 'success', 'error', 'warning'
+                let icon, borderColor, textColor;
+
+                switch (type) {
+                    case 'success':
+                        icon = '<i class="fa-solid fa-circle-check"></i>';
+                        borderColor = '#00ff88';
+                        textColor = '#00ff88';
+                        break;
+                    case 'error':
+                        icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
+                        borderColor = '#ff0000';
+                        textColor = '#ff0000';
+                        break;
+                    case 'warning':
+                        icon = '<i class="fa-solid fa-exclamation-circle"></i>';
+                        borderColor = '#ff9800';
+                        textColor = '#ff9800';
+                        break;
+                    default: // 'info'
+                        icon = '<i class="fa-solid fa-circle-info"></i>';
+                        borderColor = '#00fff9';
+                        textColor = '#00fff9';
+                }
+
                 toast.innerHTML = `${icon} <span>${message}</span>`;
-                toast.style.borderColor = isError ? '#ff0000' : '#00fff9';
-                toast.style.color = isError ? '#ff0000' : '#00fff9';
+                toast.style.borderColor = borderColor;
+                toast.style.color = textColor;
+                toast.style.background = '#000';
 
                 toast.classList.add('show');
                 setTimeout(() => {

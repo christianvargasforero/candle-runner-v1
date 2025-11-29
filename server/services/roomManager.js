@@ -138,7 +138,7 @@ class RoomManager {
     }
 
     /**
-     * Añade un usuario a un bus con validación Gatekeeper
+     * Añade un usuario a un bus con validación Gatekeeper estricta
      * @param {string} socketId - ID del socket del usuario
      * @param {string} roomId - ID del bus
      * @param {function} onBusFull - Callback cuando el bus se llena
@@ -158,18 +158,18 @@ class RoomManager {
         // --- GATEKEEPER VALIDATION ---
         const rules = ROOM_ACCESS_RULES[room.tier] || ROOM_ACCESS_RULES.TRAINING;
 
-        // 1. Validar Nivel de Skin
+        // 1. Prohibido Default si la sala no lo permite
+        if (!rules.allowDefault && user.activeSkin.isDefault) {
+            return { success: false, error: 'Protocol Droid no permitido en este bus.' };
+        }
+
+        // 2. Nivel de skin insuficiente
         const userLevel = user.activeSkin.level || 0;
         if (userLevel < rules.minLevel) {
             return { success: false, error: `Nivel insuficiente. Requiere Nivel ${rules.minLevel}` };
         }
 
-        // 2. Validar Protocol Droid (Anti-Farming)
-        if (!rules.allowDefault && user.activeSkin.isDefault) {
-            return { success: false, error: 'Protocol Droid no permitido en este bus.' };
-        }
-
-        // 3. Validar Saldo Mínimo (Proof of Funds)
+        // 3. Saldo insuficiente para el ticket
         if (user.balanceUSDT < room.ticketPrice) {
             return { success: false, error: `Saldo insuficiente. Ticket: $${room.ticketPrice.toFixed(2)}` };
         }

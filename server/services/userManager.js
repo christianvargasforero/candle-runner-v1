@@ -22,8 +22,10 @@ class UserManager {
             });
         }
 
+        let user;
+
         if (!dbUser) {
-            // Create new user in DB
+            // Crear nuevo usuario en DB
             dbUser = await prisma.user.create({
                 data: {
                     balanceUSDT: 10000, // Testing balance
@@ -40,26 +42,53 @@ class UserManager {
                 include: { skins: true }
             });
             console.log(`👤 [DB] Nuevo usuario creado: ${dbUser.id}`);
+
+            // Instanciar User y persistir skins iniciales
+            user = new User(dbUser.id, socketId);
+            user.balanceUSDT = dbUser.balanceUSDT;
+            user.balanceWICK = dbUser.balanceWICK;
+
+            // Limpiar inventario mock
+            user.inventory = [];
+
+            // Poblar inventario real desde DB
+            for (const dbSkin of dbUser.skins) {
+                const skinModel = new (await import('../models/Skin.js')).default(dbSkin.id, dbSkin.type);
+                skinModel.level = dbSkin.level;
+                skinModel.currentIntegrity = dbSkin.integrity;
+                skinModel.maxIntegrity = dbSkin.maxIntegrity;
+                skinModel.isBurned = dbSkin.isBurned;
+                skinModel.totalInvestment = dbSkin.totalInvestment;
+                user.inventory.push(skinModel);
+            }
+
+            // Asignar skin activa (la primera, o la default)
+            user.activeSkin = user.inventory.find(s => s.isDefault) || user.inventory[0];
+
         } else {
             console.log(`👤 [DB] Usuario recuperado: ${dbUser.id}`);
-        }
 
-        // Create User instance (Session)
-        const user = new User(dbUser.id, socketId);
+            // Instanciar User
+            user = new User(dbUser.id, socketId);
+            user.balanceUSDT = dbUser.balanceUSDT;
+            user.balanceWICK = dbUser.balanceWICK;
 
-        // Sync state from DB
-        user.balanceUSDT = dbUser.balanceUSDT;
-        user.balanceWICK = dbUser.balanceWICK;
+            // Limpiar inventario mock
+            user.inventory = [];
 
-        // Load active skin (logic to pick active skin, for now pick first or default)
-        const activeSkinData = dbUser.skins.find(s => !s.isBurned) || dbUser.skins[0];
-        if (activeSkinData) {
-            user.activeSkin.id = activeSkinData.id;
-            user.activeSkin.type = activeSkinData.type;
-            user.activeSkin.currentIntegrity = activeSkinData.integrity;
-            user.activeSkin.maxIntegrity = activeSkinData.maxIntegrity;
-            user.activeSkin.isBurned = activeSkinData.isBurned;
-            user.activeSkin.totalInvestment = activeSkinData.totalInvestment;
+            // Poblar inventario real desde DB
+            for (const dbSkin of dbUser.skins) {
+                const skinModel = new (await import('../models/Skin.js')).default(dbSkin.id, dbSkin.type);
+                skinModel.level = dbSkin.level;
+                skinModel.currentIntegrity = dbSkin.integrity;
+                skinModel.maxIntegrity = dbSkin.maxIntegrity;
+                skinModel.isBurned = dbSkin.isBurned;
+                skinModel.totalInvestment = dbSkin.totalInvestment;
+                user.inventory.push(skinModel);
+            }
+
+            // Asignar skin activa (la primera no quemada, o la default, o la primera)
+            user.activeSkin = user.inventory.find(s => !s.isBurned) || user.inventory.find(s => s.isDefault) || user.inventory[0];
         }
 
         this.users.set(socketId, user);
