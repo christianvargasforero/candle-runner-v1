@@ -12,6 +12,7 @@ import dotenv from 'dotenv';
 import GameLoop from './services/gameLoop.js';
 import RoomManager from './services/roomManager.js';
 import priceService from './services/priceService.js';
+import StatsService from './services/statsService.js';
 import { userManager } from './services/userManager.js';
 import { REPAIR_COST_BASE, REPAIR_COST_MULTIPLIER } from '../shared/constants.js';
 
@@ -41,6 +42,7 @@ app.use('/shared', express.static(path.join(__dirname, '../shared')));
 // Inicializar servicios
 const roomManager = new RoomManager();
 const gameLoop = new GameLoop(io);
+const statsService = new StatsService(gameLoop, roomManager);
 
 // ============================================
 // 📡 API REST - ENDPOINTS
@@ -90,10 +92,10 @@ httpServer.listen(PORT, () => {
     // Iniciar Price Service (Oráculo)
     priceService.start();
 
-    // --- ADMIN DASHBOARD STATS ---
+    // --- ADMIN METRICS LOOP ---
     setInterval(() => {
-        const stats = gameLoop.getAdminStats(roomManager);
-        io.emit('ADMIN_STATS', stats);
+        const metrics = statsService.getGlobalStats();
+        io.to('admin_channel').emit('ADMIN_METRICS', metrics);
     }, 1000);
 
     // Iniciar Game Loop
@@ -110,8 +112,18 @@ io.on('connection', async (socket) => {
 
     // 🛡️ ADMIN CONNECTION
     if (clientType === 'admin') {
-        socket.join('admin_room');
-        console.log(`🛡️ [ADMIN] Conectado: ${socket.id}`);
+        console.log(`🛡️ [ADMIN] Conectado (Esperando Auth): ${socket.id}`);
+
+        socket.on('ADMIN_SUBSCRIBE', (key) => {
+            if (key === 'admin_secret') {
+                socket.join('admin_channel');
+                console.log(`🛡️ [ADMIN] Autenticado: ${socket.id}`);
+                socket.emit('ADMIN_AUTH_SUCCESS');
+            } else {
+                console.log(`⛔ [ADMIN] Fallo de Auth: ${socket.id}`);
+                socket.disconnect();
+            }
+        });
         return;
     }
 
