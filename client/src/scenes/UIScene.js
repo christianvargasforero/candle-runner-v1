@@ -175,6 +175,14 @@ export default class UIScene extends Phaser.Scene {
             console.error('❌ [ERROR]', data);
             this.showFloatingText(data.message, '#ff0000');
         });
+
+        // Evento: Retiro exitoso
+        this.socket.on('WITHDRAW_SUCCESS', (data) => {
+            console.log('💰 [WITHDRAW]', data);
+            this.balance = 0;
+            this.updateBalanceDisplay();
+            this.showFloatingText(`✅ Retiro: $${data.amount.toFixed(2)}`, '#00ff88');
+        });
     }
 
     createBalanceDisplay() {
@@ -193,6 +201,30 @@ export default class UIScene extends Phaser.Scene {
             fill: '#00ffff'
         });
         this.wickText.setOrigin(1, 0);
+
+        // Botón de Retiro
+        this.withdrawBtn = this.add.text(x, y + 55, '💰 RETIRAR', {
+            font: 'bold 14px Courier New',
+            fill: '#FFD700',
+            backgroundColor: '#1a4d2e',
+            padding: { x: 10, y: 5 }
+        });
+        this.withdrawBtn.setOrigin(1, 0);
+        this.withdrawBtn.setInteractive({ useHandCursor: true });
+
+        this.withdrawBtn.on('pointerdown', () => {
+            this.handleWithdraw();
+        });
+
+        this.withdrawBtn.on('pointerover', () => {
+            this.withdrawBtn.setScale(1.05);
+            this.withdrawBtn.setStyle({ backgroundColor: '#2d6a4f' });
+        });
+
+        this.withdrawBtn.on('pointerout', () => {
+            this.withdrawBtn.setScale(1);
+            this.withdrawBtn.setStyle({ backgroundColor: '#1a4d2e' });
+        });
     }
 
     updateBalanceDisplay() {
@@ -542,6 +574,62 @@ export default class UIScene extends Phaser.Scene {
             this.integrityBar.setFillStyle(0x00ffff);
             this.repairBtn.setAlpha(0.5); // No necesita reparación
         }
+    }
+
+    handleWithdraw() {
+        if (this.balance <= 0) {
+            this.showFloatingText('Sin saldo para retirar', '#ff0000');
+            return;
+        }
+
+        // Mostrar confirmación
+        const confirmText = this.add.text(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2,
+            `¿Retirar $${this.balance.toFixed(2)}?\n\nClick para confirmar`,
+            {
+                font: 'bold 24px Courier New',
+                fill: '#FFD700',
+                backgroundColor: '#000000',
+                padding: { x: 20, y: 15 },
+                align: 'center'
+            }
+        ).setOrigin(0.5);
+
+        confirmText.setInteractive({ useHandCursor: true });
+        confirmText.setDepth(1000);
+
+        // Fondo oscuro
+        const overlay = this.add.rectangle(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2,
+            this.cameras.main.width,
+            this.cameras.main.height,
+            0x000000,
+            0.7
+        );
+        overlay.setDepth(999);
+        overlay.setInteractive();
+
+        // Confirmar retiro
+        confirmText.on('pointerdown', () => {
+            this.socket.emit('WITHDRAW', { amount: this.balance });
+            overlay.destroy();
+            confirmText.destroy();
+            this.showFloatingText('Retiro solicitado...', '#00ff88');
+        });
+
+        // Cancelar al hacer clic en el overlay
+        overlay.on('pointerdown', () => {
+            overlay.destroy();
+            confirmText.destroy();
+        });
+
+        // Auto-cerrar después de 5 segundos
+        this.time.delayedCall(5000, () => {
+            if (overlay.active) overlay.destroy();
+            if (confirmText.active) confirmText.destroy();
+        });
     }
 
     createSettingsButton() {

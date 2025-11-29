@@ -132,6 +132,35 @@ io.on('connection', async (socket) => {
         socket.emit('USER_PROFILE', user.getProfile());
     });
 
+    // Evento: Retiro de fondos
+    socket.on('WITHDRAW', async (data) => {
+        const user = userManager.getUser(socket.id);
+        if (!user) return;
+
+        const { amount } = data;
+
+        // Validar monto
+        if (amount <= 0 || amount > user.balanceUSDT) {
+            socket.emit('GAME_ERROR', { message: 'Monto de retiro inválido' });
+            return;
+        }
+
+        // Procesar retiro (en producción, aquí iría la lógica de blockchain/payment)
+        if (await user.withdraw(amount, 'WITHDRAWAL')) {
+            console.log(`💰 [WITHDRAW] Usuario ${user.id} retiró $${amount}`);
+
+            socket.emit('WITHDRAW_SUCCESS', {
+                amount: amount,
+                newBalance: user.balanceUSDT
+            });
+
+            // Actualizar perfil
+            socket.emit('USER_PROFILE', user.getProfile());
+        } else {
+            socket.emit('GAME_ERROR', { message: 'Error al procesar retiro' });
+        }
+    });
+
     // Evento: Desconexión
     socket.on('disconnect', () => {
         console.log(`❌ [SOCKET] Cliente desconectado: ${socket.id}`);
