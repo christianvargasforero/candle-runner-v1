@@ -35,6 +35,7 @@ const io = new Server(httpServer, {
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client')));
+app.use('/shared', express.static(path.join(__dirname, '../shared')));
 
 // Inicializar servicios
 const roomManager = new RoomManager();
