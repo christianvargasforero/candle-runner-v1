@@ -326,8 +326,8 @@
         socket.on('ADMIN_METRICS', (data) => {
             // KPIs
             els.users.innerText = data.onlineUsers;
-            els.pot.innerText = `$${data.totalPot.toFixed(2)}`;
-            els.fee.innerText = `$${data.houseFeeSession.toFixed(2)}`;
+            els.pot.innerText = `$${(data.totalPot || 0).toFixed(2)}`;
+            els.fee.innerText = `$${(data.houseFeeSession || 0).toFixed(2)}`;
             if (data.price) els.price.innerText = `$${data.price.toFixed(2)}`;
 
             // Round Info

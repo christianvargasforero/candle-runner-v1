@@ -14,8 +14,8 @@ class StatsService {
         return {
             onlineUsers: this.roomManager.getTotalPlayers(),
             activeRound: gameState.roundNumber,
-            currentPhase: gameState.phase,
-            totalPot: gameState.totalPool + (this.gameLoop.accumulatedPot || 0),
+            currentPhase: gameState.state,
+            totalPot: (gameState.currentRound ? gameState.currentRound.totalPool : 0) + (this.gameLoop.accumulatedPot || 0),
             houseFeeSession: this.gameLoop.stats ? this.gameLoop.stats.revenue : 0,
 
             // Extra data for UI
