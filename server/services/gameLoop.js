@@ -338,14 +338,27 @@ class GameLoop {
         }
 
         // Notificar a perdedores
+        // Notificar a perdedores y aplicar daño a la Integridad
         const losers = this.currentRound.bets.filter(bet => bet.direction !== result && result !== 'DRAW');
         losers.forEach(bet => {
             const user = userManager.getUser(bet.socketId);
             if (user) {
+                // Aplicar daño a la skin (10 puntos base)
+                const burned = user.activeSkin.takeDamage(10);
+
+                if (burned) {
+                    console.log(`🔥 [BURN] Skin de usuario ${user.id} ha sido destruida!`);
+                }
+
                 this.io.to(bet.socketId).emit('BET_RESULT', {
                     won: false,
                     amount: 0,
-                    balance: user.balanceUSDT
+                    balance: user.balanceUSDT,
+                    skinUpdate: {
+                        integrity: user.activeSkin.currentIntegrity,
+                        maxIntegrity: user.activeSkin.maxIntegrity,
+                        isBurned: user.activeSkin.isBurned
+                    }
                 });
             }
         });

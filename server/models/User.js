@@ -1,3 +1,5 @@
+import Skin from './Skin.js';
+
 /**
  * User Model
  * Represents a connected user with their balances and state.
@@ -7,8 +9,11 @@ export default class User {
         this.id = id;
         this.socketId = socketId;
         this.balanceUSDT = 1000; // Demo balance
-        this.balanceWICK = 0;
-        this.activeSkinId = 'protocol_droid';
+        this.balanceWICK = 100;  // Demo WICK for repairs
+
+        // Skin activa (por defecto Protocol Droid)
+        this.activeSkin = new Skin('default_droid', 'PROTOCOL_DROID');
+
         this.createdAt = Date.now();
     }
 
@@ -47,7 +52,14 @@ export default class User {
         return {
             id: this.id,
             balanceUSDT: this.balanceUSDT,
-            activeSkinId: this.activeSkinId
+            balanceWICK: this.balanceWICK,
+            activeSkin: {
+                type: this.activeSkin.type,
+                name: this.activeSkin.name,
+                integrity: this.activeSkin.currentIntegrity,
+                maxIntegrity: this.activeSkin.maxIntegrity,
+                isBurned: this.activeSkin.isBurned
+            }
         };
     }
 }

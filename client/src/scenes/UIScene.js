@@ -17,7 +17,12 @@ export default class UIScene extends Phaser.Scene {
         this.balance = 0;
         this.selectedAmount = 10;
         this.currentBet = null; // { amount, direction }
+        this.currentBet = null; // { amount, direction }
         this.canBet = false;
+
+        // Estado de Skin
+        this.skinIntegrity = 100;
+        this.maxIntegrity = 100;
     }
 
     create() {
@@ -34,6 +39,8 @@ export default class UIScene extends Phaser.Scene {
         this.createBalanceDisplay();
         this.createTimer();
         this.createBettingPanel();
+        this.createBettingPanel();
+        this.createIntegrityBar();
         this.createLogo();
 
         // Botón de Settings (Placeholder)
@@ -61,6 +68,12 @@ export default class UIScene extends Phaser.Scene {
             console.log('👤 [PROFILE]', data);
             this.balance = data.balanceUSDT;
             this.updateBalanceDisplay();
+
+            if (data.activeSkin) {
+                this.skinIntegrity = data.activeSkin.integrity;
+                this.maxIntegrity = data.activeSkin.maxIntegrity;
+                this.updateIntegrityBar();
+            }
         });
 
         // Evento: Estado del juego
@@ -127,6 +140,14 @@ export default class UIScene extends Phaser.Scene {
                 this.showFloatingText(`+$${data.amount.toFixed(2)}`, '#00ff00');
             } else if (data.refund) {
                 this.showFloatingText(`REFUND $${data.amount.toFixed(2)}`, '#ffd700');
+            }
+
+            if (data.skinUpdate) {
+                this.skinIntegrity = data.skinUpdate.integrity;
+                this.updateIntegrityBar();
+                if (data.skinUpdate.isBurned) {
+                    this.showFloatingText('🔥 SKIN BURNED!', '#ff0000');
+                }
             }
         });
 
@@ -425,6 +446,41 @@ export default class UIScene extends Phaser.Scene {
     createLogo() {
         this.logoText = this.add.text(20, this.cameras.main.height - 20, '🕯️ CANDLE RUNNER', { font: 'bold 16px Courier New', fill: '#00ff88', stroke: '#000000', strokeThickness: 3 }).setOrigin(0, 1);
         this.versionText = this.add.text(20, this.cameras.main.height - 5, 'v1.1 - Fase 4', { font: '10px Courier New', fill: '#555555' }).setOrigin(0, 1);
+    }
+
+    createIntegrityBar() {
+        const x = 20;
+        const y = 100;
+
+        // Etiqueta
+        this.add.text(x, y - 20, '🛡️ INTEGRIDAD', {
+            font: '12px Courier New',
+            fill: '#888888'
+        });
+
+        // Fondo
+        this.integrityBg = this.add.rectangle(x, y, 200, 10, 0x333333);
+        this.integrityBg.setOrigin(0, 0);
+
+        // Barra
+        this.integrityBar = this.add.rectangle(x, y, 200, 10, 0x00ffff);
+        this.integrityBar.setOrigin(0, 0);
+    }
+
+    updateIntegrityBar() {
+        if (this.maxIntegrity <= 0) return; // Evitar división por cero
+
+        const percent = Math.max(0, this.skinIntegrity / this.maxIntegrity);
+        this.integrityBar.width = 200 * percent;
+
+        // Color según daño
+        if (percent < 0.3) {
+            this.integrityBar.setFillStyle(0xff0000);
+        } else if (percent < 0.6) {
+            this.integrityBar.setFillStyle(0xffd700);
+        } else {
+            this.integrityBar.setFillStyle(0x00ffff);
+        }
     }
 
     createSettingsButton() {
