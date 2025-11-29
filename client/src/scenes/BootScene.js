@@ -46,13 +46,10 @@ export default class BootScene extends Phaser.Scene {
         particleGraphics.fillCircle(4, 4, 4);
         particleGraphics.generateTexture('particleTexture', 8, 8);
 
-        console.log('✅ [BOOT] Texturas generadas. Iniciando juego...');
+        console.log('✅ [BOOT] Texturas generadas. Iniciando menú...');
 
-        // Iniciar la escena principal del juego
-        this.scene.start('GameScene');
-
-        // Iniciar la escena de UI en paralelo
-        this.scene.launch('UIScene');
+        // Iniciar la escena de menú
+        this.scene.start('MenuScene');
     }
 
     createLoadingBar() {

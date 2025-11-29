@@ -9,8 +9,8 @@ export default class User {
     constructor(id, socketId) {
         this.id = id;
         this.socketId = socketId;
-        this.balanceUSDT = 1000; // Demo balance
-        this.balanceWICK = 100;  // Demo WICK for repairs
+        this.balanceUSDT = 10000; // Demo balance (Testing)
+        this.balanceWICK = 500;   // Demo WICK for repairs (Testing)
 
         // Skin activa (por defecto Protocol Droid)
         this.activeSkin = new Skin('default_droid', 'PROTOCOL_DROID');

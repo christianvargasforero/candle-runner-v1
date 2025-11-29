@@ -26,8 +26,8 @@ class UserManager {
             // Create new user in DB
             dbUser = await prisma.user.create({
                 data: {
-                    balanceUSDT: 1000,
-                    balanceWICK: 0,
+                    balanceUSDT: 10000, // Testing balance
+                    balanceWICK: 500,   // Testing WICK
                     skins: {
                         create: {
                             type: 'PROTOCOL_DROID',
