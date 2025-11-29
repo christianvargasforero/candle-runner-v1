@@ -20,7 +20,33 @@ export default class BootScene extends Phaser.Scene {
     }
 
     create() {
-        console.log('✅ [BOOT] Assets cargados. Iniciando juego...');
+        console.log('✅ [BOOT] Assets cargados. Generando texturas...');
+
+        // Generar textura para el JUGADOR (Sprite)
+        const playerGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        playerGraphics.fillStyle(0x00ff88, 1);
+        playerGraphics.fillRect(0, 0, 40, 60);
+        // Ojo: un pequeño detalle para saber frente
+        playerGraphics.fillStyle(0x000000, 1);
+        playerGraphics.fillRect(25, 10, 10, 10); // Ojo
+        playerGraphics.generateTexture('playerTexture', 40, 60);
+
+        // Generar textura para el SUELO (TileSprite)
+        const groundGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        groundGraphics.fillStyle(0x1a1a2e, 1);
+        groundGraphics.fillRect(0, 0, 64, 64);
+        // Detalles del suelo (líneas de grid)
+        groundGraphics.lineStyle(2, 0x00ff88, 0.3);
+        groundGraphics.strokeRect(0, 0, 64, 64);
+        groundGraphics.generateTexture('groundTexture', 64, 64);
+
+        // Generar textura para PARTÍCULAS (Dust)
+        const particleGraphics = this.make.graphics({ x: 0, y: 0, add: false });
+        particleGraphics.fillStyle(0xffffff, 1);
+        particleGraphics.fillCircle(4, 4, 4);
+        particleGraphics.generateTexture('particleTexture', 8, 8);
+
+        console.log('✅ [BOOT] Texturas generadas. Iniciando juego...');
 
         // Iniciar la escena principal del juego
         this.scene.start('GameScene');

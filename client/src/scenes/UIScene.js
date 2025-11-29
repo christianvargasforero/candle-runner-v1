@@ -28,8 +28,36 @@ export default class UIScene extends Phaser.Scene {
         this.createTimer();
         this.createLogo();
 
+        // Botón de Settings (Placeholder)
+        this.createSettingsButton();
+
         // Actualizar temporizador cada frame
         this.events.on('update', this.updateLocalTimer, this);
+    }
+
+    createSettingsButton() {
+        const x = 30;
+        const y = this.cameras.main.height - 30;
+
+        this.settingsBtn = this.add.text(x, y, '⚙️', {
+            font: '24px Arial',
+            fill: '#ffffff'
+        });
+        this.settingsBtn.setOrigin(0, 1);
+        this.settingsBtn.setInteractive({ useHandCursor: true });
+
+        this.settingsBtn.on('pointerover', () => {
+            this.settingsBtn.setScale(1.2);
+        });
+
+        this.settingsBtn.on('pointerout', () => {
+            this.settingsBtn.setScale(1);
+        });
+
+        this.settingsBtn.on('pointerdown', () => {
+            console.log('⚙️ Settings clicked');
+            // Futuro: Abrir modal de configuración
+        });
     }
 
     setupSocketListeners() {
@@ -198,14 +226,20 @@ export default class UIScene extends Phaser.Scene {
                 this.timerText.setColor('#ff0000');
                 this.timerBackground.setStrokeStyle(2, 0xff0000);
                 this.progressBar.setFillStyle(0xff0000);
-            } else if (this.timeLeft <= 5000) {
-                this.timerText.setColor('#ffd700');
-                this.timerBackground.setStrokeStyle(2, 0xffd700);
-                this.progressBar.setFillStyle(0xffd700);
+
+                // Efecto de parpadeo (urgencia)
+                this.timerText.setVisible(Math.floor(Date.now() / 100) % 2 === 0);
             } else {
-                this.timerText.setColor('#00ff88');
-                this.timerBackground.setStrokeStyle(2, 0x00ff88);
-                this.progressBar.setFillStyle(0x00ff88);
+                this.timerText.setVisible(true);
+                if (this.timeLeft <= 5000) {
+                    this.timerText.setColor('#ffd700');
+                    this.timerBackground.setStrokeStyle(2, 0xffd700);
+                    this.progressBar.setFillStyle(0xffd700);
+                } else {
+                    this.timerText.setColor('#00ff88');
+                    this.timerBackground.setStrokeStyle(2, 0x00ff88);
+                    this.progressBar.setFillStyle(0x00ff88);
+                }
             }
 
             // Actualizar barra de progreso
@@ -227,13 +261,17 @@ export default class UIScene extends Phaser.Scene {
                 const seconds = (remaining / 1000).toFixed(1);
                 this.timerText.setText(`${seconds}s`);
 
-                // Actualizar color
+                // Actualizar color y efectos
                 if (remaining <= 3000) {
                     this.timerText.setColor('#ff0000');
-                } else if (remaining <= 5000) {
-                    this.timerText.setColor('#ffd700');
+                    this.timerText.setVisible(Math.floor(Date.now() / 100) % 2 === 0);
                 } else {
-                    this.timerText.setColor('#00ff88');
+                    this.timerText.setVisible(true);
+                    if (remaining <= 5000) {
+                        this.timerText.setColor('#ffd700');
+                    } else {
+                        this.timerText.setColor('#00ff88');
+                    }
                 }
 
                 // Actualizar barra de progreso
