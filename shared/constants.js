@@ -33,7 +33,8 @@ export const DEFAULT_SKIN = {
   integrity: Infinity, // Nunca se quema
   level: 0,
   isDefault: true,
-  allowedRooms: ['TRAINING', 'SATOSHI']
+  allowedRooms: ['TRAINING', 'SATOSHI'],
+  MAX_BET: 0.10 // Límite de apuesta para evitar farming masivo
 };
 
 // 🏛️ REGLAS DE ACCESO A SALAS

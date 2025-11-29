@@ -8,7 +8,8 @@ import {
     PHASE_RESOLVE_TIME,
     GAME_STATES,
     INTEGRITY_LOSS_PER_DEFEAT,
-    ASH_INSURANCE_RATIO
+    ASH_INSURANCE_RATIO,
+    DEFAULT_SKIN
 } from '../../shared/constants.js';
 
 import priceService from './priceService.js';
@@ -468,6 +469,11 @@ class GameLoop {
         // 2.1 Validar Integridad de Skin (Zombie Skin Check)
         if (user.activeSkin.isBurned) {
             return { success: false, error: 'Skin destruida. Repara o cambia a Droid.' };
+        }
+
+        // 2.2 Restricciones Protocol Droid (Anti-Farming)
+        if (user.activeSkin.type === 'PROTOCOL_DROID' && amount > DEFAULT_SKIN.MAX_BET) {
+            return { success: false, error: `Protocol Droid limitado a $${DEFAULT_SKIN.MAX_BET} por apuesta.` };
         }
 
         // 3. Validar Saldo

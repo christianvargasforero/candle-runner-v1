@@ -56,8 +56,13 @@ io.on('connection', async (socket) => {
     // Añadir usuario a la sala principal por defecto
     const mainRoom = Array.from(roomManager.rooms.values())[0];
     if (mainRoom) {
-        roomManager.addUserToRoom(socket.id, mainRoom.id);
-        socket.join(mainRoom.id);
+        const result = await roomManager.addUserToRoom(socket.id, mainRoom.id);
+        if (result.success) {
+            socket.join(mainRoom.id);
+        } else {
+            socket.emit('GAME_ERROR', { message: `Acceso denegado: ${result.error}` });
+            // Desconectar o dejar en limbo? Dejamos conectado pero sin sala.
+        }
     }
 
     // Enviar estado inicial
