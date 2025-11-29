@@ -43,11 +43,80 @@ const roomManager = new RoomManager();
 const gameLoop = new GameLoop(io);
 
 // ============================================
+// 📡 API REST - ENDPOINTS
+// ============================================
+
+// Health check
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        timestamp: Date.now(),
+        gameState: gameLoop.getState(),
+        rooms: roomManager.getRoomsInfo()
+    });
+});
+
+// Obtener estado del juego
+app.get('/api/game/state', (req, res) => {
+    res.json(gameLoop.getState());
+});
+
+// Obtener información de salas
+app.get('/api/rooms', (req, res) => {
+    res.json(roomManager.getRoomsInfo());
+});
+
+
+// ============================================
+// 🚀 INICIO DEL SERVIDOR
+// ============================================
+
+httpServer.listen(PORT, () => {
+    console.log('\n');
+    console.log('╔════════════════════════════════════════════════════════════╗');
+    console.log('║                                                            ║');
+    console.log('║           🕯️  CANDLE RUNNER PROTOCOL v1.0 🕯️              ║');
+    console.log('║                                                            ║');
+    console.log('║              Survival Trading & Creative Economy           ║');
+    console.log('║                                                            ║');
+    console.log('╚════════════════════════════════════════════════════════════╝');
+    console.log('\n');
+    console.log(`🌐 Servidor HTTP escuchando en puerto ${PORT}`);
+    console.log(`🔌 WebSocket Server activo`);
+    console.log(`📊 Dashboard: http://localhost:${PORT}`);
+    console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
+    console.log('\n');
+
+    // Iniciar Price Service (Oráculo)
+    priceService.start();
+
+    // --- ADMIN DASHBOARD STATS ---
+    setInterval(() => {
+        const stats = gameLoop.getAdminStats(roomManager);
+        io.emit('ADMIN_STATS', stats);
+    }, 1000);
+
+    // Iniciar Game Loop
+    gameLoop.start();
+});
+
+// ============================================
 // 🔌 SOCKET.IO - GESTIÓN DE CONEXIONES
 // ============================================
 
+// Socket Connection Logic
 io.on('connection', async (socket) => {
-    console.log(`\n🔌 [SOCKET] Cliente conectado: ${socket.id}`);
+    const clientType = socket.handshake.query.type;
+
+    // 🛡️ ADMIN CONNECTION
+    if (clientType === 'admin') {
+        socket.join('admin_room');
+        console.log(`🛡️ [ADMIN] Conectado: ${socket.id}`);
+        return;
+    }
+
+    // 👤 PLAYER CONNECTION
+    console.log(`👤 [PLAYER] Conectado: ${socket.id}`);
 
     // Recuperar ID de usuario si existe (Persistencia)
     const userId = socket.handshake.auth.userId;
@@ -129,14 +198,18 @@ io.on('connection', async (socket) => {
 
             console.log(`🔧 [REPAIR] Usuario ${user.id} reparó su skin por ${totalCost} $WICK`);
 
+            // Notificar éxito y actualización
             socket.emit('SKIN_UPDATE', {
                 integrity: skin.currentIntegrity,
                 maxIntegrity: skin.maxIntegrity,
                 isBurned: skin.isBurned
             });
 
-            // Actualizar perfil completo también
-            socket.emit('USER_PROFILE', user.getProfile());
+            socket.emit('BALANCE_UPDATE', {
+                balanceUSDT: user.balanceUSDT,
+                balanceWICK: user.balanceWICK
+            });
+
         } else {
             socket.emit('GAME_ERROR', { message: 'Error al procesar la reparación' });
         }
@@ -159,15 +232,14 @@ io.on('connection', async (socket) => {
         if (await user.withdraw(amount, 'WITHDRAWAL')) {
             console.log(`💰 [WITHDRAW] Usuario ${user.id} retiró $${amount}`);
 
+            // Notificar éxito
             socket.emit('WITHDRAW_SUCCESS', {
                 amount: amount,
-                newBalance: user.balanceUSDT
+                balance: user.balanceUSDT,
+                transactionId: `TX-${Date.now()}`
             });
-
-            // Actualizar perfil
-            socket.emit('USER_PROFILE', user.getProfile());
         } else {
-            socket.emit('GAME_ERROR', { message: 'Error al procesar retiro' });
+            socket.emit('GAME_ERROR', { message: 'Error al procesar el retiro' });
         }
     });
 
@@ -178,9 +250,7 @@ io.on('connection', async (socket) => {
 
     // Evento: Desconexión
     socket.on('disconnect', () => {
-        console.log(`❌ [SOCKET] Cliente desconectado: ${socket.id}`);
-
-        // Remover usuario
+        console.log(`🔌 [DISCONNECT] Cliente desconectado: ${socket.id}`);
         userManager.removeUser(socket.id);
 
         // Remover de todas las salas

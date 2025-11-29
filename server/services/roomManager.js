@@ -199,6 +199,19 @@ class RoomManager {
     getRoom(roomId) {
         return this.rooms.get(roomId);
     }
+
+    /**
+     * Obtiene el total de jugadores únicos en todas las salas
+     */
+    getTotalPlayers() {
+        const uniqueUsers = new Set();
+        for (const room of this.rooms.values()) {
+            for (const userId of room.users) {
+                uniqueUsers.add(userId);
+            }
+        }
+        return uniqueUsers.size;
+    }
 }
 
 export default RoomManager;

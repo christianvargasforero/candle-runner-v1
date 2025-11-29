@@ -298,7 +298,10 @@
 
         // Connect Socket
         const socket = io({
-            query: { key: key }
+            query: {
+                key: key,
+                type: 'admin'
+            }
         });
 
         // DOM Elements

@@ -526,7 +526,7 @@ class GameLoop {
     /**
      * Obtiene estadísticas consolidadas para el Admin Dashboard
      */
-    getAdminStats() {
+    getAdminStats(roomManager) {
         // Count long/short bets
         const longBets = this.currentRound.bets.filter(b => b.direction === 'LONG').length;
         const shortBets = this.currentRound.bets.filter(b => b.direction === 'SHORT').length;
@@ -542,7 +542,7 @@ class GameLoop {
 
         return {
             financials: this.stats,
-            usersCount: userManager.users.size,
+            usersCount: roomManager ? roomManager.getTotalPlayers() : userManager.users.size,
             round: {
                 number: this.roundNumber,
                 state: this.currentState,
