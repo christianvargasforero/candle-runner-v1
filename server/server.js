@@ -73,11 +73,11 @@ io.on('connection', async (socket) => {
     socket.emit('USER_PROFILE', user.getProfile());
 
     // Evento: Realizar apuesta
-    socket.on('PLACE_BET', (data) => {
+    socket.on('PLACE_BET', async (data) => {
         const { amount, direction } = data;
 
         // Delegar al GameLoop
-        const result = gameLoop.handleBet(socket.id, amount, direction);
+        const result = await gameLoop.handleBet(socket.id, amount, direction);
 
         if (result.success) {
             // Confirmar apuesta al cliente
@@ -93,7 +93,7 @@ io.on('connection', async (socket) => {
     });
 
     // Evento: Reparar Skin
-    socket.on('REPAIR_SKIN', () => {
+    socket.on('REPAIR_SKIN', async () => {
         const user = userManager.getUser(socket.id);
         if (!user) return;
 
@@ -114,7 +114,7 @@ io.on('connection', async (socket) => {
 
         // Ejecutar reparación
         user.balanceWICK -= cost;
-        skin.repair(damage, cost); // Repara todo el daño
+        await skin.repair(damage, cost); // Repara todo el daño
 
         console.log(`🔧 [REPAIR] Usuario ${user.id} reparó su skin por ${cost} $WICK`);
 
