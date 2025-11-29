@@ -179,24 +179,22 @@ io.on('connection', async (socket) => {
             return;
         }
 
-        // Calcular costo exponencial
-        // Fórmula: Base * (Multiplicador ^ Nivel)
-        const skinLevel = skin.level || 1;
-        const costPerPoint = Math.floor(REPAIR_COST_BASE * Math.pow(REPAIR_COST_MULTIPLIER, skinLevel));
+        // Calcular costo exponencial (Flat Fee por reparación completa)
+        // Fórmula: 50 * (1.618 ^ Nivel)
+        const cost = Math.floor(50 * Math.pow(1.618, skin.level || 1));
         const damage = skin.maxIntegrity - skin.currentIntegrity;
-        const totalCost = damage * costPerPoint;
 
         // Verificar saldo WICK
-        if (!user.hasBalance(totalCost, 'WICK')) {
-            socket.emit('GAME_ERROR', { message: `Faltan $WICK. Costo: ${totalCost}, Tienes: ${user.balanceWICK}` });
+        if (!user.hasBalance(cost, 'WICK')) {
+            socket.emit('GAME_ERROR', { message: `Faltan $WICK. Costo: ${cost}, Tienes: ${user.balanceWICK}` });
             return;
         }
 
         // Ejecutar reparación (Transacción atómica)
-        if (await user.withdraw(totalCost, 'REPAIR', 'WICK')) {
+        if (await user.withdraw(cost, 'REPAIR', 'WICK')) {
             await skin.repair(damage);
 
-            console.log(`🔧 [REPAIR] Usuario ${user.id} reparó su skin por ${totalCost} $WICK`);
+            console.log(`🔧 [REPAIR] Usuario ${user.id} reparó su skin por ${cost} $WICK`);
 
             // Notificar éxito y actualización
             socket.emit('SKIN_UPDATE', {
