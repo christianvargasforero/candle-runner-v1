@@ -230,10 +230,13 @@ export default class GameScene extends Phaser.Scene {
     }
 
     createPlayer() {
-        // Colocar jugador sobre la vela inicial (con margen de seguridad)
+        // 🛡️ POSICIONAMIENTO INICIAL SEGURO - Evitar caída al vacío
+        const safeX = this.currentCandle ? this.currentCandle.x : 200;
+        const safeY = this.currentCandle ? this.currentCandle.y - 60 : 300;
+
         this.player = this.physics.add.sprite(
-            this.currentCandle.x,
-            this.currentCandle.y - 60, // Más arriba para asegurar colisión
+            safeX,
+            safeY,
             'playerTexture'
         );
 
@@ -270,7 +273,7 @@ export default class GameScene extends Phaser.Scene {
         // Ahora que el jugador existe, seguirlo con la cámara
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
-        console.log(`[PLAYER] Jugador local creado en pos (${this.currentCandle.x}, ${this.currentCandle.y - 60})`);
+        console.log(`[PLAYER] Jugador local creado en pos (${safeX}, ${safeY})`);
     }
 
     // 👥 Añadir un jugador remoto (fantasma)
@@ -358,8 +361,19 @@ export default class GameScene extends Phaser.Scene {
 
     // 🎯 SINCRONIZACIÓN DE VELA - Actualizar vela fantasma con precio en tiempo real
     updateCandleFromPrice(price) {
-        if (!this.nextCandleGhost || !this.currentCandle) return;
-        if (!this.startPrice) return;
+        // 🛡️ GUARDIAS DE SEGURIDAD
+        if (!this.nextCandleGhost) {
+            console.warn('[PRICE_UPDATE] No hay vela fantasma para actualizar');
+            return;
+        }
+        if (!this.currentCandle) {
+            console.warn('[PRICE_UPDATE] No hay vela actual de referencia');
+            return;
+        }
+        if (!this.startPrice || typeof this.startPrice !== 'number') {
+            console.warn('[PRICE_UPDATE] startPrice inválido:', this.startPrice);
+            return;
+        }
 
         // Calcular cambio de precio desde el inicio
         const delta = price - this.startPrice;
@@ -671,7 +685,9 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update() {
-        if (!this.player) return;
+        // 🛡️ GUARDIA DE SEGURIDAD CRÍTICA - Evitar crash si player no existe
+        if (!this.player || !this.player.body) return;
+
         // Detectar caída al vacío
         if (this.player.y > 700) {
             console.log('[GAME OVER] Jugador cayó al vacío');
@@ -679,7 +695,7 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Control manual (testing)
-        if (this.cursors.space.isDown && this.player.body.touching.down) {
+        if (this.cursors && this.cursors.space && this.cursors.space.isDown && this.player.body.touching.down) {
             this.player.setVelocityY(-450);
         }
 

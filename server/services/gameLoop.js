@@ -95,6 +95,17 @@ class BusGameLoop {
         console.log(`   Pozo Total: $${this.room.ticketPrice * this.room.users.size}`);
         console.log(`${'='.repeat(60)}\n`);
 
+        // 👥 EMITIR EVENTO BUS_START con lista de pasajeros confirmados
+        const passengerIds = Array.from(this.room.users.values());
+        for (const socketId of this.room.users.keys()) {
+            this.io.to(socketId).emit('BUS_START', {
+                busId: this.room.id,
+                passengers: passengerIds,
+                ticketPrice: this.room.ticketPrice
+            });
+        }
+        console.log(`👥 [BUS START] Notificados ${passengerIds.length} pasajeros`);
+
         // Iniciar sincronización
         this.startSyncTimer();
         // Recuperar estado persistente (acumulado, etc)
