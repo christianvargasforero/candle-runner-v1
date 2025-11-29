@@ -302,6 +302,13 @@ export default class UIScene extends Phaser.Scene {
         if (!this.canBet) return;
 
         console.log(`Intentando apostar $${this.selectedAmount} a ${direction}`);
+
+        // Comunicar apuesta a GameScene
+        this.registry.events.emit('betPlaced', {
+            direction: direction,
+            amount: this.selectedAmount
+        });
+
         this.socket.emit('PLACE_BET', {
             amount: this.selectedAmount,
             direction: direction

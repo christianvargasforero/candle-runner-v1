@@ -1,5 +1,5 @@
-// 🎮 GAME SCENE - Endless Runner de Plataformas
-// El personaje salta de vela en vela según los resultados de las rondas
+// 🎮 GAME SCENE - Endless Runner con Físicas Reales
+// El jugador REALMENTE salta y puede caer al vacío
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -8,20 +8,32 @@ export default class GameScene extends Phaser.Scene {
         // Estado del juego
         this.gameState = 'WAITING';
         this.roundNumber = 0;
-        this.lastEndPrice = 90000; // Precio inicial de referencia
 
-        // Sistema de plataformas
-        this.candles = [];
-        this.currentCandleIndex = 0;
-        this.nextCandleX = 300; // Posición X de la próxima vela
+        // Precios
+        this.startPrice = null;
+        this.currentPrice = null;
+        this.lastCandlePrice = 90000; // Precio de referencia inicial
+
+        // Sistema de velas
+        this.currentCandle = null;
+        this.nextCandleGhost = null;
+        this.candleHistory = [];
+
+        // Apuesta del jugador
+        this.playerBet = null; // 'LONG' o 'SHORT'
 
         // Configuración visual
-        this.baseY = 400; // Línea base de referencia
-        this.priceToPixelScale = 0.05; // 1 USD = 0.05 pixels de altura
+        this.candleSpacing = 300; // Distancia entre velas
+        this.priceScale = 0.1; // 1 USD = 0.1 pixels
+        this.baseY = 400; // Línea de referencia
     }
 
     create() {
         console.log('🎮 [GAME] Escena principal iniciada');
+
+        // Configurar mundo
+        this.physics.world.setBounds(0, 0, 10000, 700);
+        this.physics.world.setFPS(60);
 
         // Conectar a Socket.io
         this.socket = io();
@@ -29,25 +41,30 @@ export default class GameScene extends Phaser.Scene {
 
         // Crear elementos visuales
         this.createBackground();
-        this.createParallaxParticles();
-        this.createGround();
+        this.createParallaxStars();
 
-        // Crear grupo de plataformas (velas)
-        this.candleGroup = this.physics.add.staticGroup();
+        // Crear grupo de velas (plataformas)
+        this.candles = this.physics.add.staticGroup();
 
-        // Crear primera vela
-        this.spawnNextCandle(this.lastEndPrice, true);
+        // Crear vela inicial (plataforma de inicio)
+        this.createInitialCandle();
 
         // Crear jugador
         this.createPlayer();
-        this.createPhaseIndicator();
 
-        // Configurar cámara para seguir al jugador
+        // UI
+        this.createPhaseIndicator();
+        this.createPriceDisplay();
+
+        // Configurar cámara
         this.cameras.main.setBounds(0, 0, 10000, 700);
-        this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
+        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
         // Controles
         this.cursors = this.input.keyboard.createCursorKeys();
+
+        // Escuchar apuestas desde UIScene
+        this.registry.events.on('betPlaced', this.onBetPlaced, this);
     }
 
     setupSocketListeners() {
@@ -61,10 +78,27 @@ export default class GameScene extends Phaser.Scene {
             this.roundNumber = data.roundNumber;
 
             if (data.startPrice) {
-                this.highlightCurrentCandle();
+                this.startPrice = data.startPrice;
+                this.currentPrice = data.startPrice;
             }
 
             this.updatePhaseVisuals(data.state);
+
+            // Iniciar renderizado de vela fantasma en LOCKED
+            if (data.state === 'LOCKED') {
+                this.startGhostCandleRendering();
+            }
+        });
+
+        this.socket.on('SYNC_TIME', (data) => {
+            // Actualizar precio en tiempo real (simulado por ahora)
+            if (this.gameState === 'LOCKED' && this.startPrice) {
+                // En producción, esto vendría del servidor
+                // Por ahora simulamos fluctuación
+                const fluctuation = Phaser.Math.FloatBetween(-0.001, 0.001);
+                this.currentPrice = this.startPrice * (1 + fluctuation);
+                this.updateGhostCandle();
+            }
         });
 
         this.socket.on('ROUND_RESULT', (data) => {
@@ -78,66 +112,86 @@ export default class GameScene extends Phaser.Scene {
     }
 
     createBackground() {
-        this.backgroundRect = this.add.rectangle(
-            0, 0,
-            10000, 700,
-            0x0a0a0a
-        ).setOrigin(0, 0);
+        // Fondo oscuro expandido
+        this.add.rectangle(5000, 350, 10000, 700, 0x0a0a0a);
 
-        this.phaseOverlay = this.add.rectangle(
-            0, 0,
-            10000, 700,
-            0x000000,
-            0.3
-        ).setOrigin(0, 0);
-        this.phaseOverlay.setScrollFactor(0); // Fixed to camera
+        // Overlay de fase
+        this.phaseOverlay = this.add.rectangle(600, 350, 1200, 700, 0x000000, 0.3);
+        this.phaseOverlay.setScrollFactor(0);
     }
 
-    createParallaxParticles() {
-        this.particles = [];
+    createParallaxStars() {
+        this.stars = [];
         for (let i = 0; i < 100; i++) {
             const x = Phaser.Math.Between(0, 10000);
             const y = Phaser.Math.Between(0, 600);
-            const particle = this.add.image(x, y, 'particleTexture');
-            particle.setAlpha(Phaser.Math.FloatBetween(0.1, 0.5));
-            particle.setScale(Phaser.Math.FloatBetween(0.5, 1.5));
-            particle.setScrollFactor(0.3); // Parallax effect
-            this.particles.push(particle);
+            const star = this.add.circle(x, y, 2, 0xffffff, Phaser.Math.FloatBetween(0.3, 0.8));
+            star.setScrollFactor(0.2);
+            this.stars.push(star);
         }
     }
 
-    createGround() {
-        const width = 10000;
-        this.ground = this.add.tileSprite(
-            width / 2, 650,
-            width, 100,
-            'groundTexture'
-        );
-        this.physics.add.existing(this.ground, true);
+    createInitialCandle() {
+        const x = 200;
+        const y = this.baseY;
+
+        this.currentCandle = this.createCandlePlatform(x, y, this.lastCandlePrice, 0x4CAF50);
+        this.candleHistory.push(this.currentCandle);
+    }
+
+    createCandlePlatform(x, y, price, color = 0x888888) {
+        const width = 120;
+        const height = 30;
+
+        // Crear plataforma física
+        const platform = this.candles.create(x, y, null);
+        platform.setSize(width, height);
+        platform.setVisible(false);
+        platform.refreshBody();
+
+        // Crear visual
+        const container = this.add.container(x, y);
+
+        const body = this.add.rectangle(0, 0, width, height, color);
+        container.add(body);
+
+        const wick = this.add.rectangle(0, -height / 2 - 15, 3, 30, 0xffffff);
+        container.add(wick);
+
+        const priceText = this.add.text(0, -height / 2 - 35, `$${price.toFixed(0)}`, {
+            font: '12px Courier New',
+            fill: '#fff',
+            backgroundColor: '#000',
+            padding: { x: 4, y: 2 }
+        }).setOrigin(0.5);
+        container.add(priceText);
+
+        return {
+            x, y, price, platform, container, body, priceText
+        };
     }
 
     createPlayer() {
-        // Colocar jugador en la primera vela
-        const firstCandle = this.candles[0];
+        // Colocar jugador sobre la vela inicial
         this.player = this.physics.add.sprite(
-            firstCandle.x,
-            firstCandle.y - 80,
+            this.currentCandle.x,
+            this.currentCandle.y - 50,
             'playerTexture'
         );
 
-        this.player.setCollideWorldBounds(false);
+        this.player.setCollideWorldBounds(false); // Puede caer al vacío
         this.player.setBounce(0.1);
+        this.player.setGravityY(800);
 
         // Colisión con velas
-        this.physics.add.collider(this.player, this.candleGroup);
-        this.physics.add.collider(this.player, this.ground);
+        this.physics.add.collider(this.player, this.candles);
 
         // Animación de correr
-        this.runTween = this.tweens.add({
+        this.runAnimation = this.tweens.add({
             targets: this.player,
-            scaleY: 0.9,
-            scaleX: 1.1,
-            duration: 150,
+            scaleX: 1.05,
+            scaleY: 0.95,
+            duration: 120,
             yoyo: true,
             repeat: -1,
             paused: true
@@ -145,165 +199,155 @@ export default class GameScene extends Phaser.Scene {
     }
 
     createPhaseIndicator() {
-        this.phaseText = this.add.text(
-            600, 50,
-            'ESPERANDO...',
-            {
-                font: 'bold 32px Courier New',
-                fill: '#ffffff',
-                stroke: '#000000',
-                strokeThickness: 4
-            }
+        this.phaseText = this.add.text(600, 50, 'ESPERANDO...', {
+            font: 'bold 28px Courier New',
+            fill: '#fff',
+            stroke: '#000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setScrollFactor(0);
+    }
+
+    createPriceDisplay() {
+        this.priceDisplay = this.add.text(600, 100, '', {
+            font: '18px Courier New',
+            fill: '#FFD700',
+            backgroundColor: '#000',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5).setScrollFactor(0);
+    }
+
+    onBetPlaced(data) {
+        this.playerBet = data.direction;
+        console.log(`🎯 [BET] Jugador apostó ${this.playerBet}`);
+    }
+
+    startGhostCandleRendering() {
+        // Limpiar fantasma anterior
+        if (this.nextCandleGhost) {
+            this.nextCandleGhost.destroy();
+        }
+
+        // Crear contenedor para la vela fantasma
+        const nextX = this.currentCandle.x + this.candleSpacing;
+        this.nextCandleGhost = this.add.container(nextX, this.currentCandle.y);
+        this.nextCandleGhost.setAlpha(0.5);
+
+        const body = this.add.rectangle(0, 0, 120, 30, 0x888888);
+        this.nextCandleGhost.add(body);
+        this.nextCandleGhost.setData('body', body);
+
+        const wick = this.add.rectangle(0, -15, 3, 30, 0xffffff);
+        this.nextCandleGhost.add(wick);
+        this.nextCandleGhost.setData('wick', wick);
+    }
+
+    updateGhostCandle() {
+        if (!this.nextCandleGhost || !this.startPrice || !this.currentPrice) return;
+
+        const delta = this.currentPrice - this.startPrice;
+        const heightChange = delta * this.priceScale;
+
+        // Actualizar posición Y del fantasma
+        const targetY = this.currentCandle.y - heightChange;
+        this.nextCandleGhost.y = targetY;
+
+        // Actualizar color según dirección
+        const body = this.nextCandleGhost.getData('body');
+        const color = delta > 0 ? 0x00ff00 : (delta < 0 ? 0xff0000 : 0x888888);
+        body.setFillStyle(color);
+
+        // Actualizar display de precio
+        const changePercent = (delta / this.startPrice) * 100;
+        this.priceDisplay.setText(
+            `$${this.currentPrice.toFixed(2)} (${delta >= 0 ? '+' : ''}${changePercent.toFixed(3)}%)`
         );
-        this.phaseText.setOrigin(0.5);
-        this.phaseText.setScrollFactor(0); // Fixed to camera
     }
 
-    /**
-     * Genera la siguiente vela (plataforma)
-     * @param {number} price - Precio de Bitcoin para esta vela
-     * @param {boolean} isFirst - Si es la primera vela
-     */
-    spawnNextCandle(price, isFirst = false) {
-        const candleWidth = 120;
-        const candleHeight = 40;
-
-        // Calcular posición Y basada en el precio
-        let candleY = this.baseY;
-
-        if (!isFirst && this.candles.length > 0) {
-            const priceChange = price - this.lastEndPrice;
-            const heightDelta = priceChange * this.priceToPixelScale;
-
-            // La nueva vela está más arriba si el precio subió, más abajo si bajó
-            candleY = this.candles[this.candles.length - 1].y - heightDelta;
-
-            // Limitar altura para que no se salga de pantalla
-            candleY = Phaser.Math.Clamp(candleY, 200, 600);
-        }
-
-        // Crear plataforma visual
-        const candle = this.add.container(this.nextCandleX, candleY);
-
-        // Cuerpo de la vela (rectángulo)
-        const body = this.add.rectangle(0, 0, candleWidth, candleHeight, 0x888888);
-        candle.add(body);
-
-        // Mecha (línea vertical)
-        const wick = this.add.rectangle(0, -candleHeight / 2 - 20, 4, 40, 0xffffff);
-        candle.add(wick);
-
-        // Texto de precio
-        const priceText = this.add.text(0, -candleHeight / 2 - 50, `$${price.toFixed(0)}`, {
-            font: '14px Courier New',
-            fill: '#ffffff',
-            backgroundColor: '#000000',
-            padding: { x: 5, y: 3 }
-        }).setOrigin(0.5);
-        candle.add(priceText);
-
-        // Añadir física a la plataforma
-        const platform = this.candleGroup.create(this.nextCandleX, candleY, null);
-        platform.setSize(candleWidth, candleHeight);
-        platform.setVisible(false); // Invisible, solo física
-        platform.refreshBody();
-
-        // Guardar referencia
-        candle.setData('price', price);
-        candle.setData('body', body);
-        candle.setData('priceText', priceText);
-        candle.setData('platform', platform);
-        this.candles.push(candle);
-
-        // Actualizar posición para la próxima vela
-        this.nextCandleX += 250;
-        this.lastEndPrice = price;
-
-        return candle;
-    }
-
-    highlightCurrentCandle() {
-        const currentCandle = this.candles[this.currentCandleIndex];
-        if (currentCandle) {
-            const body = currentCandle.getData('body');
-            this.tweens.add({
-                targets: body,
-                fillColor: 0xFFD700, // Dorado
-                duration: 300
-            });
-        }
-    }
-
-    /**
-     * Maneja el resultado de la ronda
-     */
     handleRoundResult(data) {
         const { result, endPrice, priceChange } = data;
 
-        // Colorear la vela actual según el resultado
-        const currentCandle = this.candles[this.currentCandleIndex];
-        if (currentCandle) {
-            const body = currentCandle.getData('body');
-            const resultColor = result === 'LONG' ? 0x00ff00 : (result === 'SHORT' ? 0xff0000 : 0xffd700);
+        // 1. Solidificar la vela fantasma
+        if (this.nextCandleGhost) {
+            const nextX = this.nextCandleGhost.x;
+            const nextY = this.nextCandleGhost.y;
+            const color = result === 'LONG' ? 0x00ff00 : (result === 'SHORT' ? 0xff0000 : 0xFFD700);
 
-            this.tweens.add({
-                targets: body,
-                fillColor: resultColor,
-                duration: 500
+            // Destruir fantasma
+            this.nextCandleGhost.destroy();
+            this.nextCandleGhost = null;
+
+            // Crear vela real
+            const newCandle = this.createCandlePlatform(nextX, nextY, endPrice, color);
+            this.currentCandle = newCandle;
+            this.candleHistory.push(newCandle);
+            this.lastCandlePrice = endPrice;
+
+            // 2. Ejecutar movimiento del jugador
+            this.time.delayedCall(500, () => {
+                this.executePlayerMovement(result, newCandle);
             });
+
+            // 3. Limpiar velas antiguas
+            this.cleanupOldCandles();
         }
 
-        // Mostrar resultado visual
-        this.showResult(result, priceChange);
-
-        // Generar siguiente vela
-        this.time.delayedCall(1500, () => {
-            const nextCandle = this.spawnNextCandle(endPrice);
-            this.currentCandleIndex++;
-
-            // Hacer que el jugador salte a la siguiente vela
-            this.jumpToNextCandle(nextCandle);
-
-            // Limpiar velas antiguas (mantener solo las últimas 5)
-            this.cleanupOldCandles();
-        });
+        // Mostrar resultado
+        this.showResultText(result, priceChange);
     }
 
-    jumpToNextCandle(targetCandle) {
-        // Animación de salto del jugador
-        this.runTween.pause();
+    executePlayerMovement(result, targetCandle) {
+        if (!this.playerBet) {
+            console.warn('⚠️ No hay apuesta registrada');
+            return;
+        }
 
-        this.tweens.add({
-            targets: this.player,
-            x: targetCandle.x,
-            y: targetCandle.y - 80,
-            duration: 800,
-            ease: 'Quad.easeOut',
-            onStart: () => {
-                // Impulso visual de salto
-                this.player.body.setVelocityY(-300);
-            },
-            onComplete: () => {
-                this.runTween.resume();
+        const won = this.playerBet === result;
 
-                // Partículas de aterrizaje
-                this.createLandingParticles(targetCandle.x, targetCandle.y);
+        if (this.playerBet === 'LONG') {
+            // Apuesta LONG: Saltar hacia arriba y adelante
+            this.player.setVelocityX(200);
+            this.player.setVelocityY(-400);
+            this.runAnimation.pause();
+
+            if (won) {
+                // Si ganó, llegará a la plataforma
+                this.createSuccessParticles(targetCandle.x, targetCandle.y);
+            } else {
+                // Si perdió, la plataforma está muy abajo -> Caerá al vacío
+                console.log('💀 [LONG FAIL] Plataforma muy baja, jugador caerá');
             }
-        });
 
-        // Pan de cámara suave
+        } else if (this.playerBet === 'SHORT') {
+            // Apuesta SHORT: Correr hacia adelante (sin saltar)
+            this.player.setVelocityX(250);
+            this.player.setVelocityY(0);
+            this.runAnimation.resume();
+
+            if (won) {
+                // Si ganó, la plataforma está a nivel o abajo
+                this.createSuccessParticles(targetCandle.x, targetCandle.y);
+            } else {
+                // Si perdió, la plataforma está muy arriba -> Chocará y caerá
+                console.log('💀 [SHORT FAIL] Plataforma muy alta, jugador chocará');
+            }
+        }
+
+        // Pan de cámara
         this.cameras.main.pan(targetCandle.x, this.cameras.main.scrollY + 350, 1000, 'Power2');
+
+        // Resetear apuesta
+        this.playerBet = null;
     }
 
-    createLandingParticles(x, y) {
-        for (let i = 0; i < 10; i++) {
-            const particle = this.add.rectangle(x, y, 8, 8, 0xFFD700);
+    createSuccessParticles(x, y) {
+        for (let i = 0; i < 15; i++) {
+            const particle = this.add.circle(x, y, 5, 0xFFD700);
             this.tweens.add({
                 targets: particle,
-                x: x + Phaser.Math.Between(-50, 50),
-                y: y + Phaser.Math.Between(20, 60),
+                x: x + Phaser.Math.Between(-80, 80),
+                y: y + Phaser.Math.Between(-60, 60),
                 alpha: 0,
-                duration: 600,
+                duration: 800,
                 onComplete: () => particle.destroy()
             });
         }
@@ -311,40 +355,19 @@ export default class GameScene extends Phaser.Scene {
 
     cleanupOldCandles() {
         // Eliminar velas que están muy atrás
-        while (this.candles.length > 5) {
-            const oldCandle = this.candles.shift();
-            const platform = oldCandle.getData('platform');
-            if (platform) platform.destroy();
-            oldCandle.destroy();
+        while (this.candleHistory.length > 6) {
+            const oldCandle = this.candleHistory.shift();
+            if (oldCandle.platform) oldCandle.platform.destroy();
+            if (oldCandle.container) oldCandle.container.destroy();
         }
     }
 
     updatePhaseVisuals(state) {
         const phaseConfig = {
-            'BETTING': {
-                color: 0x00ff00,
-                alpha: 0.2,
-                text: '🟢 BETTING',
-                textColor: '#00ff00'
-            },
-            'LOCKED': {
-                color: 0xff0000,
-                alpha: 0.3,
-                text: '🔴 LOCKED',
-                textColor: '#ff0000'
-            },
-            'RESOLVING': {
-                color: 0xffd700,
-                alpha: 0.25,
-                text: '🟡 RESOLVING',
-                textColor: '#ffd700'
-            },
-            'WAITING': {
-                color: 0x888888,
-                alpha: 0.2,
-                text: '⚪ WAITING',
-                textColor: '#888888'
-            }
+            'BETTING': { color: 0x00ff00, alpha: 0.2, text: '🟢 BETTING', textColor: '#00ff00' },
+            'LOCKED': { color: 0xff0000, alpha: 0.3, text: '🔴 LOCKED', textColor: '#ff0000' },
+            'RESOLVING': { color: 0xffd700, alpha: 0.25, text: '🟡 RESOLVING', textColor: '#ffd700' },
+            'WAITING': { color: 0x888888, alpha: 0.2, text: '⚪ WAITING', textColor: '#888888' }
         };
 
         const config = phaseConfig[state] || phaseConfig['WAITING'];
@@ -359,84 +382,79 @@ export default class GameScene extends Phaser.Scene {
         this.phaseText.setText(config.text);
         this.phaseText.setColor(config.textColor);
 
-        // Activar/desactivar animación de correr
         if (state === 'LOCKED') {
-            this.runTween.resume();
+            this.runAnimation.resume();
         } else {
-            this.runTween.pause();
+            this.runAnimation.pause();
             this.player.setScale(1);
         }
     }
 
-    showResult(result, priceChange) {
+    showResultText(result, priceChange) {
         const resultConfig = {
-            'LONG': { color: 0x00ff00, text: '📈 LONG GANA!' },
-            'SHORT': { color: 0xff0000, text: '📉 SHORT GANA!' },
-            'DRAW': { color: 0xffd700, text: '⚖️ EMPATE!' }
+            'LONG': { text: '📈 LONG GANA!', color: '#00ff00' },
+            'SHORT': { text: '📉 SHORT GANA!', color: '#ff0000' },
+            'DRAW': { text: '⚖️ EMPATE!', color: '#ffd700' }
         };
 
         const config = resultConfig[result] || resultConfig['DRAW'];
 
-        const resultText = this.add.text(
-            this.player.x,
-            this.player.y - 150,
-            config.text,
-            {
-                font: 'bold 48px Courier New',
-                fill: '#ffffff',
-                stroke: '#000000',
-                strokeThickness: 6
-            }
-        );
-        resultText.setOrigin(0.5);
-        resultText.setAlpha(0);
+        const text = this.add.text(this.player.x, this.player.y - 100, config.text, {
+            font: 'bold 36px Courier New',
+            fill: config.color,
+            stroke: '#000',
+            strokeThickness: 5
+        }).setOrigin(0.5);
 
         this.tweens.add({
-            targets: resultText,
-            alpha: 1,
-            y: resultText.y - 50,
-            duration: 500,
-            yoyo: true,
-            repeat: 1,
-            onComplete: () => resultText.destroy()
+            targets: text,
+            y: text.y - 50,
+            alpha: 0,
+            duration: 2000,
+            onComplete: () => text.destroy()
         });
-
-        // Partículas de celebración
-        this.createParticleEffect(this.player.x, this.player.y, config.color);
-
-        if (result === 'SHORT') {
-            this.cameras.main.shake(300, 0.005);
-        }
-    }
-
-    createParticleEffect(x, y, color) {
-        for (let i = 0; i < 20; i++) {
-            const particle = this.add.rectangle(x, y, 10, 10, color);
-            this.tweens.add({
-                targets: particle,
-                x: x + Phaser.Math.Between(-200, 200),
-                y: y + Phaser.Math.Between(-150, 150),
-                alpha: 0,
-                angle: 360,
-                scale: 0,
-                duration: 1200,
-                ease: 'Power2',
-                onComplete: () => particle.destroy()
-            });
-        }
     }
 
     update() {
-        // Control manual opcional (para testing)
-        if (this.cursors.space.isDown && this.player.body.touching.down) {
-            this.player.body.setVelocityY(-400);
+        // Detectar caída al vacío
+        if (this.player.y > 700) {
+            console.log('💀 [GAME OVER] Jugador cayó al vacío');
+            this.handleGameOver();
         }
 
-        // Aplicar velocidad horizontal constante durante LOCKED
-        if (this.gameState === 'LOCKED') {
-            this.player.body.setVelocityX(50);
-        } else {
-            this.player.body.setVelocityX(0);
+        // Control manual (testing)
+        if (this.cursors.space.isDown && this.player.body.touching.down) {
+            this.player.setVelocityY(-450);
         }
+
+        // Frenar jugador si está sobre plataforma
+        if (this.player.body.touching.down && this.gameState !== 'LOCKED') {
+            this.player.setVelocityX(0);
+        }
+    }
+
+    handleGameOver() {
+        this.player.setVelocity(0, 0);
+        this.player.y = 700; // Fuera de pantalla
+
+        const gameOverText = this.add.text(600, 350, '💀 GAME OVER', {
+            font: 'bold 64px Courier New',
+            fill: '#ff0000',
+            stroke: '#000',
+            strokeThickness: 8
+        }).setOrigin(0.5).setScrollFactor(0);
+
+        this.tweens.add({
+            targets: gameOverText,
+            scale: 1.2,
+            duration: 500,
+            yoyo: true,
+            repeat: -1
+        });
+
+        // Reiniciar después de 3 segundos
+        this.time.delayedCall(3000, () => {
+            this.scene.restart();
+        });
     }
 }
