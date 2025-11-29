@@ -83,14 +83,29 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
-        // Escuchar lista de jugadores en la sala
-        this.socket.on('ROOM_PLAYERS_UPDATE', ({ roomId, players }) => {
-            this.updateRemotePlayers(players);
+        // 👥 SISTEMA DE PRESENCIA - Jugador nuevo se une
+        this.socket.on('PLAYER_JOINED', (data) => {
+            console.log('[PLAYER_JOINED]', data);
+            this.addRemotePlayer(data.id, data.skin);
         });
+
+        // 👥 SISTEMA DE PRESENCIA - Lista de jugadores actuales
+        this.socket.on('CURRENT_PLAYERS', (players) => {
+            console.log('[CURRENT_PLAYERS]', players);
+            players.forEach(player => {
+                this.addRemotePlayer(player.id, player.skin);
+            });
+        });
+
+        // 👥 SISTEMA DE PRESENCIA - Jugador se desconecta
+        this.socket.on('PLAYER_LEFT', (data) => {
+            console.log('[PLAYER_LEFT]', data);
+            this.removeRemotePlayer(data.id);
+        });
+
         this.socket.on('connect', () => {
             console.log('[SOCKET] [OK] Conectado al servidor');
         });
-
 
         this.socket.on('GAME_STATE', (data) => {
             console.log('[GAME_STATE]', data);
@@ -111,10 +126,9 @@ export default class GameScene extends Phaser.Scene {
             }
         });
 
-        // Ya no se simula fluctuación local en SYNC_TIME
-        this.socket.on('SYNC_TIME', (data) => {
-            // Si el servidor decide enviar precios en tiempo real, aquí se usarían
-            // Por ahora, ignorar fluctuaciones locales
+        // 🎯 SINCRONIZACIÓN DE VELA - Actualización de precio en tiempo real
+        this.socket.on('PRICE_UPDATE', (data) => {
+            this.updateCandleFromPrice(data.price);
         });
 
         this.socket.on('ROUND_RESULT', (data) => {
@@ -228,6 +242,9 @@ export default class GameScene extends Phaser.Scene {
         this.player.setGravityY(600); // Gravedad moderada
         this.player.setSize(35, 55); // Ajustar hitbox
 
+        // 🎯 ARREGLO DE VISIBILIDAD - Asegurar que el jugador se dibuja encima de todo
+        this.player.setDepth(100);
+
         // Colisión con velas
         this.physics.add.collider(this.player, this.candles, () => {
             // Cuando aterriza, detener movimiento horizontal si no está en RESOLVING
@@ -252,41 +269,40 @@ export default class GameScene extends Phaser.Scene {
 
         // Ahora que el jugador existe, seguirlo con la cámara
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+
+        console.log(`[PLAYER] Jugador local creado en pos (${this.currentCandle.x}, ${this.currentCandle.y - 60})`);
     }
 
-    updateRemotePlayers(players) {
-        // players: [{id, skin}]
-        // Eliminar los que ya no están
-        const currentIds = new Set(players.map(p => p.id));
-        for (const [userId, obj] of this.remotePlayers.entries()) {
-            if (!currentIds.has(userId)) {
-                obj.sprite.destroy();
-                this.remotePlayers.delete(userId);
-            }
-        }
+    // 👥 Añadir un jugador remoto (fantasma)
+    addRemotePlayer(userId, skin) {
+        if (userId === this.localUserId) return; // No crear fantasma del jugador local
+        if (this.remotePlayers.has(userId)) return; // Ya existe
 
-        // Añadir o actualizar los que están
-        for (const p of players) {
-            if (p.id === this.localUserId) continue; // No renderizar el local aquí
-            let remote = this.remotePlayers.get(p.id);
-            if (!remote) {
-                // Crear sprite para el jugador remoto
-                const sprite = this.physics.add.sprite(
-                    this.currentCandle ? this.currentCandle.x : 0,
-                    this.currentCandle ? this.currentCandle.y - 60 : 0,
-                    'playerTexture'
-                );
-                sprite.setAlpha(0.7);
-                sprite.setTint(0x00bfff); // Color azul para distinguir
-                sprite.setDepth(1);
-                sprite.isRemote = true;
-                this.remotePlayers.set(p.id, { sprite, skin: p.skin });
-            } else {
-                // Actualizar skin info si cambia (puedes expandir esto para cambiar textura)
-                remote.skin = p.skin;
-            }
+        const startX = this.currentCandle ? this.currentCandle.x : 200;
+        const startY = this.currentCandle ? this.currentCandle.y - 60 : 300;
+
+        const sprite = this.physics.add.sprite(startX, startY, 'playerTexture');
+        sprite.setAlpha(0.5); // Semitransparente
+        sprite.setTint(0x888888); // Gris para diferenciar
+        sprite.setDepth(50); // Debajo del jugador local
+        sprite.isRemote = true;
+
+        // Añadir colisión con velas
+        this.physics.add.collider(sprite, this.candles);
+        sprite.setGravityY(600);
+
+        this.remotePlayers.set(userId, { sprite, skin });
+        console.log(`[REMOTE PLAYER] Añadido fantasma de ${userId} (${skin})`);
+    }
+
+    // 👥 Remover un jugador remoto
+    removeRemotePlayer(userId) {
+        const remote = this.remotePlayers.get(userId);
+        if (remote) {
+            remote.sprite.destroy();
+            this.remotePlayers.delete(userId);
+            console.log(`[REMOTE PLAYER] Removido fantasma de ${userId}`);
         }
-        // <--- Solo una llave de cierre aquí
     }
 
     createPhaseIndicator() {
@@ -338,6 +354,32 @@ export default class GameScene extends Phaser.Scene {
         const wick = this.add.rectangle(0, -15, 3, 30, 0xffffff);
         this.nextCandleGhost.add(wick);
         this.nextCandleGhost.setData('wick', wick);
+    }
+
+    // 🎯 SINCRONIZACIÓN DE VELA - Actualizar vela fantasma con precio en tiempo real
+    updateCandleFromPrice(price) {
+        if (!this.nextCandleGhost || !this.currentCandle) return;
+        if (!this.startPrice) return;
+
+        // Calcular cambio de precio desde el inicio
+        const delta = price - this.startPrice;
+        const heightChange = delta * this.priceScale;
+        const newY = this.currentCandle.y - heightChange;
+
+        // Actualizar posición Y del fantasma suavemente
+        this.tweens.add({
+            targets: this.nextCandleGhost,
+            y: newY,
+            duration: 400,
+            ease: 'Quad.easeOut'
+        });
+
+        // Cambiar color según dirección
+        const body = this.nextCandleGhost.getData('body');
+        if (body) {
+            const color = delta > 0 ? 0x00ff00 : (delta < 0 ? 0xff0000 : 0x888888);
+            body.setFillStyle(color);
+        }
     }
 
     updateGhostCandle() {

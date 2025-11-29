@@ -236,11 +236,32 @@ io.on('connection', async (socket) => {
                 ticketPrice: room.ticketPrice
             });
 
+            // 👥 GESTIÓN DE PRESENCIA - Notificar a los demás jugadores
+            socket.to(roomId).emit('PLAYER_JOINED', {
+                id: user.id,
+                skin: user.activeSkin ? user.activeSkin.name : 'Default'
+            });
+
+            // 👥 GESTIÓN DE PRESENCIA - Enviar lista de jugadores actuales al nuevo
+            const currentPlayers = [];
+            for (const [socketId, userId] of room.users.entries()) {
+                const player = userManager.getUser(socketId);
+                if (player && player.id !== user.id) { // Excluir al jugador recién unido
+                    currentPlayers.push({
+                        id: player.id,
+                        skin: player.activeSkin ? player.activeSkin.name : 'Default'
+                    });
+                }
+            }
+
+            socket.emit('CURRENT_PLAYERS', currentPlayers);
+
             io.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
             // También actualizar la lista de buses para todos (admin y clientes)
             io.emit('ADMIN_BUSES', roomManager.getRoomsInfo());
 
             console.log(`🚌 [JOIN] Usuario ${user.id} subió al bus ${roomId} (${room.name})`);
+            console.log(`👥 [PRESENCE] ${currentPlayers.length} jugadores ya en el bus`);
         } else {
             socket.emit('GAME_ERROR', { message: `No puedes entrar a ${roomId}: ${result.error}` });
         }
@@ -396,6 +417,17 @@ io.on('connection', async (socket) => {
     // Evento: Desconexión
     socket.on('disconnect', () => {
         console.log(`🔌 [DISCONNECT] Cliente desconectado: ${socket.id}`);
+
+        const user = userManager.getUser(socket.id);
+
+        // 👥 GESTIÓN DE PRESENCIA - Notificar a los demás que este jugador se fue
+        if (user && user.currentRoom) {
+            socket.to(user.currentRoom).emit('PLAYER_LEFT', {
+                id: user.id
+            });
+            console.log(`👋 [PRESENCE] Usuario ${user.id} dejó el bus ${user.currentRoom}`);
+        }
+
         userManager.removeUser(socket.id);
 
         // Remover de todas las salas

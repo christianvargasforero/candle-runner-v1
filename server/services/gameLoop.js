@@ -27,7 +27,13 @@ class BusGameLoop {
      */
     cleanup() {
         this.stopSyncTimer();
-        // Aquí puedes agregar más lógica de limpieza si es necesario
+
+        // Limpiar intervalo de streaming de precios si existe
+        if (this.priceStreamInterval) {
+            clearInterval(this.priceStreamInterval);
+            this.priceStreamInterval = null;
+        }
+
         console.log(`🧹 [BUS LOOP] Cleanup ejecutado para bus ${this.room.id}`);
     }
     constructor(io, room, roomManager) {
@@ -57,24 +63,24 @@ class BusGameLoop {
 
         console.log(`🚌 [BUS LOOP] Instancia creada para bus ${room.id}`);
     }
-        /**
-         * Recupera el estado persistente del bus desde Redis (acumulado, etc)
-         */
-        async recoverState() {
-            try {
-                const key = `bus:${this.room.id}:accumulatedPot`;
-                const value = await redisClient.get(key);
-                if (value !== null) {
-                    this.accumulatedPot = parseFloat(value);
-                    if (isNaN(this.accumulatedPot)) this.accumulatedPot = 0;
-                } else {
-                    this.accumulatedPot = 0;
-                }
-            } catch (err) {
-                console.error(`[RECOVER] Error recuperando accumulatedPot de Redis:`, err);
+    /**
+     * Recupera el estado persistente del bus desde Redis (acumulado, etc)
+     */
+    async recoverState() {
+        try {
+            const key = `bus:${this.room.id}:accumulatedPot`;
+            const value = await redisClient.get(key);
+            if (value !== null) {
+                this.accumulatedPot = parseFloat(value);
+                if (isNaN(this.accumulatedPot)) this.accumulatedPot = 0;
+            } else {
                 this.accumulatedPot = 0;
             }
+        } catch (err) {
+            console.error(`[RECOVER] Error recuperando accumulatedPot de Redis:`, err);
+            this.accumulatedPot = 0;
         }
+    }
 
     /**
      * Inicia el ciclo de juego para este bus
@@ -91,8 +97,8 @@ class BusGameLoop {
 
         // Iniciar sincronización
         this.startSyncTimer();
-            // Recuperar estado persistente (acumulado, etc)
-            await this.recoverState();
+        // Recuperar estado persistente (acumulado, etc)
+        await this.recoverState();
 
         try {
             // FASE 1: BETTING (0s - 10s)
@@ -211,7 +217,28 @@ class BusGameLoop {
             });
         }
 
+        // 🎯 STREAMING DE PRECIOS EN TIEMPO REAL
+        // Emitir actualizaciones de precio cada 500ms para sincronizar la vela
+        this.priceStreamInterval = setInterval(() => {
+            const currentPriceData = priceService.getCurrentPrice();
+            if (currentPriceData) {
+                // Emitir a todos los pasajeros del bus
+                this.io.to(this.room.id).emit('PRICE_UPDATE', {
+                    price: currentPriceData.price,
+                    timestamp: Date.now()
+                });
+            }
+        }, 500);
+
         await this.wait(PHASE_LOCK_TIME);
+
+        // 🧹 LIMPIAR INTERVALO AL TERMINAR LA FASE
+        if (this.priceStreamInterval) {
+            clearInterval(this.priceStreamInterval);
+            this.priceStreamInterval = null;
+            console.log(`✅ [BUS ${this.room.id}] Price streaming detenido`);
+        }
+
         console.log(`✅ [BUS ${this.room.id}] LOCKED completada\n`);
     }
 
@@ -370,13 +397,13 @@ class BusGameLoop {
 
             } else {
                 // No hay ganadores (todos perdieron): Rollover
-                    this.accumulatedPot += roundPool;
-                    // Persistir accumulatedPot en Redis
-                    try {
-                        await redisClient.set(`bus:${this.room.id}:accumulatedPot`, this.accumulatedPot.toString());
-                    } catch (err) {
-                        console.error('[REDIS] Error guardando accumulatedPot:', err);
-                    }
+                this.accumulatedPot += roundPool;
+                // Persistir accumulatedPot en Redis
+                try {
+                    await redisClient.set(`bus:${this.room.id}:accumulatedPot`, this.accumulatedPot.toString());
+                } catch (err) {
+                    console.error('[REDIS] Error guardando accumulatedPot:', err);
+                }
                 this.rolloverCount++;
 
                 console.log(`🔄 [ROLLOVER] Sin ganadores. Pozo acumulado: $${this.accumulatedPot.toFixed(2)} (Racha: ${this.rolloverCount})`);

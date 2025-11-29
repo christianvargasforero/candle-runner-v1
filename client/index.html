@@ -776,7 +776,123 @@
         }
 
         /* ===================================
-           📱 RESPONSIVE DESIGN (MOBILE)
+           � BUSES DISPONIBLES
+           =================================== */
+
+        .bus-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 255, 249, 0.2);
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .bus-card:hover {
+            border-color: #00fff9;
+            background: rgba(0, 255, 249, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .bus-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .bus-name {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #fff;
+            text-transform: uppercase;
+        }
+
+        .bus-status {
+            font-size: 0.65rem;
+            padding: 2px 8px;
+            border-radius: 2px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .bus-status.boarding {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid #00ff88;
+        }
+
+        .bus-status.in_progress {
+            background: rgba(255, 152, 0, 0.2);
+            color: #ff9800;
+            border: 1px solid #ff9800;
+        }
+
+        .bus-status.locked {
+            background: rgba(255, 0, 85, 0.2);
+            color: #ff0055;
+            border: 1px solid #ff0055;
+        }
+
+        .bus-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 0.75rem;
+            color: #aaa;
+        }
+
+        .bus-info-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .bus-info-item i {
+            color: #00fff9;
+        }
+
+        .bus-ticket-price {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+            margin-bottom: 10px;
+        }
+
+        .bus-join-btn {
+            width: 100%;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid #00ff88;
+            color: #00ff88;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+        }
+
+        .bus-join-btn:hover {
+            background: #00ff88;
+            color: #000;
+        }
+
+        .bus-join-btn:disabled {
+            border-color: #333;
+            color: #555;
+            cursor: not-allowed;
+        }
+
+        .bus-join-btn:disabled:hover {
+            background: transparent;
+            color: #555;
+        }
+
+        /* ===================================
+           �📱 RESPONSIVE DESIGN (MOBILE)
            =================================== */
 
         @media (max-width: 768px) {
@@ -933,6 +1049,14 @@
                     </div>
                 </div>
 
+                <!-- 🚌 BUSES DISPONIBLES -->
+                <div class="buses-section" style="margin-top: 30px;">
+                    <div class="inventory-header"><i class="fa-solid fa-bus"></i> BUSES DISPONIBLES</div>
+                    <div id="buses-grid" style="display: grid; gap: 15px;">
+                        <!-- Buses generados por JS -->
+                    </div>
+                </div>
+
                 <!-- Manual del Sistema -->
                 <div class="manual-section">
                     <div class="manual-header" id="manual-toggle">
@@ -982,13 +1106,67 @@
 
     <!-- 🧠 LÓGICA DEL CENTRO DE COMANDO -->
     <script>
-        // --- MOCKS PARA EVITAR ERRORES DE REFERENCIA DE BUSES (UI ahora en Phaser) ---
-        // Si la UI de buses ya no se usa en el DOM, estas funciones/elementos pueden ser mocks vacíos
+        // 🚌 RENDERIZAR LISTA DE BUSES DISPONIBLES
         function renderBusList(buses) {
-            // Esta función ya no hace nada porque la selección de bus es in-game
-            // Puedes implementar aquí un log si quieres depurar
-            // console.log('[MOCK] renderBusList llamada', buses);
+            const busesGrid = document.getElementById('buses-grid');
+            if (!buses || buses.length === 0) {
+                busesGrid.innerHTML = '<p style="color:#888; text-align:center;">[ NO BUSES AVAILABLE ]</p>';
+                return;
+            }
+
+            busesGrid.innerHTML = '';
+
+            buses.forEach(bus => {
+                const card = document.createElement('div');
+                card.className = 'bus-card';
+
+                // Determinar estado visual
+                const statusClass = bus.status.toLowerCase();
+                const statusText = bus.status === 'BOARDING' ? 'BOARDING' :
+                    bus.status === 'IN_PROGRESS' ? 'IN GAME' : 'LOCKED';
+
+                // Determinar si puede unirse
+                const canJoin = bus.status === 'BOARDING' && bus.userCount < bus.capacity;
+
+                card.innerHTML = `
+                    <div class="bus-card-header">
+                        <div class="bus-name">${bus.name}</div>
+                        <div class="bus-status ${statusClass}">${statusText}</div>
+                    </div>
+                    <div class="bus-ticket-price">
+                        <i class="fa-solid fa-ticket"></i> $${bus.ticketPrice.toFixed(2)} USDT
+                    </div>
+                    <div class="bus-info">
+                        <div class="bus-info-item">
+                            <i class="fa-solid fa-users"></i>
+                            <span>${bus.userCount}/${bus.capacity} Pasajeros</span>
+                        </div>
+                        <div class="bus-info-item">
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span>Tier: ${bus.tier || 'Unknown'}</span>
+                        </div>
+                    </div>
+                    <button class="bus-join-btn" data-bus-id="${bus.id}" ${!canJoin ? 'disabled' : ''}>
+                        ${canJoin ? '<i class="fa-solid fa-right-to-bracket"></i> JOIN BUS' : '<i class="fa-solid fa-lock"></i> NOT AVAILABLE'}
+                    </button>
+                `;
+
+                // Evento de unirse al bus
+                const joinBtn = card.querySelector('.bus-join-btn');
+                if (canJoin) {
+                    joinBtn.addEventListener('click', () => {
+                        window.globalSocket.emit('JOIN_ROOM', { roomId: bus.id });
+                        showToast(`🚌 Joining ${bus.name}...`, 'info');
+                        overlay.classList.remove('active'); // Cerrar dashboard al unirse
+                    });
+                }
+
+                busesGrid.appendChild(card);
+            });
+
+            console.log(`[BUSES] Renderizados ${buses.length} buses`);
         }
+
         // Mock para evitar error si busModalOverlay no existe
         const busModalOverlay = { classList: { remove: () => { } } };
         document.addEventListener('DOMContentLoaded', () => {
