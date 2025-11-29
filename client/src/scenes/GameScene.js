@@ -172,19 +172,25 @@ export default class GameScene extends Phaser.Scene {
     }
 
     createPlayer() {
-        // Colocar jugador sobre la vela inicial
+        // Colocar jugador sobre la vela inicial (con margen de seguridad)
         this.player = this.physics.add.sprite(
             this.currentCandle.x,
-            this.currentCandle.y - 50,
+            this.currentCandle.y - 60, // Más arriba para asegurar colisión
             'playerTexture'
         );
 
         this.player.setCollideWorldBounds(false); // Puede caer al vacío
-        this.player.setBounce(0.1);
-        this.player.setGravityY(800);
+        this.player.setBounce(0);
+        this.player.setGravityY(600); // Gravedad moderada
+        this.player.setSize(35, 55); // Ajustar hitbox
 
         // Colisión con velas
-        this.physics.add.collider(this.player, this.candles);
+        this.physics.add.collider(this.player, this.candles, () => {
+            // Cuando aterriza, detener movimiento horizontal si no está en RESOLVING
+            if (this.gameState !== 'RESOLVING') {
+                this.player.setVelocityX(0);
+            }
+        });
 
         // Animación de correr
         this.runAnimation = this.tweens.add({
@@ -306,49 +312,51 @@ export default class GameScene extends Phaser.Scene {
         console.log(`🎯 Ejecutando movimiento: ${this.playerBet}, Ganó: ${won}`);
         console.log(`📍 Target: x=${targetCandle.x}, y=${targetCandle.y}`);
 
-        if (this.playerBet === 'LONG') {
-            // Apuesta LONG: Saltar hacia arriba y adelante
-            this.player.setVelocityX(350); // Aumentado para cubrir 300px
-            this.player.setVelocityY(-500); // Salto más alto
-            this.runAnimation.pause();
+        if (won) {
+            // Si GANÓ: Usar tween para garantizar llegada a la plataforma
+            const jumpHeight = this.playerBet === 'LONG' ? -100 : -30;
 
-            if (won) {
-                // Asegurar que llegue con un tween de respaldo
-                this.tweens.add({
-                    targets: this.player,
-                    x: targetCandle.x,
-                    duration: 1200,
-                    ease: 'Power2',
-                    onComplete: () => {
-                        console.log('✅ Jugador llegó a la plataforma');
-                        this.createSuccessParticles(targetCandle.x, targetCandle.y);
+            this.tweens.add({
+                targets: this.player,
+                x: targetCandle.x,
+                y: targetCandle.y - 60, // Posición sobre la plataforma
+                duration: 1200,
+                ease: 'Quad.easeInOut',
+                onStart: () => {
+                    // Dar impulso físico inicial
+                    if (this.playerBet === 'LONG') {
+                        this.player.setVelocityY(-400);
+                        this.runAnimation.pause();
+                    } else {
+                        this.player.setVelocityY(-200);
+                        this.runAnimation.resume();
                     }
-                });
-            } else {
-                // Si perdió, la plataforma está muy abajo -> Caerá al vacío
+                },
+                onUpdate: (tween, target) => {
+                    // Sincronizar física con tween
+                    const progress = tween.progress;
+                    if (progress > 0.8) {
+                        // Al final del salto, reducir velocidad para aterrizaje suave
+                        this.player.setVelocityY(Math.min(this.player.body.velocity.y, 200));
+                    }
+                },
+                onComplete: () => {
+                    console.log('✅ Jugador llegó a la plataforma');
+                    this.player.setVelocity(0, 0);
+                    this.createSuccessParticles(targetCandle.x, targetCandle.y);
+                    this.runAnimation.pause();
+                }
+            });
+
+        } else {
+            // Si PERDIÓ: Aplicar física normal y dejar que caiga
+            if (this.playerBet === 'LONG') {
+                this.player.setVelocityX(300);
+                this.player.setVelocityY(-400);
                 console.log('💀 [LONG FAIL] Plataforma muy baja, jugador caerá');
-            }
-
-        } else if (this.playerBet === 'SHORT') {
-            // Apuesta SHORT: Correr hacia adelante (sin saltar mucho)
-            this.player.setVelocityX(400); // Velocidad horizontal fuerte
-            this.player.setVelocityY(-150); // Pequeño salto para superar gaps
-            this.runAnimation.resume();
-
-            if (won) {
-                // Tween de respaldo para asegurar llegada
-                this.tweens.add({
-                    targets: this.player,
-                    x: targetCandle.x,
-                    duration: 1000,
-                    ease: 'Power2',
-                    onComplete: () => {
-                        console.log('✅ Jugador llegó corriendo');
-                        this.createSuccessParticles(targetCandle.x, targetCandle.y);
-                    }
-                });
             } else {
-                // Si perdió, la plataforma está muy arriba -> Chocará y caerá
+                this.player.setVelocityX(350);
+                this.player.setVelocityY(-100);
                 console.log('💀 [SHORT FAIL] Plataforma muy alta, jugador chocará');
             }
         }
