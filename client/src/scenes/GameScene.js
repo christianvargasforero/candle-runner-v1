@@ -132,11 +132,39 @@ export default class GameScene extends Phaser.Scene {
     }
 
     createInitialCandle() {
-        const x = 200;
-        const y = this.baseY;
+        // Generar 5 velas históricas para dar contexto
+        const numHistoricalCandles = 5;
+        let currentPrice = this.lastCandlePrice;
+        let currentX = -200; // Empezar fuera de pantalla a la izquierda
 
-        this.currentCandle = this.createCandlePlatform(x, y, this.lastCandlePrice, 0x4CAF50);
-        this.candleHistory.push(this.currentCandle);
+        for (let i = 0; i < numHistoricalCandles; i++) {
+            // Simular fluctuación de precio (-2% a +2%)
+            const priceChange = currentPrice * Phaser.Math.FloatBetween(-0.02, 0.02);
+            currentPrice += priceChange;
+
+            // Calcular Y basado en el precio
+            const priceVariation = currentPrice - this.lastCandlePrice;
+            const y = this.baseY - (priceVariation * this.priceScale);
+
+            // Color basado en si subió o bajó
+            const color = priceChange > 0 ? 0x00ff00 : (priceChange < 0 ? 0xff0000 : 0x888888);
+
+            // Crear vela
+            const candle = this.createCandlePlatform(currentX, y, currentPrice, color);
+            this.candleHistory.push(candle);
+
+            currentX += this.candleSpacing;
+        }
+
+        // La última vela histórica es la plataforma actual
+        this.currentCandle = this.candleHistory[this.candleHistory.length - 1];
+        this.lastCandlePrice = currentPrice;
+
+        // Actualizar nextCandleX para la siguiente vela
+        this.nextCandleX = this.currentCandle.x + this.candleSpacing;
+
+        // Posicionar cámara para que se vea la vela actual
+        this.cameras.main.scrollX = this.currentCandle.x - 400;
     }
 
     createCandlePlatform(x, y, price, color = 0x888888) {
