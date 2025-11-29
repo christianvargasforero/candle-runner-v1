@@ -41,7 +41,7 @@ app.use('/shared', express.static(path.join(__dirname, '../shared')));
 
 // Inicializar servicios
 const roomManager = new RoomManager();
-const gameLoop = new GameLoop(io);
+const gameLoop = new GameLoop(io, roomManager); // 🚌 Inyectar roomManager
 const statsService = new StatsService(gameLoop, roomManager);
 
 // ============================================
@@ -136,18 +136,9 @@ io.on('connection', async (socket) => {
     // Crear o recuperar usuario
     const user = await userManager.createUser(socket.id, userId);
 
-    // Añadir usuario a la sala principal por defecto
-    const mainRoom = Array.from(roomManager.rooms.values())[0];
-    if (mainRoom) {
-        const result = await roomManager.addUserToRoom(socket.id, mainRoom.id);
-        if (result.success) {
-            socket.join(mainRoom.id);
-            io.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
-        } else {
-            socket.emit('GAME_ERROR', { message: `Acceso denegado: ${result.error}` });
-            // Desconectar o dejar en limbo? Dejamos conectado pero sin sala.
-        }
-    }
+    // 🚌 MODELO BUS: El usuario NO entra a ninguna sala automáticamente
+    // Debe elegir explícitamente su sala mediante JOIN_ROOM
+    user.currentRoom = null;
 
     // Enviar estado inicial
     socket.emit('SYNC_TIME', gameLoop.getState());
@@ -155,17 +146,48 @@ io.on('connection', async (socket) => {
     // Enviar perfil de usuario (saldo inicial)
     socket.emit('USER_PROFILE', user.getProfile());
 
-    // Evento: Realizar apuesta
-    socket.on('PLACE_BET', async (data) => {
-        const { amount, direction } = data;
+    // 🚌 Evento: Unirse a una sala (elegir el "Bus")
+    socket.on('JOIN_ROOM', async (data) => {
+        const { roomName } = data; // 'TRAINING', 'SATOSHI', 'TRADER', 'WHALE'
+        const roomId = `room_${roomName.toLowerCase()}`;
 
-        // Delegar al GameLoop
-        const result = await gameLoop.handleBet(socket.id, amount, direction);
+        // Salir de la sala actual si existe
+        if (user.currentRoom) {
+            socket.leave(user.currentRoom);
+            roomManager.removeUserFromRoom(socket.id, user.currentRoom);
+        }
+
+        // Intentar unirse a la nueva sala
+        const result = await roomManager.addUserToRoom(socket.id, roomId);
+
+        if (result.success) {
+            user.currentRoom = roomId;
+            socket.join(roomId);
+
+            socket.emit('ROOM_JOINED', {
+                roomId: roomId,
+                roomName: roomName,
+                ticketPrice: roomManager.getRoom(roomId).ticketPrice
+            });
+
+            io.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
+            console.log(`🚌 [JOIN] Usuario ${user.id} subió al bus ${roomName}`);
+        } else {
+            socket.emit('GAME_ERROR', { message: `No puedes entrar a ${roomName}: ${result.error}` });
+        }
+    });
+
+    // 🎟️ Evento: Realizar apuesta (COMPRAR TICKET)
+    socket.on('PLACE_BET', async (data) => {
+        const { direction } = data; // Solo recibimos la dirección, NO el amount
+
+        // Delegar al GameLoop (handleBet ahora obtiene el amount de la sala)
+        const result = await gameLoop.handleBet(socket.id, direction);
 
         if (result.success) {
             // Confirmar apuesta al cliente
             socket.emit('BET_CONFIRMED', {
-                amount: amount,
+                amount: result.amount, // El servidor devuelve el amount que usó
                 direction: direction,
                 balance: result.balance
             });

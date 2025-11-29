@@ -17,8 +17,9 @@ import { userManager } from './userManager.js';
 import redisClient from '../config/redis.js';
 
 class GameLoop {
-    constructor(io) {
+    constructor(io, roomManager = null) {
         this.io = io; // Socket.io instance
+        this.roomManager = roomManager; // 🚌 Room Manager para acceder a precios de tickets
         this.currentState = GAME_STATES.WAITING;
         this.roundNumber = 0;
         this.startTime = null;
@@ -558,12 +559,11 @@ class GameLoop {
     }
 
     /**
-     * Procesa una apuesta de un usuario
+     * 🎟️ Procesa la compra de un ticket (apuesta con precio fijo)
      * @param {string} socketId 
-     * @param {number} amount 
      * @param {string} direction 'LONG' | 'SHORT'
      */
-    async handleBet(socketId, amount, direction) {
+    async handleBet(socketId, direction) {
         // 1. Validar Fase
         if (this.currentState !== GAME_STATES.BETTING) {
             return { success: false, error: 'Las apuestas están cerradas' };
@@ -575,14 +575,29 @@ class GameLoop {
             return { success: false, error: 'Usuario no encontrado' };
         }
 
-        // 2.1 Validar Integridad de Skin (Zombie Skin Check)
+        // 🚌 2.1 Validar que el usuario esté en una sala
+        if (!user.currentRoom) {
+            return { success: false, error: 'Debes unirte a una sala primero' };
+        }
+
+        // 🎟️ 2.2 OBTENER EL PRECIO DEL TICKET DE LA SALA (NO del cliente)
+        // Esto es CRUCIAL para evitar manipulación del monto
+        const room = this.getRoomByUserId(socketId);
+        if (!room) {
+            return { success: false, error: 'Sala no encontrada' };
+        }
+
+        const amount = room.ticketPrice; // 🔐 El servidor DICTA el precio
+        console.log(`🎟️ [TICKET] Usuario ${user.id} intenta comprar ticket de $${amount} (${room.name})`);
+
+        // 2.3 Validar Integridad de Skin (Zombie Skin Check)
         if (user.activeSkin.isBurned) {
             return { success: false, error: 'Skin destruida. Repara o cambia a Droid.' };
         }
 
-        // 2.2 Restricciones Protocol Droid (Anti-Farming)
+        // 2.4 Restricciones Protocol Droid (Anti-Farming)
         if (user.activeSkin.isDefault && amount > 0.10) {
-            return { success: false, error: "Droid limitado a $0.10" };
+            return { success: false, error: "Droid limitado a salas de máximo $0.10" };
         }
 
         // 3. Verificar si ya apostó en esta ronda
@@ -600,9 +615,9 @@ class GameLoop {
             this.currentRound.bets.splice(existingBetIndex, 1);
         }
 
-        // 4. Validar Saldo
+        // 4. Validar Saldo (usando precio del ticket de la sala)
         if (!user.hasBalance(amount)) {
-            return { success: false, error: 'Saldo insuficiente' };
+            return { success: false, error: `Saldo insuficiente. Ticket: $${amount.toFixed(2)}` };
         }
 
         // 5. Ejecutar Nueva Apuesta
@@ -618,20 +633,42 @@ class GameLoop {
             this.currentRound.bets.push(bet);
             this.currentRound.totalPool += amount;
 
-            console.log(`💵 [BET] ${user.id} apostó $${amount} a ${direction}`);
+            console.log(`💵 [BET] ${user.id} apostó $${amount} a ${direction} en ${room.name}`);
 
             // Admin Log
             this.io.emit('ADMIN_LOG', {
                 type: 'BET',
                 user: user.id,
-                detail: `${direction} $${amount.toFixed(2)}`,
+                detail: `${direction} $${amount.toFixed(2)} [${room.name}]`,
                 isWhale: amount >= 100
             });
 
-            return { success: true, balance: user.balanceUSDT };
+            return { success: true, balance: user.balanceUSDT, amount: amount };
         }
 
         return { success: false, error: 'Error al procesar la apuesta' };
+    }
+
+    /**
+     * Obtiene la sala donde está un usuario
+     * @param {string} socketId 
+     */
+    getRoomByUserId(socketId) {
+        const user = userManager.getUser(socketId);
+        if (!user || !user.currentRoom) return null;
+
+        // Necesitamos acceso a roomManager aquí
+        // Lo haremos mediante inyección o singleton
+        // Por ahora asumimos que está disponible
+
+        // NOTA: Necesitaremos pasar roomManager al constructor de GameLoop
+        // Para este MVP, lo simulamos con una referencia temporal
+        if (!this.roomManager) {
+            console.error('❌ [ERROR] roomManager no disponible en GameLoop');
+            return null;
+        }
+
+        return this.roomManager.getRoom(user.currentRoom);
     }
 
     /**

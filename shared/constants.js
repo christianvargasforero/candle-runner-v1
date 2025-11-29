@@ -37,12 +37,12 @@ export const DEFAULT_SKIN = {
   MAX_BET: 0.10 // Límite de apuesta para evitar farming masivo
 };
 
-// 🏛️ REGLAS DE ACCESO A SALAS
+// 🏛️ REGLAS DE ACCESO A SALAS (MODELO "BUS" - PRECIO FIJO)
 export const ROOM_ACCESS_RULES = {
-  TRAINING: { allowDefault: true, minLevel: 0, minBet: 0 },
-  SATOSHI: { allowDefault: true, minLevel: 0, minBet: 0.10 },
-  TRADER: { allowDefault: false, minLevel: 1, minBet: 1.00 },
-  WHALE: { allowDefault: false, minLevel: 4, minBet: 10.00 }
+  TRAINING: { allowDefault: true, minLevel: 0, ticketPrice: 0 },        // Gratis (Practice Mode)
+  SATOSHI: { allowDefault: true, minLevel: 0, ticketPrice: 0.10 },     // $0.10 Ticket
+  TRADER: { allowDefault: false, minLevel: 1, ticketPrice: 1.00 },     // $1.00 Ticket
+  WHALE: { allowDefault: false, minLevel: 4, ticketPrice: 10.00 }      // $10.00 Ticket
 };
 
 // 🔥 ECONOMÍA $WICK

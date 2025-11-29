@@ -35,8 +35,8 @@ export default class GameScene extends Phaser.Scene {
         this.physics.world.setBounds(0, 0, 10000, 700);
         this.physics.world.setFPS(60);
 
-        // Conectar a Socket.io
-        this.socket = io();
+        // 🔌 Usar socket GLOBAL en lugar de crear uno nuevo
+        this.socket = window.globalSocket;
         this.setupSocketListeners();
 
         // Crear elementos visuales

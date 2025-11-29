@@ -6,6 +6,22 @@ import MenuScene from './scenes/MenuScene.js';
 import GameScene from './scenes/GameScene.js';
 import UIScene from './scenes/UIScene.js';
 
+// 🔌 SOCKET GLOBAL COMPARTIDO
+// Creamos UNA SOLA conexión que se reutiliza en todas las escenas
+console.log('🔌 [MAIN] Creando socket global...');
+const globalSocket = io();
+
+// Exponer socket globalmente para que las escenas puedan acceder
+window.globalSocket = globalSocket;
+
+globalSocket.on('connect', () => {
+    console.log(`🟢 [SOCKET GLOBAL] Conectado: ${globalSocket.id}`);
+});
+
+globalSocket.on('disconnect', () => {
+    console.log('🔴 [SOCKET GLOBAL] Desconectado');
+});
+
 // Configuración del juego
 const config = {
     type: Phaser.AUTO,
@@ -38,3 +54,4 @@ game.events.once('ready', () => {
 
 // Exportar para debugging
 window.game = game;
+window.socket = globalSocket; // También exportar como window.socket para fácil acceso

@@ -12,25 +12,33 @@ export default class MenuScene extends Phaser.Scene {
     create() {
         const { width, height } = this.cameras.main;
 
-        // Conectar socket para obtener datos en tiempo real
-        this.socket = io();
+        // 🔌 Usar socket GLOBAL en lugar de crear uno nuevo
+        this.socket = window.globalSocket;
         this.roomCounts = {};
 
-        this.socket.on('connect', () => {
-            console.log('🔌 [MENU] Conectado al servidor');
-            this.socket.emit('GET_ROOM_COUNTS');
-        });
-
+        // Listeners del socket
         this.socket.on('ROOM_COUNTS_UPDATE', (counts) => {
             this.roomCounts = counts;
             this.updateRoomCounts();
         });
 
-        // Limpieza al salir de la escena
+        // Solicitar conteos al conectar (puede que ya esté conectado)
+        if (this.socket.connected) {
+            console.log('🔌 [MENU] Socket ya conectado');
+            this.socket.emit('GET_ROOM_COUNTS');
+        } else {
+            // Si aún no está conectado, esperar la conexión
+            this.socket.once('connect', () => {
+                console.log('🔌 [MENU] Conectado al servidor');
+                this.socket.emit('GET_ROOM_COUNTS');
+            });
+        }
+
+        // IMPORTANTE: NO desconectar el socket al salir de la escena
+        // ya que es compartido entre todas las escenas
         this.events.on('shutdown', () => {
-            if (this.socket) {
-                this.socket.disconnect();
-            }
+            // Solo remover el listener específico de esta escena
+            this.socket.off('ROOM_COUNTS_UPDATE');
         });
 
         // Fondo oscuro con gradiente
@@ -115,10 +123,10 @@ export default class MenuScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         const rooms = [
-            { key: 'TRAINING', name: '🎓 Training', color: 0x4CAF50, desc: 'Gratis • Sin límites' },
-            { key: 'SATOSHI', name: '🪙 Satoshi', color: 0x2196F3, desc: 'Min: $0.10 • Casual' },
-            { key: 'TRADER', name: '📈 Trader', color: 0xFF9800, desc: 'Min: $10 • Nivel 3+' },
-            { key: 'WHALE', name: '🐋 Whale', color: 0xE91E63, desc: 'Min: $100 • Nivel 5+' }
+            { key: 'TRAINING', name: '🎓 Training', color: 0x4CAF50, desc: 'Gratis • Practice' },
+            { key: 'SATOSHI', name: '🪙 Satoshi Pit', color: 0x2196F3, desc: 'Ticket: $0.10' },
+            { key: 'TRADER', name: '📈 Trader Lounge', color: 0xFF9800, desc: 'Ticket: $1.00 • Nivel 1+' },
+            { key: 'WHALE', name: '🐋 Whale Club', color: 0xE91E63, desc: 'Ticket: $10.00 • Nivel 4+' }
         ];
 
         const startX = x - 360;
@@ -218,12 +226,32 @@ export default class MenuScene extends Phaser.Scene {
         const zone = this.add.zone(x - 150, y - 25, 300, 50).setOrigin(0).setInteractive();
 
         zone.on('pointerdown', () => {
-            // Guardar sala seleccionada y cambiar a juego
+            // 🚌 Emitir JOIN_ROOM antes de iniciar el juego
+            this.socket.emit('JOIN_ROOM', { roomName: this.selectedRoom });
+
+            // Guardar sala seleccionada
             this.registry.set('selectedRoom', this.selectedRoom);
 
-            // Iniciar GameScene y UIScene en paralelo
-            this.scene.start('GameScene');
-            this.scene.launch('UIScene');
+            // Esperar confirmación y luego iniciar GameScene
+            this.socket.once('ROOM_JOINED', (data) => {
+                console.log(`✅ [MENU] Unido a sala: ${data.roomName} | Ticket: $${data.ticketPrice}`);
+
+                // Guardar ticketPrice en el registry para mostrarlo en UIScene
+                this.registry.set('ticketPrice', data.ticketPrice);
+
+                // Iniciar GameScene y UIScene en paralelo
+                this.scene.start('GameScene');
+                this.scene.launch('UIScene');
+            });
+
+            // Timeout de seguridad (5 segundos)
+            setTimeout(() => {
+                if (!this.scene.isActive('GameScene')) {
+                    console.warn('⚠️ Timeout esperando ROOM_JOINED, iniciando de todas formas...');
+                    this.scene.start('GameScene');
+                    this.scene.launch('UIScene');
+                }
+            }, 5000);
         });
 
         zone.on('pointerover', () => {

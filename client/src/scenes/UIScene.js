@@ -16,7 +16,7 @@ export default class UIScene extends Phaser.Scene {
         // Estado de Apuestas
         this.balance = 0;
         this.balanceWICK = 0;
-        this.selectedAmount = 0.10; // Máximo para Protocol Droid
+        // 🚌 ELIMINADO: this.selectedAmount (ahora lo dicta la sala)
         this.currentBet = null; // { amount, direction }
         this.currentBet = null; // { amount, direction }
         this.canBet = false;
@@ -29,8 +29,8 @@ export default class UIScene extends Phaser.Scene {
     create() {
         console.log('🎨 [UI] Escena de interfaz iniciada');
 
-        // Conectar a Socket.io
-        this.socket = io();
+        // 🔌 Usar socket GLOBAL en lugar de crear uno nuevo
+        this.socket = window.globalSocket;
         this.setupSocketListeners();
 
         // Crear elementos de UI
@@ -189,12 +189,20 @@ export default class UIScene extends Phaser.Scene {
             this.updateBalanceDisplay();
             this.showFloatingText(`✅ Retiro Exitoso!`, '#00ff88');
 
-            // Salir de la sala y volver al menú
+            // Volver al menú (NO desconectar el socket compartido)
             this.time.delayedCall(2000, () => {
-                this.socket.disconnect();
                 this.scene.stop('GameScene');
                 this.scene.start('MenuScene');
             });
+        });
+
+        // 🚌 Evento: Sala unida exitosamente
+        this.socket.on('ROOM_JOINED', (data) => {
+            console.log('🚌 [ROOM JOINED]', data);
+            // Actualizar el precio del ticket en la UI
+            if (this.ticketPriceText) {
+                this.ticketPriceText.setText(`🎟️ TICKET: $${data.ticketPrice.toFixed(2)}`);
+            }
         });
     }
 
@@ -260,32 +268,33 @@ export default class UIScene extends Phaser.Scene {
         // Contenedor del panel
         this.bettingContainer = this.add.container(centerX, bottomY);
 
-        // Botón LONG (Verde)
-        this.btnLong = this.createButton(-100, 0, 'LONG ▲', 0x00ff00, () => this.placeBet('LONG'));
-        this.bettingContainer.add(this.btnLong);
-
-        // Botón SHORT (Rojo)
-        this.btnShort = this.createButton(100, 0, 'SHORT ▼', 0xff0000, () => this.placeBet('SHORT'));
-        this.bettingContainer.add(this.btnShort);
-
-        // Selector de Monto
-        this.amountText = this.add.text(0, 50, `Apuesta: $${this.selectedAmount.toFixed(2)}`, {
-            font: '18px Courier New',
-            fill: '#ffffff'
-        }).setOrigin(0.5);
-        this.bettingContainer.add(this.amountText);
-
-        // Botones de monto rápido (ajustados para Protocol Droid)
-        this.createAmountButton(-80, 80, 0.01);
-        this.createAmountButton(0, 80, 0.05);
-        this.createAmountButton(80, 80, 0.10);
-
-        // Texto de apuesta actual
-        this.currentBetText = this.add.text(0, -60, '', {
+        // Texto de apuesta actual (arriba de los botones)
+        this.currentBetText = this.add.text(0, -80, '', {
             font: 'bold 18px Courier New',
             fill: '#ffd700'
         }).setOrigin(0.5);
         this.bettingContainer.add(this.currentBetText);
+
+        // 🎟️ Mostrar precio del ticket de la sala
+        const ticketPrice = this.registry.get('ticketPrice') || 0;
+        this.ticketPriceText = this.add.text(0, -50, `🎟️ TICKET: $${ticketPrice.toFixed(2)}`, {
+            font: 'bold 20px Courier New',
+            fill: '#00ffff',
+            stroke: '#000000',
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        this.bettingContainer.add(this.ticketPriceText);
+
+        // Botón LONG (Verde) - Ahora dice "COMPRAR TICKET ▲"
+        this.btnLong = this.createButton(-110, 20, 'COMPRAR ▲', 0x00ff00, () => this.placeBet('LONG'));
+        this.bettingContainer.add(this.btnLong);
+
+        // Botón SHORT (Rojo) - Ahora dice "COMPRAR TICKET ▼"
+        this.btnShort = this.createButton(110, 20, 'COMPRAR ▼', 0xff0000, () => this.placeBet('SHORT'));
+        this.bettingContainer.add(this.btnShort);
+
+        // NOTA: ELIMINADOS los botones de selección de monto
+        // Ya no es necesario porque el servidor dicta el precio
     }
 
     createButton(x, y, text, color, callback) {
@@ -324,40 +333,18 @@ export default class UIScene extends Phaser.Scene {
         return container;
     }
 
-    createAmountButton(x, y, amount) {
-        const btn = this.add.text(x, y, `$${amount}`, {
-            font: '16px Courier New',
-            fill: '#888888',
-            backgroundColor: '#222222',
-            padding: { x: 10, y: 5 }
-        }).setOrigin(0.5);
 
-        btn.setInteractive({ useHandCursor: true });
-        btn.on('pointerdown', () => {
-            this.selectedAmount = amount;
-            this.amountText.setText(`Apuesta: $${this.selectedAmount.toFixed(2)}`);
-            // Highlight effect
-            this.tweens.add({ targets: btn, scale: 1.2, duration: 100, yoyo: true });
-        });
-
-        this.bettingContainer.add(btn);
-    }
 
     placeBet(direction) {
         if (!this.canBet) return;
 
-        console.log(`Intentando apostar $${this.selectedAmount} a ${direction}`);
+        console.log(`🎟️ Comprando ticket: ${direction}`);
 
-        // Comunicar apuesta a GameScene
-        this.registry.events.emit('betPlaced', {
-            direction: direction,
-            amount: this.selectedAmount
-        });
+        // Comunicar apuesta a GameScene (solo dirección)
+        this.registry.events.emit('betPlaced', { direction: direction });
 
-        this.socket.emit('PLACE_BET', {
-            amount: this.selectedAmount,
-            direction: direction
-        });
+        // 🎫 Enviar solo la dirección - el servidor dicta el precio
+        this.socket.emit('PLACE_BET', { direction: direction });
     }
 
     updateBettingButtons() {

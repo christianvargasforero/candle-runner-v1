@@ -9,15 +9,23 @@ class RoomManager {
         this.rooms = new Map();
         this.nextRoomId = 1;
 
-        // Crear sala inicial (Training)
-        this.createRoom('TRAINING', 0);
+        // 🚌 MODELO "BUS": Crear salas estáticas con precios de ticket fijos
+        console.log('🏛️  [ROOM MANAGER] Inicializando salas con modelo BUS...\n');
+        this.createRoom('TRAINING', 0, 0);       // Gratis
+        this.createRoom('SATOSHI', 0, 0.10);     // $0.10 ticket
+        this.createRoom('TRADER', 0, 1.00);      // $1.00 ticket
+        this.createRoom('WHALE', 0, 10.00);      // $10.00 ticket
+        console.log('✅ [ROOM MANAGER] Salas estáticas creadas.\n');
     }
 
     /**
-     * Crea una nueva sala
+     * Crea una nueva sala con precio de ticket fijo
+     * @param {string} name - Nombre de la sala (TRAINING, SATOSHI, TRADER, WHALE)
+     * @param {number} initialPot - Pozo inicial acumulado
+     * @param {number} ticketPrice - Precio fijo del ticket para esta sala
      */
-    createRoom(name, initialPot = 0) {
-        const roomId = `room_${this.nextRoomId++}`;
+    createRoom(name, initialPot = 0, ticketPrice = 0) {
+        const roomId = `room_${name.toLowerCase()}`;
 
         const room = {
             id: roomId,
@@ -25,11 +33,12 @@ class RoomManager {
             users: new Set(),
             accumulatedPot: initialPot,
             tier: this.determineTier(name),
+            ticketPrice: ticketPrice, // 🎟️ PRECIO FIJO DEL TICKET
             createdAt: Date.now()
         };
 
         this.rooms.set(roomId, room);
-        console.log(`🏛️  [ROOM MANAGER] Sala creada: ${roomId} (${name}) - Pozo inicial: ${initialPot} USDT`);
+        console.log(`🏛️  [ROOM] ${roomId} creada | Ticket: $${ticketPrice.toFixed(2)} | Tier: ${room.tier}`);
 
         return room;
     }
@@ -63,9 +72,9 @@ class RoomManager {
             return { success: false, error: 'Protocol Droid no permitido en esta sala.' };
         }
 
-        // 3. Validar Saldo Mínimo (Proof of Funds)
-        if (user.balanceUSDT < rules.minBet) {
-            return { success: false, error: `Saldo insuficiente. Mínimo para entrar: $${rules.minBet}` };
+        // 3. Validar Saldo Mínimo (Proof of Funds) - Usar ticketPrice de la sala
+        if (user.balanceUSDT < room.ticketPrice) {
+            return { success: false, error: `Saldo insuficiente. Ticket: $${room.ticketPrice.toFixed(2)}` };
         }
 
         room.users.add(userId);
