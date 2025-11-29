@@ -6,7 +6,9 @@ import {
     PHASE_BET_TIME,
     PHASE_LOCK_TIME,
     PHASE_RESOLVE_TIME,
-    GAME_STATES
+    GAME_STATES,
+    INTEGRITY_LOSS_PER_DEFEAT,
+    ASH_INSURANCE_RATIO
 } from '../../shared/constants.js';
 
 import priceService from './priceService.js';
@@ -343,11 +345,17 @@ class GameLoop {
         losers.forEach(bet => {
             const user = userManager.getUser(bet.socketId);
             if (user) {
-                // Aplicar daño a la skin (10 puntos base)
-                const burned = user.activeSkin.takeDamage(10);
+                // Aplicar daño a la skin
+                const burned = user.activeSkin.takeDamage(INTEGRITY_LOSS_PER_DEFEAT);
+                let refundAmount = 0;
 
                 if (burned) {
+                    // Seguro de Cenizas: Reembolso parcial de la inversión en la skin
+                    refundAmount = user.activeSkin.totalInvestment * ASH_INSURANCE_RATIO;
+                    user.balanceWICK += refundAmount;
+
                     console.log(`🔥 [BURN] Skin de usuario ${user.id} ha sido destruida!`);
+                    console.log(`🛡️ [INSURANCE] Reembolso de cenizas: ${refundAmount.toFixed(2)} $WICK`);
                 }
 
                 this.io.to(bet.socketId).emit('BET_RESULT', {
@@ -358,7 +366,8 @@ class GameLoop {
                         integrity: user.activeSkin.currentIntegrity,
                         maxIntegrity: user.activeSkin.maxIntegrity,
                         isBurned: user.activeSkin.isBurned
-                    }
+                    },
+                    refundAmount: refundAmount
                 });
             }
         });
@@ -394,6 +403,11 @@ class GameLoop {
         const user = userManager.getUser(socketId);
         if (!user) {
             return { success: false, error: 'Usuario no encontrado' };
+        }
+
+        // 2.1 Validar Integridad de Skin (Zombie Skin Check)
+        if (user.activeSkin.isBurned) {
+            return { success: false, error: 'Skin destruida. Repara o cambia a Droid.' };
         }
 
         // 3. Validar Saldo

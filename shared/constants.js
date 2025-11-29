@@ -22,8 +22,8 @@ export const ASH_INSURANCE_RATIO = 0.618; // 61.8% refund en Permadeath
 export const SKIN_LEVEL_REQ = [0, 2, 3, 5, 8, 13]; // Rondas sobrevividas para subir nivel (Fibonacci)
 
 // 🛡️ SISTEMA DE INTEGRIDAD (DURABILIDAD)
-export const MAX_INTEGRITY_BASE = 3; // Integridad inicial de Skins NFT
-export const INTEGRITY_LOSS_PER_DEFEAT = 1; // Daño por derrota
+export const MAX_INTEGRITY_BASE = 100; // Integridad inicial de Skins NFT
+export const INTEGRITY_LOSS_PER_DEFEAT = 10; // Daño por derrota
 export const REPAIR_COST_BASE = 50; // $WICK base para reparación
 export const REPAIR_COST_MULTIPLIER = 1.618; // Multiplicador Fibonacci por nivel
 

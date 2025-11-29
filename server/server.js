@@ -83,6 +83,46 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Evento: Reparar Skin
+    socket.on('REPAIR_SKIN', () => {
+        const user = userManager.getUser(socket.id);
+        if (!user) return;
+
+        const skin = user.activeSkin;
+        if (skin.currentIntegrity >= skin.maxIntegrity) {
+            socket.emit('GAME_ERROR', { message: 'La skin ya está en perfecto estado.' });
+            return;
+        }
+
+        // Calcular costo: 10 $WICK por punto de integridad
+        const damage = skin.maxIntegrity - skin.currentIntegrity;
+        const cost = damage * 10;
+
+        if (user.balanceWICK < cost) {
+            socket.emit('GAME_ERROR', { message: `Faltan $WICK. Costo: ${cost}, Tienes: ${user.balanceWICK}` });
+            return;
+        }
+
+        // Ejecutar reparación
+        user.balanceWICK -= cost;
+        skin.repair(damage, cost); // Repara todo el daño
+
+        console.log(`🔧 [REPAIR] Usuario ${user.id} reparó su skin por ${cost} $WICK`);
+
+        // Emitir éxito
+        socket.emit('SKIN_REPAIRED', {
+            balanceWICK: user.balanceWICK,
+            skin: {
+                integrity: skin.currentIntegrity,
+                maxIntegrity: skin.maxIntegrity,
+                isBurned: skin.isBurned
+            }
+        });
+
+        // Actualizar perfil completo también
+        socket.emit('USER_PROFILE', user.getProfile());
+    });
+
     // Evento: Desconexión
     socket.on('disconnect', () => {
         console.log(`❌ [SOCKET] Cliente desconectado: ${socket.id}`);
