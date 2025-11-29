@@ -478,13 +478,28 @@ class GameLoop {
             return { success: false, error: 'Protocol Droid limitado a apuestas de $0.10' };
         }
 
-        // 3. Validar Saldo
+        // 3. Verificar si ya apostó en esta ronda
+        const existingBetIndex = this.currentRound.bets.findIndex(b => b.socketId === socketId);
+
+        if (existingBetIndex !== -1) {
+            // Ya apostó - Reembolsar apuesta anterior
+            const oldBet = this.currentRound.bets[existingBetIndex];
+            await user.deposit(oldBet.amount, 'REFUND');
+            this.currentRound.totalPool -= oldBet.amount;
+
+            console.log(`🔄 [CHANGE BET] ${user.id} cambió de ${oldBet.direction} a ${direction}`);
+
+            // Eliminar apuesta anterior
+            this.currentRound.bets.splice(existingBetIndex, 1);
+        }
+
+        // 4. Validar Saldo
         if (!user.hasBalance(amount)) {
             return { success: false, error: 'Saldo insuficiente' };
         }
 
-        // 4. Ejecutar Apuesta
-        if (await user.withdraw(amount)) {
+        // 5. Ejecutar Nueva Apuesta
+        if (await user.withdraw(amount, 'BET')) {
             const bet = {
                 userId: user.id,
                 socketId: socketId,

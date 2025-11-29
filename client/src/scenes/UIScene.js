@@ -128,9 +128,9 @@ export default class UIScene extends Phaser.Scene {
             this.updateBalanceDisplay();
             this.updateCurrentBetDisplay();
 
-            // Deshabilitar botones tras apostar
-            this.canBet = false;
-            this.updateBettingButtons();
+            // NO deshabilitar botones - permitir cambiar de decisión
+            // Los botones se deshabilitarán automáticamente en fase LOCKED
+            this.showFloatingText(`Apuesta: ${data.direction} $${data.amount.toFixed(2)}`, '#FFD700');
         });
 
         // Evento: Resultado de apuesta (Ganar/Perder)
