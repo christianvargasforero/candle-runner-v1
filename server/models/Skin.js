@@ -24,6 +24,10 @@ export default class Skin {
         this.totalInvestment = 1000; // Valor base inicial
     }
 
+    get isDefault() {
+        return this.type === 'PROTOCOL_DROID';
+    }
+
     getSkinConfig(type) {
         switch (type) {
             case 'CYBER_SAMURAI':

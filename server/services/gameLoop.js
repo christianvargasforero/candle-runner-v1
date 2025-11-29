@@ -44,27 +44,27 @@ class GameLoop {
      * Recupera el estado del juego desde Redis
      */
     async recoverState() {
+        if (!redisClient.isOpen) return;
+
         try {
-            const savedState = await redisClient.get('GAME_STATE');
-            if (savedState) {
-                const state = JSON.parse(savedState);
+            const data = await redisClient.get('GAME_STATE');
+            if (data) {
+                const state = JSON.parse(data);
 
                 this.roundNumber = state.roundNumber;
                 this.accumulatedPot = state.accumulatedPot;
                 this.currentState = state.currentState;
-                this.currentRound = state.currentRound;
+                this.currentRound = state.currentRound || this.currentRound;
                 this.rolloverCount = state.rolloverCount || 0;
 
                 // Calcular tiempo restante para sincronizar
                 if (state.timeLeft > 0) {
-                    // Ajustar phaseStartTime para que coincida con el tiempo restante
                     const phaseDuration = this.getPhaseDuration(this.currentState);
                     this.phaseStartTime = Date.now() - (phaseDuration - state.timeLeft);
                 }
 
-                console.log(`🔄 [RECOVERY] Estado recuperado: Ronda #${this.roundNumber} en fase ${this.currentState}`);
+                console.log('🔄 Estado recuperado de Redis');
 
-                // Reanudar ronda si estaba activa
                 if (this.currentState !== GAME_STATES.WAITING) {
                     this.resumeRound();
                 }
@@ -526,10 +526,8 @@ class GameLoop {
         }
 
         // 2.2 Restricciones Protocol Droid (Anti-Farming)
-        // Regla: Protocol Droid solo puede apostar en salas bajas (Max $0.10)
-        const isDefaultSkin = user.activeSkin.type === 'PROTOCOL_DROID';
-        if (isDefaultSkin && amount > 0.10) {
-            return { success: false, error: 'Protocol Droid limitado a apuestas de $0.10' };
+        if (user.activeSkin.isDefault && amount > 0.10) {
+            return { success: false, error: "Droid limitado a $0.10" };
         }
 
         // 3. Verificar si ya apostó en esta ronda

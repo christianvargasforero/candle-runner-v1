@@ -59,18 +59,15 @@ export default class User {
                 });
 
                 // 2. Atomic Decrement
-                const updateData = currency === 'WICK'
-                    ? { balanceWICK: { decrement: amount } }
-                    : { balanceUSDT: { decrement: amount } };
+                const field = currency === 'USDT' ? 'balanceUSDT' : 'balanceWICK';
 
                 const updatedUser = await tx.user.update({
                     where: { id: this.id },
-                    data: updateData
+                    data: { [field]: { decrement: amount } }
                 });
 
                 // 3. Check Balance Integrity
-                const newBalance = currency === 'WICK' ? updatedUser.balanceWICK : updatedUser.balanceUSDT;
-                if (newBalance < 0) {
+                if (updatedUser[field] < 0) {
                     throw new Error('INSUFFICIENT_FUNDS');
                 }
 
@@ -110,13 +107,11 @@ export default class User {
                 });
 
                 // 2. Atomic Increment
-                const updateData = currency === 'WICK'
-                    ? { balanceWICK: { increment: amount } }
-                    : { balanceUSDT: { increment: amount } };
+                const field = currency === 'USDT' ? 'balanceUSDT' : 'balanceWICK';
 
                 return await tx.user.update({
                     where: { id: this.id },
-                    data: updateData
+                    data: { [field]: { increment: amount } }
                 });
             });
 

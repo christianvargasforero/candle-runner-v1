@@ -37,9 +37,6 @@ class RoomManager {
     /**
      * Añade un usuario a una sala con validación de Gatekeeper
      */
-    /**
-     * Añade un usuario a una sala con validación de Gatekeeper
-     */
     async addUserToRoom(userId, roomId) {
         const room = this.rooms.get(roomId);
         if (!room) {
@@ -56,15 +53,13 @@ class RoomManager {
         const rules = ROOM_ACCESS_RULES[room.tier] || ROOM_ACCESS_RULES.TRAINING;
 
         // 1. Validar Nivel de Skin
-        // Asumimos que activeSkin tiene propiedad 'level', si no, es 1
         const userLevel = user.activeSkin.level || 1;
         if (userLevel < rules.minLevel) {
             return { success: false, error: `Nivel insuficiente. Requiere Nivel ${rules.minLevel}` };
         }
 
         // 2. Validar Protocol Droid (Anti-Farming)
-        const isDefaultSkin = user.activeSkin.type === 'PROTOCOL_DROID';
-        if (!rules.allowDefault && isDefaultSkin) {
+        if (!rules.allowDefault && user.activeSkin.isDefault) {
             return { success: false, error: 'Protocol Droid no permitido en esta sala.' };
         }
 
