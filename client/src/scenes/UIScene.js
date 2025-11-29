@@ -16,7 +16,7 @@ export default class UIScene extends Phaser.Scene {
         // Estado de Apuestas
         this.balance = 0;
         this.balanceWICK = 0;
-        this.selectedAmount = 10;
+        this.selectedAmount = 0.10; // Máximo para Protocol Droid
         this.currentBet = null; // { amount, direction }
         this.currentBet = null; // { amount, direction }
         this.canBet = false;
@@ -224,16 +224,16 @@ export default class UIScene extends Phaser.Scene {
         this.bettingContainer.add(this.btnShort);
 
         // Selector de Monto
-        this.amountText = this.add.text(0, 50, `Apuesta: $${this.selectedAmount}`, {
+        this.amountText = this.add.text(0, 50, `Apuesta: $${this.selectedAmount.toFixed(2)}`, {
             font: '18px Courier New',
             fill: '#ffffff'
         }).setOrigin(0.5);
         this.bettingContainer.add(this.amountText);
 
-        // Botones de monto rápido
-        this.createAmountButton(-80, 80, 10);
-        this.createAmountButton(0, 80, 50);
-        this.createAmountButton(80, 80, 100);
+        // Botones de monto rápido (ajustados para Protocol Droid)
+        this.createAmountButton(-80, 80, 0.01);
+        this.createAmountButton(0, 80, 0.05);
+        this.createAmountButton(80, 80, 0.10);
 
         // Texto de apuesta actual
         this.currentBetText = this.add.text(0, -60, '', {
@@ -290,7 +290,7 @@ export default class UIScene extends Phaser.Scene {
         btn.setInteractive({ useHandCursor: true });
         btn.on('pointerdown', () => {
             this.selectedAmount = amount;
-            this.amountText.setText(`Apuesta: $${this.selectedAmount}`);
+            this.amountText.setText(`Apuesta: $${this.selectedAmount.toFixed(2)}`);
             // Highlight effect
             this.tweens.add({ targets: btn, scale: 1.2, duration: 100, yoyo: true });
         });
@@ -515,10 +515,18 @@ export default class UIScene extends Phaser.Scene {
     }
 
     updateIntegrityBar() {
-        if (this.maxIntegrity <= 0) return; // Evitar división por cero
+        if (!this.integrityBar || this.maxIntegrity <= 0) return; // Evitar errores
 
-        const percent = Math.max(0, this.skinIntegrity / this.maxIntegrity);
-        this.integrityBar.width = 200 * percent;
+        const percent = Math.max(0, Math.min(1, this.skinIntegrity / this.maxIntegrity));
+        const targetWidth = 200 * percent;
+
+        // Animar cambio de tamaño
+        this.tweens.add({
+            targets: this.integrityBar,
+            width: targetWidth,
+            duration: 300,
+            ease: 'Power2'
+        });
 
         // Color según daño
         if (this.isBurned) {
