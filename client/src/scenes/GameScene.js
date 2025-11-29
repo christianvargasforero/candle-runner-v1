@@ -303,40 +303,63 @@ export default class GameScene extends Phaser.Scene {
 
         const won = this.playerBet === result;
 
+        console.log(`🎯 Ejecutando movimiento: ${this.playerBet}, Ganó: ${won}`);
+        console.log(`📍 Target: x=${targetCandle.x}, y=${targetCandle.y}`);
+
         if (this.playerBet === 'LONG') {
             // Apuesta LONG: Saltar hacia arriba y adelante
-            this.player.setVelocityX(200);
-            this.player.setVelocityY(-400);
+            this.player.setVelocityX(350); // Aumentado para cubrir 300px
+            this.player.setVelocityY(-500); // Salto más alto
             this.runAnimation.pause();
 
             if (won) {
-                // Si ganó, llegará a la plataforma
-                this.createSuccessParticles(targetCandle.x, targetCandle.y);
+                // Asegurar que llegue con un tween de respaldo
+                this.tweens.add({
+                    targets: this.player,
+                    x: targetCandle.x,
+                    duration: 1200,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        console.log('✅ Jugador llegó a la plataforma');
+                        this.createSuccessParticles(targetCandle.x, targetCandle.y);
+                    }
+                });
             } else {
                 // Si perdió, la plataforma está muy abajo -> Caerá al vacío
                 console.log('💀 [LONG FAIL] Plataforma muy baja, jugador caerá');
             }
 
         } else if (this.playerBet === 'SHORT') {
-            // Apuesta SHORT: Correr hacia adelante (sin saltar)
-            this.player.setVelocityX(250);
-            this.player.setVelocityY(0);
+            // Apuesta SHORT: Correr hacia adelante (sin saltar mucho)
+            this.player.setVelocityX(400); // Velocidad horizontal fuerte
+            this.player.setVelocityY(-150); // Pequeño salto para superar gaps
             this.runAnimation.resume();
 
             if (won) {
-                // Si ganó, la plataforma está a nivel o abajo
-                this.createSuccessParticles(targetCandle.x, targetCandle.y);
+                // Tween de respaldo para asegurar llegada
+                this.tweens.add({
+                    targets: this.player,
+                    x: targetCandle.x,
+                    duration: 1000,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        console.log('✅ Jugador llegó corriendo');
+                        this.createSuccessParticles(targetCandle.x, targetCandle.y);
+                    }
+                });
             } else {
                 // Si perdió, la plataforma está muy arriba -> Chocará y caerá
                 console.log('💀 [SHORT FAIL] Plataforma muy alta, jugador chocará');
             }
         }
 
-        // Pan de cámara
-        this.cameras.main.pan(targetCandle.x, this.cameras.main.scrollY + 350, 1000, 'Power2');
+        // Pan de cámara suave
+        this.cameras.main.pan(targetCandle.x, this.cameras.main.scrollY + 350, 1500, 'Power2');
 
-        // Resetear apuesta
-        this.playerBet = null;
+        // Resetear apuesta después de un delay
+        this.time.delayedCall(2000, () => {
+            this.playerBet = null;
+        });
     }
 
     createSuccessParticles(x, y) {
@@ -427,8 +450,8 @@ export default class GameScene extends Phaser.Scene {
             this.player.setVelocityY(-450);
         }
 
-        // Frenar jugador si está sobre plataforma
-        if (this.player.body.touching.down && this.gameState !== 'LOCKED') {
+        // NO frenar al jugador durante RESOLVING (está saltando entre plataformas)
+        if (this.player.body.touching.down && this.gameState === 'BETTING') {
             this.player.setVelocityX(0);
         }
     }
