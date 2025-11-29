@@ -272,6 +272,13 @@ export default class GameScene extends Phaser.Scene {
     handleRoundResult(data) {
         const { result, endPrice, priceChange } = data;
 
+        // Verificar si el jugador apostó
+        if (!this.playerBet) {
+            console.log('⚠️ [NO BET] Jugador no apostó - Destruyendo plataforma');
+            this.destroyCurrentPlatform();
+            return;
+        }
+
         // 1. Solidificar la vela fantasma
         if (this.nextCandleGhost) {
             const nextX = this.nextCandleGhost.x;
@@ -370,18 +377,83 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
-    createSuccessParticles(x, y) {
-        for (let i = 0; i < 15; i++) {
-            const particle = this.add.circle(x, y, 5, 0xFFD700);
+    destroyCurrentPlatform() {
+        if (!this.currentCandle) return;
+
+        // Animación de destrucción de la plataforma
+        const platform = this.currentCandle.platform;
+        const container = this.currentCandle.container;
+        const body = this.currentCandle.body;
+
+        // Efecto de temblor
+        this.tweens.add({
+            targets: container,
+            y: container.y + 5,
+            duration: 100,
+            yoyo: true,
+            repeat: 3,
+            onComplete: () => {
+                // Hacer caer la plataforma
+                this.tweens.add({
+                    targets: container,
+                    y: 800, // Caer fuera de pantalla
+                    angle: Phaser.Math.Between(-45, 45),
+                    alpha: 0,
+                    duration: 1500,
+                    ease: 'Quad.easeIn'
+                });
+
+                // Destruir plataforma física
+                if (platform) {
+                    this.time.delayedCall(100, () => {
+                        platform.destroy();
+                    });
+                }
+            }
+        });
+
+        // Partículas de destrucción
+        for (let i = 0; i < 20; i++) {
+            const particle = this.add.rectangle(
+                this.currentCandle.x,
+                this.currentCandle.y,
+                10, 10,
+                0xff0000
+            );
             this.tweens.add({
                 targets: particle,
-                x: x + Phaser.Math.Between(-80, 80),
-                y: y + Phaser.Math.Between(-60, 60),
+                x: this.currentCandle.x + Phaser.Math.Between(-100, 100),
+                y: this.currentCandle.y + Phaser.Math.Between(50, 200),
                 alpha: 0,
-                duration: 800,
+                duration: 1000,
                 onComplete: () => particle.destroy()
             });
         }
+
+        // Texto de advertencia
+        const warningText = this.add.text(
+            this.currentCandle.x,
+            this.currentCandle.y - 100,
+            '⚠️ NO APOSTASTE\nPLATAFORMA DESTRUIDA',
+            {
+                font: 'bold 24px Courier New',
+                fill: '#ff0000',
+                stroke: '#000',
+                strokeThickness: 5,
+                align: 'center'
+            }
+        ).setOrigin(0.5);
+
+        this.tweens.add({
+            targets: warningText,
+            y: warningText.y - 50,
+            alpha: 0,
+            duration: 2000,
+            onComplete: () => warningText.destroy()
+        });
+
+        // El jugador caerá al vacío por gravedad
+        console.log('💀 Plataforma destruida - Jugador caerá');
     }
 
     cleanupOldCandles() {
