@@ -13,6 +13,7 @@ import {
 
 import priceService from './priceService.js';
 import { userManager } from './userManager.js';
+import redisClient from '../config/redis.js';
 
 class GameLoop {
     constructor(io) {
@@ -287,7 +288,7 @@ class GameLoop {
                 // Para este MVP haremos prorrata basada en la apuesta
                 const totalWinningBetAmount = winners.reduce((sum, bet) => sum + bet.amount, 0);
 
-                winners.forEach(bet => {
+                for (const bet of winners) {
                     const user = userManager.getUser(bet.socketId);
                     if (user) {
                         // Calcular parte proporcional del premio
@@ -298,7 +299,7 @@ class GameLoop {
                         // Ojo: En parimutuel, el netPool YA incluye la apuesta original de todos.
                         // Así que prize es el total a recibir.
 
-                        user.deposit(prize);
+                        await user.deposit(prize);
 
                         console.log(`💰 [WINNER] ${user.id} gana $${prize.toFixed(2)}`);
 
@@ -309,7 +310,7 @@ class GameLoop {
                             balance: user.balanceUSDT
                         });
                     }
-                });
+                }
 
                 // Resetear bote acumulado
                 this.accumulatedPot = 0;
@@ -342,17 +343,17 @@ class GameLoop {
         // Notificar a perdedores
         // Notificar a perdedores y aplicar daño a la Integridad
         const losers = this.currentRound.bets.filter(bet => bet.direction !== result && result !== 'DRAW');
-        losers.forEach(bet => {
+        for (const bet of losers) {
             const user = userManager.getUser(bet.socketId);
             if (user) {
                 // Aplicar daño a la skin
-                const burned = user.activeSkin.takeDamage(INTEGRITY_LOSS_PER_DEFEAT);
+                const burned = await user.activeSkin.takeDamage(INTEGRITY_LOSS_PER_DEFEAT);
                 let refundAmount = 0;
 
                 if (burned) {
                     // Seguro de Cenizas: Reembolso parcial de la inversión en la skin
                     refundAmount = user.activeSkin.totalInvestment * ASH_INSURANCE_RATIO;
-                    user.balanceWICK += refundAmount;
+                    user.balanceWICK += refundAmount; // TODO: Persist WICK
 
                     console.log(`🔥 [BURN] Skin de usuario ${user.id} ha sido destruida!`);
                     console.log(`🛡️ [INSURANCE] Reembolso de cenizas: ${refundAmount.toFixed(2)} $WICK`);
@@ -370,7 +371,7 @@ class GameLoop {
                     refundAmount: refundAmount
                 });
             }
-        });
+        }
 
         // Emitir resultado a todos los clientes
         this.io.emit('ROUND_RESULT', {
@@ -393,7 +394,7 @@ class GameLoop {
      * @param {number} amount 
      * @param {string} direction 'LONG' | 'SHORT'
      */
-    handleBet(socketId, amount, direction) {
+    async handleBet(socketId, amount, direction) {
         // 1. Validar Fase
         if (this.currentState !== GAME_STATES.BETTING) {
             return { success: false, error: 'Las apuestas están cerradas' };
@@ -416,7 +417,7 @@ class GameLoop {
         }
 
         // 4. Ejecutar Apuesta
-        if (user.withdraw(amount)) {
+        if (await user.withdraw(amount)) {
             const bet = {
                 userId: user.id,
                 socketId: socketId,

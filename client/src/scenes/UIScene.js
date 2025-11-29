@@ -15,6 +15,7 @@ export default class UIScene extends Phaser.Scene {
 
         // Estado de Apuestas
         this.balance = 0;
+        this.balanceWICK = 0;
         this.selectedAmount = 10;
         this.currentBet = null; // { amount, direction }
         this.currentBet = null; // { amount, direction }
@@ -67,11 +68,13 @@ export default class UIScene extends Phaser.Scene {
         this.socket.on('USER_PROFILE', (data) => {
             console.log('👤 [PROFILE]', data);
             this.balance = data.balanceUSDT;
+            this.balanceWICK = data.balanceWICK || 0;
             this.updateBalanceDisplay();
 
             if (data.activeSkin) {
                 this.skinIntegrity = data.activeSkin.integrity;
                 this.maxIntegrity = data.activeSkin.maxIntegrity;
+                this.isBurned = data.activeSkin.isBurned;
                 this.updateIntegrityBar();
             }
         });
@@ -144,11 +147,27 @@ export default class UIScene extends Phaser.Scene {
 
             if (data.skinUpdate) {
                 this.skinIntegrity = data.skinUpdate.integrity;
+                this.isBurned = data.skinUpdate.isBurned;
                 this.updateIntegrityBar();
                 if (data.skinUpdate.isBurned) {
                     this.showFloatingText('🔥 SKIN BURNED!', '#ff0000');
+                    if (data.refundAmount) {
+                        this.showFloatingText(`🛡️ +${data.refundAmount} $WICK`, '#00ffff');
+                    }
                 }
             }
+        });
+
+        // Evento: Skin Reparada
+        this.socket.on('SKIN_REPAIRED', (data) => {
+            console.log('🔧 [REPAIRED]', data);
+            this.balanceWICK = data.balanceWICK;
+            this.skinIntegrity = data.skin.integrity;
+            this.isBurned = data.skin.isBurned;
+
+            this.updateBalanceDisplay();
+            this.updateIntegrityBar();
+            this.showFloatingText('🔧 REPARADO!', '#00ffff');
         });
 
         // Evento: Error
@@ -168,14 +187,21 @@ export default class UIScene extends Phaser.Scene {
             fill: '#00ff88'
         });
         this.balanceText.setOrigin(1, 0);
+
+        this.wickText = this.add.text(x, y + 25, `WICK: ${this.balanceWICK}`, {
+            font: 'bold 16px Courier New',
+            fill: '#00ffff'
+        });
+        this.wickText.setOrigin(1, 0);
     }
 
     updateBalanceDisplay() {
         this.balanceText.setText(`Saldo: $${this.balance.toFixed(2)}`);
+        this.wickText.setText(`WICK: ${this.balanceWICK.toFixed(0)}`);
 
         // Efecto de pulso
         this.tweens.add({
-            targets: this.balanceText,
+            targets: [this.balanceText, this.wickText],
             scale: 1.2,
             duration: 200,
             yoyo: true
@@ -465,6 +491,20 @@ export default class UIScene extends Phaser.Scene {
         // Barra
         this.integrityBar = this.add.rectangle(x, y, 200, 10, 0x00ffff);
         this.integrityBar.setOrigin(0, 0);
+
+        // Botón de Reparar
+        this.repairBtn = this.add.text(x + 210, y - 5, '🛠️', {
+            font: '16px Arial',
+            backgroundColor: '#333333',
+            padding: { x: 5, y: 2 }
+        });
+        this.repairBtn.setInteractive({ useHandCursor: true });
+
+        this.repairBtn.on('pointerdown', () => {
+            if (!this.isBurned && this.skinIntegrity < this.maxIntegrity) {
+                this.socket.emit('REPAIR_SKIN');
+            }
+        });
     }
 
     updateIntegrityBar() {
@@ -474,12 +514,18 @@ export default class UIScene extends Phaser.Scene {
         this.integrityBar.width = 200 * percent;
 
         // Color según daño
-        if (percent < 0.3) {
+        if (this.isBurned) {
+            this.integrityBar.setFillStyle(0x333333); // Gris oscuro (cenizas)
+            this.repairBtn.setAlpha(0.5); // No se puede reparar
+        } else if (percent < 0.3) {
             this.integrityBar.setFillStyle(0xff0000);
+            this.repairBtn.setAlpha(1);
         } else if (percent < 0.6) {
             this.integrityBar.setFillStyle(0xffd700);
+            this.repairBtn.setAlpha(1);
         } else {
             this.integrityBar.setFillStyle(0x00ffff);
+            this.repairBtn.setAlpha(0.5); // No necesita reparación
         }
     }
 

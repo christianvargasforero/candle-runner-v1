@@ -1,4 +1,5 @@
 import Skin from './Skin.js';
+import prisma from '../config/prisma.js';
 
 /**
  * User Model
@@ -13,6 +14,7 @@ export default class User {
 
         // Skin activa (por defecto Protocol Droid)
         this.activeSkin = new Skin('default_droid', 'PROTOCOL_DROID');
+        this.activeSkin.userId = id; // Link skin to user for persistence
 
         this.createdAt = Date.now();
     }
@@ -29,20 +31,43 @@ export default class User {
     /**
      * Deduct amount from balance
      * @param {number} amount 
-     * @returns {boolean} true if successful
+     * @returns {Promise<boolean>} true if successful
      */
-    withdraw(amount) {
+    async withdraw(amount) {
         if (!this.hasBalance(amount)) return false;
+
         this.balanceUSDT -= amount;
-        return true;
+
+        // Persist to DB
+        try {
+            await prisma.user.update({
+                where: { id: this.id },
+                data: { balanceUSDT: this.balanceUSDT }
+            });
+            return true;
+        } catch (error) {
+            console.error(`❌ [DB] Error withdrawing user ${this.id}:`, error);
+            // Rollback memory state if DB fails? For now, assume critical failure.
+            this.balanceUSDT += amount;
+            return false;
+        }
     }
 
     /**
      * Add amount to balance
      * @param {number} amount 
      */
-    deposit(amount) {
+    async deposit(amount) {
         this.balanceUSDT += amount;
+
+        try {
+            await prisma.user.update({
+                where: { id: this.id },
+                data: { balanceUSDT: this.balanceUSDT }
+            });
+        } catch (error) {
+            console.error(`❌ [DB] Error depositing user ${this.id}:`, error);
+        }
     }
 
     /**

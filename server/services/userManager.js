@@ -1,22 +1,68 @@
 import User from '../models/User.js';
+import prisma from '../config/prisma.js';
 
 class UserManager {
     constructor() {
-        this.users = new Map(); // socketId -> User
+        this.users = new Map(); // socketId -> User (Session Cache)
     }
 
     /**
-     * Create a new user session
+     * Create or restore a user session
      * @param {string} socketId 
-     * @returns {User}
+     * @param {string} [existingUserId] Optional ID to restore session
+     * @returns {Promise<User>}
      */
-    createUser(socketId) {
-        // In a real app, we would fetch from DB using a token
-        // For now, we create a new ephemeral user per socket connection
-        const userId = `user_${Math.random().toString(36).substr(2, 9)}`;
-        const user = new User(userId, socketId);
+    async createUser(socketId, existingUserId = null) {
+        let dbUser;
+
+        if (existingUserId) {
+            dbUser = await prisma.user.findUnique({
+                where: { id: existingUserId },
+                include: { skins: true }
+            });
+        }
+
+        if (!dbUser) {
+            // Create new user in DB
+            dbUser = await prisma.user.create({
+                data: {
+                    balanceUSDT: 1000,
+                    balanceWICK: 0,
+                    skins: {
+                        create: {
+                            type: 'PROTOCOL_DROID',
+                            integrity: 100,
+                            maxIntegrity: 100,
+                            isBurned: false
+                        }
+                    }
+                },
+                include: { skins: true }
+            });
+            console.log(`👤 [DB] Nuevo usuario creado: ${dbUser.id}`);
+        } else {
+            console.log(`👤 [DB] Usuario recuperado: ${dbUser.id}`);
+        }
+
+        // Create User instance (Session)
+        const user = new User(dbUser.id, socketId);
+
+        // Sync state from DB
+        user.balanceUSDT = dbUser.balanceUSDT;
+        user.balanceWICK = dbUser.balanceWICK;
+
+        // Load active skin (logic to pick active skin, for now pick first or default)
+        const activeSkinData = dbUser.skins.find(s => !s.isBurned) || dbUser.skins[0];
+        if (activeSkinData) {
+            user.activeSkin.id = activeSkinData.id;
+            user.activeSkin.type = activeSkinData.type;
+            user.activeSkin.currentIntegrity = activeSkinData.integrity;
+            user.activeSkin.maxIntegrity = activeSkinData.maxIntegrity;
+            user.activeSkin.isBurned = activeSkinData.isBurned;
+            user.activeSkin.totalInvestment = activeSkinData.totalInvestment;
+        }
+
         this.users.set(socketId, user);
-        console.log(`👤 [USER MANAGER] User created: ${userId} (${socketId})`);
         return user;
     }
 

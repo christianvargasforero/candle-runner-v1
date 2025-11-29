@@ -1,5 +1,5 @@
-```javascript
 import { MAX_INTEGRITY_BASE } from '../../shared/constants.js';
+import prisma from '../config/prisma.js';
 
 /**
  * Skin Model
@@ -9,16 +9,17 @@ export default class Skin {
     constructor(id, type = 'PROTOCOL_DROID') {
         this.id = id;
         this.type = type;
-        
+        this.userId = null; // Set by User
+
         // Configuración base según tipo
         const config = this.getSkinConfig(type);
-        
+
         this.name = config.name;
         this.maxIntegrity = config.maxIntegrity;
         this.currentIntegrity = config.maxIntegrity;
         this.repairCostBase = config.repairCostBase;
         this.isBurned = false;
-        
+
         // Tracking de inversión para seguro
         this.totalInvestment = 1000; // Valor base inicial
     }
@@ -38,18 +39,33 @@ export default class Skin {
     /**
      * Reduce integrity on loss
      * @param {number} amount 
-     * @returns {boolean} true if skin burned (integrity <= 0)
+     * @returns {Promise<boolean>} true if skin burned (integrity <= 0)
      */
-    takeDamage(amount) {
+    async takeDamage(amount) {
         if (this.type === 'PROTOCOL_DROID') return false; // Droid no recibe daño
 
         this.currentIntegrity = Math.max(0, this.currentIntegrity - amount);
-        
+        let burned = false;
+
         if (this.currentIntegrity <= 0) {
             this.isBurned = true;
-            return true;
+            burned = true;
         }
-        return false;
+
+        // Persist
+        try {
+            await prisma.skin.update({
+                where: { id: this.id },
+                data: {
+                    integrity: this.currentIntegrity,
+                    isBurned: this.isBurned
+                }
+            });
+        } catch (error) {
+            console.error(`❌ [DB] Error updating skin ${this.id}:`, error);
+        }
+
+        return burned;
     }
 
     /**
@@ -57,14 +73,26 @@ export default class Skin {
      * @param {number} amount 
      * @param {number} cost Cost in $WICK
      */
-    repair(amount, cost = 0) {
+    async repair(amount, cost = 0) {
         if (this.isBurned) return false; // Cannot repair burned skin
         this.currentIntegrity = Math.min(this.maxIntegrity, this.currentIntegrity + amount);
-        
+
         // Aumentar valor asegurado
         this.totalInvestment += cost;
-        
+
+        // Persist
+        try {
+            await prisma.skin.update({
+                where: { id: this.id },
+                data: {
+                    integrity: this.currentIntegrity,
+                    totalInvestment: this.totalInvestment
+                }
+            });
+        } catch (error) {
+            console.error(`❌ [DB] Error repairing skin ${this.id}:`, error);
+        }
+
         return true;
     }
 }
-```

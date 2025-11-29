@@ -44,11 +44,14 @@ const gameLoop = new GameLoop(io);
 // 🔌 SOCKET.IO - GESTIÓN DE CONEXIONES
 // ============================================
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
     console.log(`\n🔌 [SOCKET] Cliente conectado: ${socket.id}`);
 
-    // Crear usuario con saldo Demo
-    const user = userManager.createUser(socket.id);
+    // Recuperar ID de usuario si existe (Persistencia)
+    const userId = socket.handshake.auth.userId;
+
+    // Crear o recuperar usuario
+    const user = await userManager.createUser(socket.id, userId);
 
     // Añadir usuario a la sala principal por defecto
     const mainRoom = Array.from(roomManager.rooms.values())[0];
