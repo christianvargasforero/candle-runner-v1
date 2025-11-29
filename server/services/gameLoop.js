@@ -694,27 +694,7 @@ class GameLoop {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    /**
-     * Recuperar estado desde Redis
-     */
-    async recoverState() {
-        try {
-            if (!redisClient.isOpen) await redisClient.connect();
 
-            const data = await redisClient.get('GAME_STATE');
-            if (data) {
-                const state = JSON.parse(data);
-                this.roundNumber = state.roundNumber;
-                this.currentState = state.currentState;
-                this.phaseStartTime = state.phaseStartTime;
-                this.currentRound = state.currentRound;
-                this.accumulatedPot = state.accumulatedPot;
-                console.log('🔄 [REDIS] Estado recuperado:', state.currentState);
-            }
-        } catch (error) {
-            console.error('⚠️ [REDIS] No se pudo recuperar estado:', error.message);
-        }
-    }
 
     /**
      * Obtiene el estado actual del juego
