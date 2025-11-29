@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candle Runner | Mission Control</title>
+
+    <!-- Bootstrap 5 Dark -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
+
+    <style>
+        :root {
+            --bg-dark: #1a1a2e;
+            --card-bg: #16213e;
+            --accent-red: #e94560;
+            --accent-blue: #0f3460;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --neon-green: #00ff88;
+            --neon-red: #ff0055;
+            --gold: #ffd700;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        .navbar {
+            background-color: var(--card-bg);
+            border-bottom: 2px solid var(--accent-red);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--accent-blue);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            background-color: rgba(15, 52, 96, 0.5);
+            border-bottom: 1px solid var(--accent-blue);
+            font-weight: bold;
+            color: var(--text-secondary);
+        }
+
+        .kpi-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+
+        .kpi-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        /* Progress Bar */
+        .progress {
+            height: 25px;
+            background-color: #0f3460;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            transition: width 0.5s linear;
+        }
+
+        /* Kill Feed */
+        .kill-feed {
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .kill-feed table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .kill-feed td {
+            padding: 8px;
+            border-bottom: 1px solid #2a2a4e;
+        }
+
+        .log-win {
+            color: var(--neon-green);
+        }
+
+        .log-burn {
+            color: var(--neon-red);
+            font-weight: bold;
+        }
+
+        .log-whale {
+            background-color: rgba(255, 215, 0, 0.1);
+            color: var(--gold);
+            border-left: 3px solid var(--gold);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-blue);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-red);
+        }
+
+        .sentiment-bar {
+            height: 20px;
+            display: flex;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .sentiment-long {
+            background-color: var(--neon-green);
+        }
+
+        .sentiment-short {
+            background-color: var(--neon-red);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark p-3">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-fire me-2 text-warning"></i>
+                CANDLE RUNNER <span class="text-muted">| MISSION CONTROL</span>
+            </a>
+            <div class="d-flex align-items-center">
+                <span id="connectionStatus" class="badge bg-danger me-3">DISCONNECTED</span>
+                <span id="serverTime" class="text-monospace text-muted">00:00:00</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid p-4">
+
+        <!-- SECTION 1: KPIs -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="kpi-label">💰 House Revenue</div>
+                            <div class="kpi-value text-success" id="kpiRevenue">$0.00</div>
+                        </div>
+                        <i class="fas fa-hand-holding-usd fa-3x text-success opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="kpi-label">🏦 Treasury Fund</div>
+                            <div class="kpi-value text-primary" id="kpiTreasury">$0.00</div>
+                        </div>
+                        <i class="fas fa-landmark fa-3x text-primary opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="kpi-label">🔥 WICK Burned</div>
+                            <div class="kpi-value text-warning" id="kpiBurned">0</div>
+                        </div>
+                        <i class="fas fa-fire-alt fa-3x text-warning opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card p-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="kpi-label">👥 Active Users</div>
+                            <div class="kpi-value text-white" id="kpiUsers">0</div>
+                        </div>
+                        <i class="fas fa-users fa-3x text-white opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2 & 3: Main Grid -->
+        <div class="row">
+
+            <!-- Monitor de Ronda -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <i class="fas fa-stopwatch me-2"></i> LIVE ROUND MONITOR
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="badge bg-secondary" id="roundId">ROUND #0</span>
+                            <span class="badge bg-info" id="roundState">WAITING</span>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="progress mb-4">
+                            <div id="roundProgress" class="progress-bar bg-success" role="progressbar"
+                                style="width: 0%"></div>
+                        </div>
+
+                        <!-- Price Data -->
+                        <div class="row text-center mb-4">
+                            <div class="col-4">
+                                <small class="text-muted">ENTRY PRICE</small>
+                                <div class="h4" id="priceStart">---</div>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted">LIVE PRICE</small>
+                                <div class="h4 text-white" id="priceLive">---</div>
+                            </div>
+                            <div class="col-4">
+                                <small class="text-muted">DELTA</small>
+                                <div class="h4" id="priceDelta">---</div>
+                            </div>
+                        </div>
+
+                        <!-- Sentiment -->
+                        <div class="mt-4">
+                            <small class="text-muted text-uppercase">Market Sentiment (Long vs Short)</small>
+                            <div class="sentiment-bar">
+                                <div id="sentimentLong" class="sentiment-long" style="width: 50%"></div>
+                                <div id="sentimentShort" class="sentiment-short" style="width: 50%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1">
+                                <small class="text-success" id="textLong">50%</small>
+                                <small class="text-danger" id="textShort">50%</small>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kill Feed -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between">
+                        <span><i class="fas fa-list-alt me-2"></i> THE KILL FEED</span>
+                        <span class="badge bg-dark">LIVE LOGS</span>
+                    </div>
+                    <div class="card-body p-0 kill-feed" id="killFeedContainer">
+                        <table class="table table-dark table-hover mb-0">
+                            <tbody id="killFeedBody">
+                                <!-- Logs injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Check Auth
+        const urlParams = new URLSearchParams(window.location.search);
+        const key = urlParams.get('key');
+
+        if (key !== 'admin123') {
+            document.body.innerHTML = '<h1 style="color:red; text-align:center; margin-top:20%">⛔ ACCESS DENIED</h1>';
+            throw new Error('Unauthorized');
+        }
+
+        // Connect Socket
+        const socket = io({
+            query: { key: key }
+        });
+
+        // DOM Elements
+        const els = {
+            status: document.getElementById('connectionStatus'),
+            revenue: document.getElementById('kpiRevenue'),
+            treasury: document.getElementById('kpiTreasury'),
+            burned: document.getElementById('kpiBurned'),
+            users: document.getElementById('kpiUsers'),
+            roundId: document.getElementById('roundId'),
+            roundState: document.getElementById('roundState'),
+            progress: document.getElementById('roundProgress'),
+            priceStart: document.getElementById('priceStart'),
+            priceLive: document.getElementById('priceLive'),
+            priceDelta: document.getElementById('priceDelta'),
+            feed: document.getElementById('killFeedBody'),
+            sentLong: document.getElementById('sentimentLong'),
+            sentShort: document.getElementById('sentimentShort'),
+            txtLong: document.getElementById('textLong'),
+            txtShort: document.getElementById('textShort')
+        };
+
+        socket.on('connect', () => {
+            els.status.className = 'badge bg-success me-3';
+            els.status.innerText = 'CONNECTED';
+            console.log('🔌 Connected to Admin Channel');
+        });
+
+        socket.on('disconnect', () => {
+            els.status.className = 'badge bg-danger me-3';
+            els.status.innerText = 'DISCONNECTED';
+        });
+
+        // 📊 ADMIN_STATS Update
+        socket.on('ADMIN_STATS', (data) => {
+            // KPIs
+            els.revenue.innerText = `$${data.financials.revenue.toFixed(2)}`;
+            els.treasury.innerText = `$${data.financials.treasury.toFixed(2)}`;
+            els.burned.innerText = data.financials.burned;
+            els.users.innerText = data.usersCount;
+
+            // Round Info
+            els.roundId.innerText = `ROUND #${data.round.number}`;
+            els.roundState.innerText = data.round.state;
+
+            // Progress Bar
+            const percent = (data.round.timeLeft / 30000) * 100; // Approx base on 30s
+            // Better: calculate based on phase duration
+            // But server sends raw timeLeft. Let's map it visually.
+            // Actually, let's just use the timeLeft directly if we know phase max.
+            // Simplified: Just animate width.
+
+            // Phase Colors
+            if (data.round.state === 'BETTING') els.progress.className = 'progress-bar bg-success';
+            else if (data.round.state === 'LOCKED') els.progress.className = 'progress-bar bg-danger';
+            else els.progress.className = 'progress-bar bg-warning';
+
+            // We need max time per phase to calculate %. 
+            // Betting: 10s, Locked: 15s, Resolve: 5s.
+            let maxTime = 10000;
+            if (data.round.state === 'LOCKED') maxTime = 15000;
+            if (data.round.state === 'RESOLVING') maxTime = 5000;
+
+            const progressPct = ((maxTime - data.round.timeLeft) / maxTime) * 100;
+            els.progress.style.width = `${progressPct}%`;
+
+            // Prices
+            if (data.round.startPrice) els.priceStart.innerText = `$${data.round.startPrice.toFixed(2)}`;
+            if (data.round.currentPrice) {
+                els.priceLive.innerText = `$${data.round.currentPrice.toFixed(2)}`;
+
+                if (data.round.startPrice) {
+                    const delta = data.round.currentPrice - data.round.startPrice;
+                    const color = delta >= 0 ? 'text-success' : 'text-danger';
+                    const sign = delta >= 0 ? '+' : '';
+                    els.priceDelta.innerHTML = `<span class="${color}">${sign}$${delta.toFixed(2)}</span>`;
+                }
+            }
+
+            // Sentiment
+            const totalBets = data.round.bets.long + data.round.bets.short;
+            if (totalBets > 0) {
+                const longPct = (data.round.bets.long / totalBets) * 100;
+                const shortPct = (data.round.bets.short / totalBets) * 100;
+
+                els.sentLong.style.width = `${longPct}%`;
+                els.sentShort.style.width = `${shortPct}%`;
+                els.txtLong.innerText = `${Math.round(longPct)}%`;
+                els.txtShort.innerText = `${Math.round(shortPct)}%`;
+            }
+        });
+
+        // 📜 ADMIN_LOG Event
+        socket.on('ADMIN_LOG', (log) => {
+            const row = document.createElement('tr');
+
+            // Style based on type
+            let amountClass = '';
+            if (log.type === 'WIN') amountClass = 'log-win';
+            if (log.type === 'BURN') amountClass = 'log-burn';
+            if (log.isWhale) row.className = 'log-whale';
+
+            const time = new Date().toLocaleTimeString();
+
+            row.innerHTML = `
+                <td class="text-muted"><small>${time}</small></td>
+                <td><span class="badge bg-dark border border-secondary">${log.type}</span></td>
+                <td>${log.user}</td>
+                <td class="${amountClass}">${log.detail}</td>
+            `;
+
+            els.feed.prepend(row);
+
+            // Limit feed size
+            if (els.feed.children.length > 50) {
+                els.feed.lastElementChild.remove();
+            }
+        });
+
+    </script>
+</body>
+
+</html>

@@ -38,6 +38,13 @@ class GameLoop {
         // Bote acumulado (Rollover)
         this.accumulatedPot = 0;
         this.rolloverCount = 0; // Contador para dispersión de tesorería
+
+        // Estadísticas para Admin Dashboard
+        this.stats = {
+            revenue: 0,
+            treasury: 0,
+            burned: 0
+        };
     }
 
     /**
@@ -388,6 +395,9 @@ class GameLoop {
             if (winners.length > 0) {
                 // Hay ganadores: Distribuir premio
                 houseFee = totalPot * 0.05; // 5% Fee
+                this.stats.revenue += houseFee;
+                this.stats.treasury += houseFee * 0.20;
+
                 netPool = totalPot - houseFee;
 
                 // Distribución simplificada: Igualitaria (se puede mejorar a prorrata)
@@ -406,6 +416,13 @@ class GameLoop {
                         await user.deposit(prize, 'WIN');
 
                         console.log(`💰 [WINNER] ${user.id} gana $${prize.toFixed(2)}`);
+
+                        this.io.emit('ADMIN_LOG', {
+                            type: 'WIN',
+                            user: user.id,
+                            detail: `$${prize.toFixed(2)}`,
+                            isWhale: prize >= 100
+                        });
 
                         // Notificar al usuario
                         this.io.to(bet.socketId).emit('BET_RESULT', {
@@ -432,6 +449,7 @@ class GameLoop {
                 if (this.rolloverCount >= 3) {
                     const treasuryShare = this.accumulatedPot * 0.5;
                     this.accumulatedPot -= treasuryShare;
+                    this.stats.treasury += treasuryShare; // Add to treasury stats
                     this.rolloverCount = 0; // Resetear contador tras dispersión
 
                     console.log(`💸 [DISPERSION] Dispersión de Bote: $${treasuryShare.toFixed(2)} a Tesorería por inactividad.`);
@@ -465,6 +483,9 @@ class GameLoop {
                 let refundAmount = 0;
 
                 if (burned) {
+                    this.stats.burned++;
+                    this.io.emit('ADMIN_LOG', { type: 'BURN', user: user.id, detail: 'SKIN DESTROYED' });
+
                     // Seguro de Cenizas: Reembolso parcial de la inversión en la skin
                     refundAmount = user.activeSkin.totalInvestment * ASH_INSURANCE_RATIO;
                     user.balanceWICK += refundAmount; // TODO: Persist WICK
@@ -500,6 +521,40 @@ class GameLoop {
             winnersCount: winners.length,
             timestamp: Date.now()
         });
+    }
+
+    /**
+     * Obtiene estadísticas consolidadas para el Admin Dashboard
+     */
+    getAdminStats() {
+        // Count long/short bets
+        const longBets = this.currentRound.bets.filter(b => b.direction === 'LONG').length;
+        const shortBets = this.currentRound.bets.filter(b => b.direction === 'SHORT').length;
+
+        // Calculate time left
+        const now = Date.now();
+        const phaseElapsed = this.phaseStartTime ? now - this.phaseStartTime : 0;
+        const phaseDuration = this.getPhaseDuration(this.currentState);
+        const timeLeft = Math.max(0, phaseDuration - phaseElapsed);
+
+        // Get current price safely
+        const priceData = priceService.getCurrentPrice();
+
+        return {
+            financials: this.stats,
+            usersCount: userManager.users.size,
+            round: {
+                number: this.roundNumber,
+                state: this.currentState,
+                timeLeft: timeLeft,
+                startPrice: this.currentRound.startPrice,
+                currentPrice: priceData ? priceData.price : null,
+                bets: {
+                    long: longBets,
+                    short: shortBets
+                }
+            }
+        };
     }
 
     /**
@@ -564,6 +619,14 @@ class GameLoop {
             this.currentRound.totalPool += amount;
 
             console.log(`💵 [BET] ${user.id} apostó $${amount} a ${direction}`);
+
+            // Admin Log
+            this.io.emit('ADMIN_LOG', {
+                type: 'BET',
+                user: user.id,
+                detail: `${direction} $${amount.toFixed(2)}`,
+                isWhale: amount >= 100
+            });
 
             return { success: true, balance: user.balanceUSDT };
         }

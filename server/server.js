@@ -241,6 +241,12 @@ httpServer.listen(PORT, () => {
     // Iniciar Price Service (Oráculo)
     priceService.start();
 
+    // --- ADMIN DASHBOARD STATS ---
+    setInterval(() => {
+        const stats = gameLoop.getAdminStats();
+        io.emit('ADMIN_STATS', stats);
+    }, 1000);
+
     // Iniciar Game Loop
     gameLoop.start();
 });
