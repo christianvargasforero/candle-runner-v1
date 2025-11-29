@@ -1,5 +1,5 @@
 // 🎨 UI SCENE - Interfaz de Usuario (HUD)
-// Muestra información en tiempo real: temporizador, precio, ronda
+// Muestra información en tiempo real: temporizador, precio, ronda, apuestas y saldo
 
 export default class UIScene extends Phaser.Scene {
     constructor() {
@@ -12,6 +12,12 @@ export default class UIScene extends Phaser.Scene {
         this.serverTime = null;
         this.connectionStatus = 'Desconectado';
         this.currentPhaseEndTime = null;
+
+        // Estado de Apuestas
+        this.balance = 0;
+        this.selectedAmount = 10;
+        this.currentBet = null; // { amount, direction }
+        this.canBet = false;
     }
 
     create() {
@@ -25,7 +31,9 @@ export default class UIScene extends Phaser.Scene {
         this.createConnectionIndicator();
         this.createRoundCounter();
         this.createPriceDisplay();
+        this.createBalanceDisplay();
         this.createTimer();
+        this.createBettingPanel();
         this.createLogo();
 
         // Botón de Settings (Placeholder)
@@ -33,31 +41,6 @@ export default class UIScene extends Phaser.Scene {
 
         // Actualizar temporizador cada frame
         this.events.on('update', this.updateLocalTimer, this);
-    }
-
-    createSettingsButton() {
-        const x = 30;
-        const y = this.cameras.main.height - 30;
-
-        this.settingsBtn = this.add.text(x, y, '⚙️', {
-            font: '24px Arial',
-            fill: '#ffffff'
-        });
-        this.settingsBtn.setOrigin(0, 1);
-        this.settingsBtn.setInteractive({ useHandCursor: true });
-
-        this.settingsBtn.on('pointerover', () => {
-            this.settingsBtn.setScale(1.2);
-        });
-
-        this.settingsBtn.on('pointerout', () => {
-            this.settingsBtn.setScale(1);
-        });
-
-        this.settingsBtn.on('pointerdown', () => {
-            console.log('⚙️ Settings clicked');
-            // Futuro: Abrir modal de configuración
-        });
     }
 
     setupSocketListeners() {
@@ -73,10 +56,27 @@ export default class UIScene extends Phaser.Scene {
             this.updateConnectionIndicator();
         });
 
+        // Evento: Perfil de usuario (Saldo inicial)
+        this.socket.on('USER_PROFILE', (data) => {
+            console.log('👤 [PROFILE]', data);
+            this.balance = data.balanceUSDT;
+            this.updateBalanceDisplay();
+        });
+
         // Evento: Estado del juego
         this.socket.on('GAME_STATE', (data) => {
             this.roundNumber = data.roundNumber;
             this.updateRoundCounter();
+
+            // Habilitar/Deshabilitar apuestas según fase
+            this.canBet = (data.state === 'BETTING');
+            this.updateBettingButtons();
+
+            // Resetear apuesta visual al inicio de ronda
+            if (data.state === 'BETTING') {
+                this.currentBet = null;
+                this.updateCurrentBetDisplay();
+            }
         });
 
         // Evento: Sincronización de tiempo
@@ -85,6 +85,15 @@ export default class UIScene extends Phaser.Scene {
             this.timeLeft = data.timeLeft;
             this.currentPhaseEndTime = data.serverTime + data.timeLeft;
             this.updateTimer();
+
+            // Sincronizar estado de apuestas si nos unimos tarde
+            if (data.state === 'BETTING' && !this.currentBet) {
+                this.canBet = true;
+                this.updateBettingButtons();
+            } else {
+                this.canBet = false;
+                this.updateBettingButtons();
+            }
         });
 
         // Evento: Resultado de la ronda
@@ -94,17 +103,221 @@ export default class UIScene extends Phaser.Scene {
                 this.updatePriceDisplay();
             }
         });
+
+        // Evento: Apuesta confirmada
+        this.socket.on('BET_CONFIRMED', (data) => {
+            console.log('✅ [BET CONFIRMED]', data);
+            this.balance = data.balance;
+            this.currentBet = { amount: data.amount, direction: data.direction };
+            this.updateBalanceDisplay();
+            this.updateCurrentBetDisplay();
+
+            // Deshabilitar botones tras apostar
+            this.canBet = false;
+            this.updateBettingButtons();
+        });
+
+        // Evento: Resultado de apuesta (Ganar/Perder)
+        this.socket.on('BET_RESULT', (data) => {
+            console.log('💰 [BET RESULT]', data);
+            this.balance = data.balance;
+            this.updateBalanceDisplay();
+
+            if (data.won) {
+                this.showFloatingText(`+$${data.amount.toFixed(2)}`, '#00ff00');
+            } else if (data.refund) {
+                this.showFloatingText(`REFUND $${data.amount.toFixed(2)}`, '#ffd700');
+            }
+        });
+
+        // Evento: Error
+        this.socket.on('GAME_ERROR', (data) => {
+            console.error('❌ [ERROR]', data);
+            this.showFloatingText(data.message, '#ff0000');
+        });
     }
 
-    createConnectionIndicator() {
-        // Indicador de conexión en la esquina superior izquierda
-        this.connectionCircle = this.add.circle(30, 30, 10, 0xff0000);
+    createBalanceDisplay() {
+        // Display de Saldo (Esquina superior derecha, debajo del precio)
+        const x = this.cameras.main.width - 20;
+        const y = 110;
 
+        this.balanceText = this.add.text(x, y, `Saldo: $${this.balance.toFixed(2)}`, {
+            font: 'bold 20px Courier New',
+            fill: '#00ff88'
+        });
+        this.balanceText.setOrigin(1, 0);
+    }
+
+    updateBalanceDisplay() {
+        this.balanceText.setText(`Saldo: $${this.balance.toFixed(2)}`);
+
+        // Efecto de pulso
+        this.tweens.add({
+            targets: this.balanceText,
+            scale: 1.2,
+            duration: 200,
+            yoyo: true
+        });
+    }
+
+    createBettingPanel() {
+        const centerX = this.cameras.main.width / 2;
+        const bottomY = this.cameras.main.height - 150;
+
+        // Contenedor del panel
+        this.bettingContainer = this.add.container(centerX, bottomY);
+
+        // Botón LONG (Verde)
+        this.btnLong = this.createButton(-100, 0, 'LONG ▲', 0x00ff00, () => this.placeBet('LONG'));
+        this.bettingContainer.add(this.btnLong);
+
+        // Botón SHORT (Rojo)
+        this.btnShort = this.createButton(100, 0, 'SHORT ▼', 0xff0000, () => this.placeBet('SHORT'));
+        this.bettingContainer.add(this.btnShort);
+
+        // Selector de Monto
+        this.amountText = this.add.text(0, 50, `Apuesta: $${this.selectedAmount}`, {
+            font: '18px Courier New',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+        this.bettingContainer.add(this.amountText);
+
+        // Botones de monto rápido
+        this.createAmountButton(-80, 80, 10);
+        this.createAmountButton(0, 80, 50);
+        this.createAmountButton(80, 80, 100);
+
+        // Texto de apuesta actual
+        this.currentBetText = this.add.text(0, -60, '', {
+            font: 'bold 18px Courier New',
+            fill: '#ffd700'
+        }).setOrigin(0.5);
+        this.bettingContainer.add(this.currentBetText);
+    }
+
+    createButton(x, y, text, color, callback) {
+        const container = this.add.container(x, y);
+
+        const bg = this.add.rectangle(0, 0, 140, 50, color);
+        bg.setStrokeStyle(2, 0xffffff);
+
+        const label = this.add.text(0, 0, text, {
+            font: 'bold 20px Arial',
+            fill: '#000000'
+        }).setOrigin(0.5);
+
+        container.add([bg, label]);
+        container.setSize(140, 50);
+
+        // Interacción
+        bg.setInteractive({ useHandCursor: true });
+
+        bg.on('pointerover', () => container.setScale(1.1));
+        bg.on('pointerout', () => container.setScale(1));
+        bg.on('pointerdown', () => {
+            if (this.canBet) {
+                this.tweens.add({
+                    targets: container,
+                    scale: 0.9,
+                    duration: 100,
+                    yoyo: true,
+                    onComplete: callback
+                });
+            }
+        });
+
+        // Guardar referencia para deshabilitar
+        container.bg = bg;
+        return container;
+    }
+
+    createAmountButton(x, y, amount) {
+        const btn = this.add.text(x, y, `$${amount}`, {
+            font: '16px Courier New',
+            fill: '#888888',
+            backgroundColor: '#222222',
+            padding: { x: 10, y: 5 }
+        }).setOrigin(0.5);
+
+        btn.setInteractive({ useHandCursor: true });
+        btn.on('pointerdown', () => {
+            this.selectedAmount = amount;
+            this.amountText.setText(`Apuesta: $${this.selectedAmount}`);
+            // Highlight effect
+            this.tweens.add({ targets: btn, scale: 1.2, duration: 100, yoyo: true });
+        });
+
+        this.bettingContainer.add(btn);
+    }
+
+    placeBet(direction) {
+        if (!this.canBet) return;
+
+        console.log(`Intentando apostar $${this.selectedAmount} a ${direction}`);
+        this.socket.emit('PLACE_BET', {
+            amount: this.selectedAmount,
+            direction: direction
+        });
+    }
+
+    updateBettingButtons() {
+        const alpha = this.canBet ? 1 : 0.5;
+
+        this.btnLong.setAlpha(alpha);
+        this.btnShort.setAlpha(alpha);
+
+        // Desactivar interacción si no se puede apostar
+        if (!this.canBet) {
+            this.btnLong.bg.disableInteractive();
+            this.btnShort.bg.disableInteractive();
+        } else {
+            this.btnLong.bg.setInteractive({ useHandCursor: true });
+            this.btnShort.bg.setInteractive({ useHandCursor: true });
+        }
+    }
+
+    updateCurrentBetDisplay() {
+        if (this.currentBet) {
+            const color = this.currentBet.direction === 'LONG' ? '#00ff00' : '#ff0000';
+            const arrow = this.currentBet.direction === 'LONG' ? '▲' : '▼';
+            this.currentBetText.setText(`APOSTADO: $${this.currentBet.amount} ${arrow}`);
+            this.currentBetText.setColor(color);
+        } else {
+            this.currentBetText.setText('');
+        }
+    }
+
+    showFloatingText(text, color) {
+        const floatText = this.add.text(
+            this.cameras.main.width / 2,
+            this.cameras.main.height / 2 - 100,
+            text,
+            {
+                font: 'bold 40px Arial',
+                fill: color,
+                stroke: '#000000',
+                strokeThickness: 4
+            }
+        ).setOrigin(0.5);
+
+        this.tweens.add({
+            targets: floatText,
+            y: floatText.y - 100,
+            alpha: 0,
+            duration: 2000,
+            onComplete: () => floatText.destroy()
+        });
+    }
+
+    // --- MÉTODOS EXISTENTES (Sin cambios mayores) ---
+
+    createConnectionIndicator() {
+        this.connectionCircle = this.add.circle(30, 30, 10, 0xff0000);
         this.connectionText = this.add.text(50, 30, 'Desconectado', {
             font: '14px Courier New',
             fill: '#ff0000'
-        });
-        this.connectionText.setOrigin(0, 0.5);
+        }).setOrigin(0, 0.5);
     }
 
     updateConnectionIndicator() {
@@ -112,15 +325,7 @@ export default class UIScene extends Phaser.Scene {
             this.connectionCircle.setFillStyle(0x00ff00);
             this.connectionText.setText('Conectado');
             this.connectionText.setColor('#00ff00');
-
-            // Efecto de pulso
-            this.tweens.add({
-                targets: this.connectionCircle,
-                scale: 1.3,
-                duration: 500,
-                yoyo: true,
-                repeat: 0
-            });
+            this.tweens.add({ targets: this.connectionCircle, scale: 1.3, duration: 500, yoyo: true });
         } else {
             this.connectionCircle.setFillStyle(0xff0000);
             this.connectionText.setText('Desconectado');
@@ -129,91 +334,40 @@ export default class UIScene extends Phaser.Scene {
     }
 
     createRoundCounter() {
-        // Contador de ronda en la parte superior central
         this.roundText = this.add.text(
-            this.cameras.main.width / 2,
-            20,
-            'RONDA #0',
-            {
-                font: 'bold 24px Courier New',
-                fill: '#ffd700',
-                stroke: '#000000',
-                strokeThickness: 4
-            }
-        );
-        this.roundText.setOrigin(0.5, 0);
+            this.cameras.main.width / 2, 20, 'RONDA #0',
+            { font: 'bold 24px Courier New', fill: '#ffd700', stroke: '#000000', strokeThickness: 4 }
+        ).setOrigin(0.5, 0);
     }
 
     updateRoundCounter() {
         this.roundText.setText(`RONDA #${this.roundNumber}`);
-
-        // Efecto de actualización
-        this.tweens.add({
-            targets: this.roundText,
-            scale: 1.2,
-            duration: 200,
-            yoyo: true
-        });
+        this.tweens.add({ targets: this.roundText, scale: 1.2, duration: 200, yoyo: true });
     }
 
     createPriceDisplay() {
-        // Display de precio en la esquina superior derecha
         const x = this.cameras.main.width - 20;
         const y = 20;
-
-        // Fondo del precio
-        this.priceBackground = this.add.rectangle(x, y, 250, 80, 0x000000, 0.7);
-        this.priceBackground.setOrigin(1, 0);
-
-        // Etiqueta
-        this.priceLabelText = this.add.text(x - 10, y + 10, '💲 PRECIO BTC', {
-            font: '12px Courier New',
-            fill: '#888888'
-        });
-        this.priceLabelText.setOrigin(1, 0);
-
-        // Valor del precio
-        this.priceValueText = this.add.text(x - 10, y + 35, '-', {
-            font: 'bold 24px Courier New',
-            fill: '#00ff88'
-        });
-        this.priceValueText.setOrigin(1, 0);
+        this.priceBackground = this.add.rectangle(x, y, 250, 80, 0x000000, 0.7).setOrigin(1, 0);
+        this.priceLabelText = this.add.text(x - 10, y + 10, '💲 PRECIO BTC', { font: '12px Courier New', fill: '#888888' }).setOrigin(1, 0);
+        this.priceValueText = this.add.text(x - 10, y + 35, '-', { font: 'bold 24px Courier New', fill: '#00ff88' }).setOrigin(1, 0);
     }
 
     updatePriceDisplay() {
         if (this.currentPrice) {
             this.priceValueText.setText(`$${this.currentPrice.toFixed(2)}`);
-
-            // Efecto de actualización
-            this.tweens.add({
-                targets: this.priceValueText,
-                scale: 1.1,
-                duration: 150,
-                yoyo: true
-            });
+            this.tweens.add({ targets: this.priceValueText, scale: 1.1, duration: 150, yoyo: true });
         }
     }
 
     createTimer() {
-        // Temporizador en la parte inferior central
         const x = this.cameras.main.width / 2;
         const y = this.cameras.main.height - 80;
-
-        // Fondo del temporizador
         this.timerBackground = this.add.rectangle(x, y, 300, 60, 0x000000, 0.8);
         this.timerBackground.setStrokeStyle(2, 0x00ff88);
-
-        // Texto del temporizador
-        this.timerText = this.add.text(x, y, '00.0s', {
-            font: 'bold 36px Courier New',
-            fill: '#00ff88'
-        });
-        this.timerText.setOrigin(0.5);
-
-        // Barra de progreso
+        this.timerText = this.add.text(x, y, '00.0s', { font: 'bold 36px Courier New', fill: '#00ff88' }).setOrigin(0.5);
         this.progressBar = this.add.rectangle(x, y + 35, 280, 8, 0x00ff88);
-        this.progressBarBackground = this.add.rectangle(x, y + 35, 280, 8, 0x333333);
-        this.progressBarBackground.setDepth(-1);
+        this.progressBarBackground = this.add.rectangle(x, y + 35, 280, 8, 0x333333).setDepth(-1);
     }
 
     updateTimer() {
@@ -221,13 +375,10 @@ export default class UIScene extends Phaser.Scene {
             const seconds = (this.timeLeft / 1000).toFixed(1);
             this.timerText.setText(`${seconds}s`);
 
-            // Cambiar color según tiempo restante
             if (this.timeLeft <= 3000) {
                 this.timerText.setColor('#ff0000');
                 this.timerBackground.setStrokeStyle(2, 0xff0000);
                 this.progressBar.setFillStyle(0xff0000);
-
-                // Efecto de parpadeo (urgencia)
                 this.timerText.setVisible(Math.floor(Date.now() / 100) % 2 === 0);
             } else {
                 this.timerText.setVisible(true);
@@ -241,27 +392,19 @@ export default class UIScene extends Phaser.Scene {
                     this.progressBar.setFillStyle(0x00ff88);
                 }
             }
-
-            // Actualizar barra de progreso
-            // Asumimos fase de 30 segundos total
             const progress = Math.max(0, Math.min(1, this.timeLeft / 30000));
             this.progressBar.setSize(280 * progress, 8);
         }
     }
 
     updateLocalTimer() {
-        // Actualizar temporizador local entre sincronizaciones del servidor
         if (this.currentPhaseEndTime) {
             const remaining = this.currentPhaseEndTime - Date.now();
-
             if (remaining > 0) {
                 this.timeLeft = remaining;
-
-                // Actualizar display
                 const seconds = (remaining / 1000).toFixed(1);
                 this.timerText.setText(`${seconds}s`);
 
-                // Actualizar color y efectos
                 if (remaining <= 3000) {
                     this.timerText.setColor('#ff0000');
                     this.timerText.setVisible(Math.floor(Date.now() / 100) % 2 === 0);
@@ -273,8 +416,6 @@ export default class UIScene extends Phaser.Scene {
                         this.timerText.setColor('#00ff88');
                     }
                 }
-
-                // Actualizar barra de progreso
                 const progress = Math.max(0, Math.min(1, remaining / 30000));
                 this.progressBar.setSize(280 * progress, 8);
             }
@@ -282,20 +423,17 @@ export default class UIScene extends Phaser.Scene {
     }
 
     createLogo() {
-        // Logo del juego en la esquina inferior izquierda
-        this.logoText = this.add.text(20, this.cameras.main.height - 20, '🕯️ CANDLE RUNNER', {
-            font: 'bold 16px Courier New',
-            fill: '#00ff88',
-            stroke: '#000000',
-            strokeThickness: 3
-        });
-        this.logoText.setOrigin(0, 1);
+        this.logoText = this.add.text(20, this.cameras.main.height - 20, '🕯️ CANDLE RUNNER', { font: 'bold 16px Courier New', fill: '#00ff88', stroke: '#000000', strokeThickness: 3 }).setOrigin(0, 1);
+        this.versionText = this.add.text(20, this.cameras.main.height - 5, 'v1.1 - Fase 4', { font: '10px Courier New', fill: '#555555' }).setOrigin(0, 1);
+    }
 
-        // Versión
-        this.versionText = this.add.text(20, this.cameras.main.height - 5, 'v1.0 - Fase 3', {
-            font: '10px Courier New',
-            fill: '#555555'
-        });
-        this.versionText.setOrigin(0, 1);
+    createSettingsButton() {
+        const x = 30;
+        const y = this.cameras.main.height - 30;
+        this.settingsBtn = this.add.text(x, y, '⚙️', { font: '24px Arial', fill: '#ffffff' }).setOrigin(0, 1);
+        this.settingsBtn.setInteractive({ useHandCursor: true });
+        this.settingsBtn.on('pointerover', () => this.settingsBtn.setScale(1.2));
+        this.settingsBtn.on('pointerout', () => this.settingsBtn.setScale(1));
+        this.settingsBtn.on('pointerdown', () => console.log('⚙️ Settings clicked'));
     }
 }

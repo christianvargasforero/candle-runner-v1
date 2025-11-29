@@ -10,6 +10,7 @@ import {
 } from '../../shared/constants.js';
 
 import priceService from './priceService.js';
+import { userManager } from './userManager.js';
 
 class GameLoop {
     constructor(io) {
@@ -26,8 +27,12 @@ class GameLoop {
             startPrice: null,
             endPrice: null,
             bets: [],
+            bets: [],
             totalPool: 0
         };
+
+        // Bote acumulado (Rollover)
+        this.accumulatedPot = 0;
     }
 
     /**
@@ -257,6 +262,94 @@ class GameLoop {
         this.currentRound.priceChange = priceChange;
         this.currentRound.priceChangePercent = priceChangePercent;
 
+        // --- LÓGICA DE DISTRIBUCIÓN DE PREMIOS ---
+        let winners = [];
+        let winAmountPerUser = 0;
+        let houseFee = 0;
+        let netPool = 0;
+
+        if (result !== 'DRAW') {
+            // Filtrar ganadores
+            winners = this.currentRound.bets.filter(bet => bet.direction === result);
+
+            // Calcular Pozo
+            const roundPool = this.currentRound.totalPool;
+            const totalPot = roundPool + this.accumulatedPot;
+
+            if (winners.length > 0) {
+                // Hay ganadores: Distribuir premio
+                houseFee = totalPot * 0.05; // 5% Fee
+                netPool = totalPot - houseFee;
+
+                // Distribución simplificada: Igualitaria (se puede mejorar a prorrata)
+                // Para este MVP haremos prorrata basada en la apuesta
+                const totalWinningBetAmount = winners.reduce((sum, bet) => sum + bet.amount, 0);
+
+                winners.forEach(bet => {
+                    const user = userManager.getUser(bet.socketId);
+                    if (user) {
+                        // Calcular parte proporcional del premio
+                        const share = bet.amount / totalWinningBetAmount;
+                        const prize = netPool * share;
+
+                        // Devolver la apuesta original + ganancia
+                        // Ojo: En parimutuel, el netPool YA incluye la apuesta original de todos.
+                        // Así que prize es el total a recibir.
+
+                        user.deposit(prize);
+
+                        console.log(`💰 [WINNER] ${user.id} gana $${prize.toFixed(2)}`);
+
+                        // Notificar al usuario
+                        this.io.to(bet.socketId).emit('BET_RESULT', {
+                            won: true,
+                            amount: prize,
+                            balance: user.balanceUSDT
+                        });
+                    }
+                });
+
+                // Resetear bote acumulado
+                this.accumulatedPot = 0;
+                console.log(`💸 [PAYOUT] Se distribuyeron $${netPool.toFixed(2)} entre ${winners.length} ganadores. Fee: $${houseFee.toFixed(2)}`);
+
+            } else {
+                // No hay ganadores (todos perdieron): Rollover
+                // La casa se lleva el fee del roundPool solamente? O todo va al pozo?
+                // Regla típica: Todo al pozo siguiente.
+                this.accumulatedPot += roundPool;
+                console.log(`🔄 [ROLLOVER] Sin ganadores. Pozo acumulado: $${this.accumulatedPot.toFixed(2)}`);
+            }
+        } else {
+            // EMPATE (DRAW): Devolver apuestas (Refund)
+            console.log('⚖️ [REFUND] Empate. Devolviendo apuestas...');
+            this.currentRound.bets.forEach(bet => {
+                const user = userManager.getUser(bet.socketId);
+                if (user) {
+                    user.deposit(bet.amount);
+                    this.io.to(bet.socketId).emit('BET_RESULT', {
+                        won: false,
+                        refund: true,
+                        amount: bet.amount,
+                        balance: user.balanceUSDT
+                    });
+                }
+            });
+        }
+
+        // Notificar a perdedores
+        const losers = this.currentRound.bets.filter(bet => bet.direction !== result && result !== 'DRAW');
+        losers.forEach(bet => {
+            const user = userManager.getUser(bet.socketId);
+            if (user) {
+                this.io.to(bet.socketId).emit('BET_RESULT', {
+                    won: false,
+                    amount: 0,
+                    balance: user.balanceUSDT
+                });
+            }
+        });
+
         // Emitir resultado a todos los clientes
         this.io.emit('ROUND_RESULT', {
             roundNumber: this.roundNumber,
@@ -266,8 +359,54 @@ class GameLoop {
             priceChange: priceChange,
             priceChangePercent: priceChangePercent,
             totalPool: this.currentRound.totalPool,
+            accumulatedPot: this.accumulatedPot,
+            winnersCount: winners.length,
             timestamp: Date.now()
         });
+    }
+
+    /**
+     * Procesa una apuesta de un usuario
+     * @param {string} socketId 
+     * @param {number} amount 
+     * @param {string} direction 'LONG' | 'SHORT'
+     */
+    handleBet(socketId, amount, direction) {
+        // 1. Validar Fase
+        if (this.currentState !== GAME_STATES.BETTING) {
+            return { success: false, error: 'Las apuestas están cerradas' };
+        }
+
+        // 2. Validar Usuario
+        const user = userManager.getUser(socketId);
+        if (!user) {
+            return { success: false, error: 'Usuario no encontrado' };
+        }
+
+        // 3. Validar Saldo
+        if (!user.hasBalance(amount)) {
+            return { success: false, error: 'Saldo insuficiente' };
+        }
+
+        // 4. Ejecutar Apuesta
+        if (user.withdraw(amount)) {
+            const bet = {
+                userId: user.id,
+                socketId: socketId,
+                amount: amount,
+                direction: direction,
+                timestamp: Date.now()
+            };
+
+            this.currentRound.bets.push(bet);
+            this.currentRound.totalPool += amount;
+
+            console.log(`💵 [BET] ${user.id} apostó $${amount} a ${direction}`);
+
+            return { success: true, balance: user.balanceUSDT };
+        }
+
+        return { success: false, error: 'Error al procesar la apuesta' };
     }
 
     /**

@@ -12,6 +12,7 @@ import dotenv from 'dotenv';
 import GameLoop from './services/gameLoop.js';
 import RoomManager from './services/roomManager.js';
 import priceService from './services/priceService.js';
+import { userManager } from './services/userManager.js';
 
 // Configuración de ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -46,6 +47,9 @@ const gameLoop = new GameLoop(io);
 io.on('connection', (socket) => {
     console.log(`\n🔌 [SOCKET] Cliente conectado: ${socket.id}`);
 
+    // Crear usuario con saldo Demo
+    const user = userManager.createUser(socket.id);
+
     // Añadir usuario a la sala principal por defecto
     const mainRoom = Array.from(roomManager.rooms.values())[0];
     if (mainRoom) {
@@ -53,18 +57,38 @@ io.on('connection', (socket) => {
         socket.join(mainRoom.id);
     }
 
-    // Enviar estado actual del juego al conectarse
+    // Enviar estado inicial
     socket.emit('SYNC_TIME', gameLoop.getState());
+
+    // Enviar perfil de usuario (saldo inicial)
+    socket.emit('USER_PROFILE', user.getProfile());
 
     // Evento: Realizar apuesta
     socket.on('PLACE_BET', (data) => {
-        console.log(`💰 [BET] Usuario ${socket.id} apuesta ${data.amount} USDT en ${data.direction}`);
-        // TODO: Implementar lógica de apuestas en Fase 4
+        const { amount, direction } = data;
+
+        // Delegar al GameLoop
+        const result = gameLoop.handleBet(socket.id, amount, direction);
+
+        if (result.success) {
+            // Confirmar apuesta al cliente
+            socket.emit('BET_CONFIRMED', {
+                amount: amount,
+                direction: direction,
+                balance: result.balance
+            });
+        } else {
+            // Enviar error
+            socket.emit('GAME_ERROR', { message: result.error });
+        }
     });
 
     // Evento: Desconexión
     socket.on('disconnect', () => {
         console.log(`❌ [SOCKET] Cliente desconectado: ${socket.id}`);
+
+        // Remover usuario
+        userManager.removeUser(socket.id);
 
         // Remover de todas las salas
         roomManager.rooms.forEach((room, roomId) => {
