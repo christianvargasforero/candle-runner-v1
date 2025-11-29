@@ -471,10 +471,10 @@ class GameLoop {
             return { success: false, error: 'Skin destruida. Repara o cambia a Droid.' };
         }
 
-        // 2.2 Restricciones Protocol Droid (Anti-Farming)
-        if (user.activeSkin.type === 'PROTOCOL_DROID' && amount > DEFAULT_SKIN.MAX_BET) {
-            return { success: false, error: `Protocol Droid limitado a $${DEFAULT_SKIN.MAX_BET} por apuesta.` };
-        }
+        // 2.2 Restricciones Protocol Droid (Anti-Farming) - DESACTIVADO PARA TESTING
+        // if (user.activeSkin.type === 'PROTOCOL_DROID' && amount > DEFAULT_SKIN.MAX_BET) {
+        //     return { success: false, error: `Protocol Droid limitado a $${DEFAULT_SKIN.MAX_BET} por apuesta.` };
+        // }
 
         // 3. Validar Saldo
         if (!user.hasBalance(amount)) {
