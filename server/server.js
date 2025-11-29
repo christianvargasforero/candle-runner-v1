@@ -263,63 +263,7 @@ io.on('connection', async (socket) => {
     });
 });
 
-// ============================================
-// 📡 API REST - ENDPOINTS
-// ============================================
 
-// Health check
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: Date.now(),
-        gameState: gameLoop.getState(),
-        rooms: roomManager.getRoomsInfo()
-    });
-});
-
-// Obtener estado del juego
-app.get('/api/game/state', (req, res) => {
-    res.json(gameLoop.getState());
-});
-
-// Obtener información de salas
-app.get('/api/rooms', (req, res) => {
-    res.json(roomManager.getRoomsInfo());
-});
-
-
-// ============================================
-// 🚀 INICIO DEL SERVIDOR
-// ============================================
-
-httpServer.listen(PORT, () => {
-    console.log('\n');
-    console.log('╔════════════════════════════════════════════════════════════╗');
-    console.log('║                                                            ║');
-    console.log('║           🕯️  CANDLE RUNNER PROTOCOL v1.0 🕯️              ║');
-    console.log('║                                                            ║');
-    console.log('║              Survival Trading & Creative Economy           ║');
-    console.log('║                                                            ║');
-    console.log('╚════════════════════════════════════════════════════════════╝');
-    console.log('\n');
-    console.log(`🌐 Servidor HTTP escuchando en puerto ${PORT}`);
-    console.log(`🔌 WebSocket Server activo`);
-    console.log(`📊 Dashboard: http://localhost:${PORT}`);
-    console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
-    console.log('\n');
-
-    // Iniciar Price Service (Oráculo)
-    priceService.start();
-
-    // --- ADMIN DASHBOARD STATS ---
-    setInterval(() => {
-        const stats = gameLoop.getAdminStats();
-        io.emit('ADMIN_STATS', stats);
-    }, 1000);
-
-    // Iniciar Game Loop
-    gameLoop.start();
-});
 
 // Manejo de errores
 process.on('uncaughtException', (error) => {
