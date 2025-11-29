@@ -31,24 +31,48 @@ export default class User {
     /**
      * Deduct amount from balance
      * @param {number} amount 
+     * @param {string} type Transaction type (BET, REPAIR)
      * @returns {Promise<boolean>} true if successful
      */
-    async withdraw(amount) {
+    async withdraw(amount, type = 'BET') {
+        // Optimistic check
         if (!this.hasBalance(amount)) return false;
 
-        this.balanceUSDT -= amount;
-
-        // Persist to DB
         try {
-            await prisma.user.update({
-                where: { id: this.id },
-                data: { balanceUSDT: this.balanceUSDT }
+            const result = await prisma.$transaction(async (tx) => {
+                // 1. Create Transaction Record
+                await tx.transaction.create({
+                    data: {
+                        userId: this.id,
+                        type: type,
+                        amount: amount,
+                        currency: 'USDT'
+                    }
+                });
+
+                // 2. Atomic Decrement
+                const updatedUser = await tx.user.update({
+                    where: { id: this.id },
+                    data: { balanceUSDT: { decrement: amount } }
+                });
+
+                // 3. Check Balance Integrity
+                if (updatedUser.balanceUSDT < 0) {
+                    throw new Error('INSUFFICIENT_FUNDS');
+                }
+
+                return updatedUser;
             });
+
+            // Sync memory state
+            this.balanceUSDT = result.balanceUSDT;
             return true;
+
         } catch (error) {
-            console.error(`❌ [DB] Error withdrawing user ${this.id}:`, error);
-            // Rollback memory state if DB fails? For now, assume critical failure.
-            this.balanceUSDT += amount;
+            if (error.message !== 'INSUFFICIENT_FUNDS') {
+                console.error(`❌ [DB] Error withdrawing user ${this.id}:`, error);
+            }
+            // If failed (rollback), memory state remains valid (old balance)
             return false;
         }
     }
@@ -56,17 +80,34 @@ export default class User {
     /**
      * Add amount to balance
      * @param {number} amount 
+     * @param {string} type Transaction type (WIN, REFUND)
      */
-    async deposit(amount) {
-        this.balanceUSDT += amount;
-
+    async deposit(amount, type = 'WIN') {
         try {
-            await prisma.user.update({
-                where: { id: this.id },
-                data: { balanceUSDT: this.balanceUSDT }
+            const result = await prisma.$transaction(async (tx) => {
+                // 1. Create Transaction Record
+                await tx.transaction.create({
+                    data: {
+                        userId: this.id,
+                        type: type,
+                        amount: amount,
+                        currency: 'USDT'
+                    }
+                });
+
+                // 2. Atomic Increment
+                return await tx.user.update({
+                    where: { id: this.id },
+                    data: { balanceUSDT: { increment: amount } }
+                });
             });
+
+            // Sync memory state
+            this.balanceUSDT = result.balanceUSDT;
+            return true;
         } catch (error) {
             console.error(`❌ [DB] Error depositing user ${this.id}:`, error);
+            return false;
         }
     }
 

@@ -41,10 +41,52 @@ class GameLoop {
     /**
      * Inicia el Game Loop infinito
      */
-    start() {
+    async start() {
         console.log('🚀 [GAME LOOP] Iniciando motor de juego...\n');
+
+        // Intentar recuperar estado previo
+        await this.recoverState();
+
         this.startSyncTimer();
-        this.runRound();
+
+        if (this.currentState === GAME_STATES.WAITING) {
+            this.runRound();
+        } else {
+            console.log(`🔄 [RESUME] Reanudando ronda #${this.roundNumber} en fase ${this.currentState}`);
+            this.resumeRound();
+        }
+    }
+
+    async resumeRound() {
+        try {
+            switch (this.currentState) {
+                case GAME_STATES.BETTING:
+                    await this.phaseBetting(true);
+                    await this.phaseLocked();
+                    await this.phaseResolving();
+                    break;
+                case GAME_STATES.LOCKED:
+                    await this.phaseLocked(true);
+                    await this.phaseResolving();
+                    break;
+                case GAME_STATES.RESOLVING:
+                    await this.phaseResolving(true);
+                    break;
+                default:
+                    this.runRound();
+            }
+        } catch (error) {
+            console.error('❌ [RESUME ERROR]', error);
+            this.resetRound();
+            this.runRound();
+        } finally {
+            // Loop continue
+            if (this.currentState !== GAME_STATES.WAITING) {
+                this.resetRound();
+                await this.wait(1000);
+                this.runRound();
+            }
+        }
     }
 
     /**
@@ -78,6 +120,19 @@ class GameLoop {
                 serverTime: now,
                 phaseElapsed: phaseElapsed
             });
+
+            // Persistir estado en Redis (TTL 60s)
+            if (redisClient.isOpen) {
+                const state = {
+                    roundNumber: this.roundNumber,
+                    currentState: this.currentState,
+                    phaseStartTime: this.phaseStartTime,
+                    currentRound: this.currentRound,
+                    accumulatedPot: this.accumulatedPot
+                };
+                redisClient.set('GAME_STATE', JSON.stringify(state), { EX: 60 });
+            }
+
         }, 1000);
 
         console.log('⏰ [SYNC] Temporizador de sincronización iniciado (1s interval)\n');
@@ -131,9 +186,11 @@ class GameLoop {
      * FASE 1: Posicionamiento (0s - 10s)
      * Los jugadores pueden realizar apuestas
      */
-    async phaseBetting() {
+    async phaseBetting(isResuming = false) {
         this.currentState = GAME_STATES.BETTING;
-        this.phaseStartTime = Date.now();
+        if (!isResuming) {
+            this.phaseStartTime = Date.now();
+        }
 
         console.log('🟢 [FASE 1] BETTING - Posicionamiento Abierto');
         console.log(`⏱️  Duración: ${PHASE_BET_TIME / 1000}s`);
@@ -158,9 +215,11 @@ class GameLoop {
      * FASE 2: Lockdown (10s - 25s)
      * No se aceptan más apuestas, visualización del precio
      */
-    async phaseLocked() {
+    async phaseLocked(isResuming = false) {
         this.currentState = GAME_STATES.LOCKED;
-        this.phaseStartTime = Date.now();
+        if (!isResuming) {
+            this.phaseStartTime = Date.now();
+        }
 
         // Capturar precio de entrada (startPrice)
         const priceData = priceService.getCurrentPrice();
@@ -194,9 +253,11 @@ class GameLoop {
      * FASE 3: Resolución (25s - 30s)
      * Determinar ganadores y liquidar perdedores
      */
-    async phaseResolving() {
+    async phaseResolving(isResuming = false) {
         this.currentState = GAME_STATES.RESOLVING;
-        this.phaseStartTime = Date.now();
+        if (!isResuming) {
+            this.phaseStartTime = Date.now();
+        }
 
         console.log('🟡 [FASE 3] RESOLVING - Liquidación');
         console.log(`⏱️  Duración: ${PHASE_RESOLVE_TIME / 1000}s`);
@@ -288,7 +349,8 @@ class GameLoop {
                 // Para este MVP haremos prorrata basada en la apuesta
                 const totalWinningBetAmount = winners.reduce((sum, bet) => sum + bet.amount, 0);
 
-                for (const bet of winners) {
+                // Optimización: Pagos en paralelo
+                await Promise.all(winners.map(async (bet) => {
                     const user = userManager.getUser(bet.socketId);
                     if (user) {
                         // Calcular parte proporcional del premio
@@ -296,10 +358,7 @@ class GameLoop {
                         const prize = netPool * share;
 
                         // Devolver la apuesta original + ganancia
-                        // Ojo: En parimutuel, el netPool YA incluye la apuesta original de todos.
-                        // Así que prize es el total a recibir.
-
-                        await user.deposit(prize);
+                        await user.deposit(prize, 'WIN');
 
                         console.log(`💰 [WINNER] ${user.id} gana $${prize.toFixed(2)}`);
 
@@ -310,7 +369,7 @@ class GameLoop {
                             balance: user.balanceUSDT
                         });
                     }
-                }
+                }));
 
                 // Resetear bote acumulado
                 this.accumulatedPot = 0;
