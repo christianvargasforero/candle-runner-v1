@@ -1,3 +1,5 @@
+
+
 // 🎯 SERVIDOR PRINCIPAL - CANDLE RUNNER PROTOCOL
 // Express + Socket.io + Game Loop
 
@@ -34,6 +36,8 @@ const io = new Server(httpServer, {
     }
 });
 
+
+
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client')));
@@ -67,7 +71,6 @@ app.get('/api/game/state', (req, res) => {
 app.get('/api/rooms', (req, res) => {
     res.json(roomManager.getRoomsInfo());
 });
-
 
 // ============================================
 // 🚀 INICIO DEL SERVIDOR
@@ -124,6 +127,56 @@ io.on('connection', async (socket) => {
                 socket.disconnect();
             }
         });
+
+        // Evento: Admin crea un bus personalizado
+        socket.on('ADMIN_SET_BUS_SIZE', (data) => {
+            const { tierName, capacity } = data;
+            const result = roomManager.createCustomBus(tierName, capacity);
+            socket.emit('BUS_CREATED', result);
+        });
+
+        // Evento: Admin solicita info de buses activos
+        socket.on('ADMIN_GET_BUSES', () => {
+            socket.emit('ADMIN_BUSES', roomManager.getRoomsInfo());
+        });
+
+        // Evento: Admin elimina un bus por ID
+        socket.on('ADMIN_DELETE_BUS', (data) => {
+            const { busId } = data;
+            const result = roomManager.deleteBus(busId);
+            socket.emit('BUS_DELETED', result);
+            // Actualizar lista para todos los admins conectados
+            io.to('admin_channel').emit('ADMIN_BUSES', roomManager.getRoomsInfo());
+        });
+
+        return;
+    }
+    if (clientType === 'admin') {
+        console.log(`🛡️ [ADMIN] Conectado (Esperando Auth): ${socket.id}`);
+
+        socket.on('ADMIN_SUBSCRIBE', (key) => {
+            if (key === 'admin_secret') {
+                socket.join('admin_channel');
+                console.log(`🛡️ [ADMIN] Autenticado: ${socket.id}`);
+                socket.emit('ADMIN_AUTH_SUCCESS');
+            } else {
+                console.log(`⛔ [ADMIN] Fallo de Auth: ${socket.id}`);
+                socket.disconnect();
+            }
+        });
+
+        // Evento: Admin crea un bus personalizado
+        socket.on('ADMIN_SET_BUS_SIZE', (data) => {
+            const { tierName, capacity } = data;
+            const result = roomManager.createCustomBus(tierName, capacity);
+            socket.emit('BUS_CREATED', result);
+        });
+
+        // Evento: Admin solicita info de buses activos
+        socket.on('ADMIN_GET_BUSES', () => {
+            socket.emit('ADMIN_BUSES', roomManager.getRoomsInfo());
+        });
+
         return;
     }
 
@@ -148,8 +201,13 @@ io.on('connection', async (socket) => {
 
     // 🚌 Evento: Unirse a una sala (elegir el "Bus")
     socket.on('JOIN_ROOM', async (data) => {
-        const { roomName } = data; // 'TRAINING', 'SATOSHI', 'TRADER', 'WHALE'
-        const roomId = `room_${roomName.toLowerCase()}`;
+        // Ahora esperamos un ID específico de bus (ej: 'bus_training_1')
+        const { roomId } = data;
+
+        if (!roomId) {
+            socket.emit('GAME_ERROR', { message: 'Bus ID is required' });
+            return;
+        }
 
         // Salir de la sala actual si existe
         if (user.currentRoom) {
@@ -158,22 +216,33 @@ io.on('connection', async (socket) => {
         }
 
         // Intentar unirse a la nueva sala
-        const result = await roomManager.addUserToRoom(socket.id, roomId);
+        const { BusGameLoop } = await import('./services/gameLoop.js');
+        const result = await roomManager.addUserToRoom(socket.id, roomId, (room) => {
+            // Solo arrancar si no hay ya un gameLoopInstance
+            if (!room.gameLoopInstance) {
+                room.gameLoopInstance = new BusGameLoop(io, room, roomManager);
+                room.gameLoopInstance.startBus();
+            }
+        });
 
         if (result.success) {
             user.currentRoom = roomId;
             socket.join(roomId);
 
+            const room = roomManager.getRoom(roomId);
             socket.emit('ROOM_JOINED', {
                 roomId: roomId,
-                roomName: roomName,
-                ticketPrice: roomManager.getRoom(roomId).ticketPrice
+                roomName: room.name, // Tier name
+                ticketPrice: room.ticketPrice
             });
 
             io.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
-            console.log(`🚌 [JOIN] Usuario ${user.id} subió al bus ${roomName}`);
+            // También actualizar la lista de buses para todos (admin y clientes)
+            io.emit('ADMIN_BUSES', roomManager.getRoomsInfo());
+
+            console.log(`🚌 [JOIN] Usuario ${user.id} subió al bus ${roomId} (${room.name})`);
         } else {
-            socket.emit('GAME_ERROR', { message: `No puedes entrar a ${roomName}: ${result.error}` });
+            socket.emit('GAME_ERROR', { message: `No puedes entrar a ${roomId}: ${result.error}` });
         }
     });
 
@@ -270,14 +339,58 @@ io.on('connection', async (socket) => {
                 balance: user.balanceUSDT,
                 transactionId: `TX-${Date.now()}`
             });
+            // Emitir perfil actualizado tras retiro
+            socket.emit('USER_PROFILE', user.getProfile());
         } else {
             socket.emit('GAME_ERROR', { message: 'Error al procesar el retiro' });
         }
     });
 
+    // 🎒 Evento: Equipar Skin del inventario
+    socket.on('EQUIP_SKIN', (data) => {
+        const user = userManager.getUser(socket.id);
+        if (!user) return;
+
+        const { skinId } = data;
+
+        // Buscar la skin en el inventario
+        const skin = user.inventory.find(s => s.id === skinId);
+
+        if (!skin) {
+            socket.emit('GAME_ERROR', { message: 'Skin no encontrada en inventario' });
+            return;
+        }
+
+        // Verificar que no esté quemada
+        if (skin.isBurned) {
+            socket.emit('GAME_ERROR', { message: '💀 Esta skin está quemada. No puede equiparse.' });
+            return;
+        }
+
+        // Cambiar la skin activa
+        user.activeSkin = skin;
+
+        console.log(`🎨 [EQUIP] Usuario ${user.id} equipó skin: ${skin.name}`);
+
+        // Enviar perfil actualizado
+        socket.emit('USER_PROFILE', user.getProfile());
+        socket.emit('SKIN_EQUIPPED', {
+            skinId: skin.id,
+            skinName: skin.name,
+            message: `✅ ${skin.name} equipada`
+        });
+    });
+
+
     // Evento: Solicitar conteo de salas
     socket.on('GET_ROOM_COUNTS', () => {
         socket.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
+    });
+
+    // Evento: Admin solicita info de buses activos
+    socket.on('ADMIN_GET_BUSES', () => {
+        // Devuelve la lista de buses y su estado actual
+        socket.emit('ADMIN_BUSES', roomManager.getRoomsInfo());
     });
 
     // Evento: Desconexión
@@ -306,4 +419,4 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('❌ [ERROR] Promesa rechazada no manejada:', reason);
 });
 
-export { io, roomManager, gameLoop, priceService };
+

@@ -3,14 +3,19 @@
 
 export const GOLDEN_RATIO = 1.618;
 
-// ⏱️ TEMPORIZACIÓN DEL GAME LOOP
+// ⏱️ TEMPORIZACIÓN DEL GAME LOOP (POR BUS, NO GLOBAL)
 export const ROUND_DURATION = 30000; // 30 segundos por ronda
 export const PHASE_BET_TIME = 10000; // 10s - Fase de Posicionamiento
 export const PHASE_LOCK_TIME = 15000; // 15s - Fase de Lockdown
 export const PHASE_RESOLVE_TIME = 5000; // 5s - Fase de Liquidación
 
-// 🏛️ GESTIÓN DE SALAS (FIBONACCI SHARDING)
-export const ROOM_MAX_CAPACITY = 987; // Número de Fibonacci para mitosis
+// 🚌 MODELO "BUS CON SILLAS" - CAPACIDADES FIBONACCI
+export const FIBONACCI_CAPACITIES = [2, 3, 5, 8, 13, 21, 34, 55, 89, 144]; // Secuencia permitida
+export const DEFAULT_CAPACITY = 5; // Capacidad inicial por defecto
+export const FILL_SPEED_THRESHOLD = 10000; // 10s - Si se llena más rápido, trigger Mitosis
+
+// 🏛️ GESTIÓN DE SALAS (FIBONACCI SHARDING - LEGACY)
+export const ROOM_MAX_CAPACITY = 987; // Número de Fibonacci para mitosis (DEPRECADO en modelo Bus)
 export const SPLIT_RATIO_ALPHA = 0.618; // 61.8% del pozo va a sala Alpha
 export const SPLIT_RATIO_BETA = 0.382; // 38.2% del pozo va a sala Beta
 
@@ -37,12 +42,20 @@ export const DEFAULT_SKIN = {
   MAX_BET: 0.10 // Límite de apuesta para evitar farming masivo
 };
 
-// 🏛️ REGLAS DE ACCESO A SALAS (MODELO "BUS" - PRECIO FIJO)
+// 🏛️ REGLAS DE ACCESO A SALAS (MODELO "BUS" - PRECIO FIJO + CAPACIDAD)
 export const ROOM_ACCESS_RULES = {
-  TRAINING: { allowDefault: true, minLevel: 0, ticketPrice: 0 },        // Gratis (Practice Mode)
-  SATOSHI: { allowDefault: true, minLevel: 0, ticketPrice: 0.10 },     // $0.10 Ticket
-  TRADER: { allowDefault: false, minLevel: 1, ticketPrice: 1.00 },     // $1.00 Ticket
-  WHALE: { allowDefault: false, minLevel: 4, ticketPrice: 10.00 }      // $10.00 Ticket
+  TRAINING: { allowDefault: true, minLevel: 0, ticketPrice: 0, defaultCapacity: 5 },        // Gratis (Practice Mode)
+  SATOSHI: { allowDefault: true, minLevel: 0, ticketPrice: 0.10, defaultCapacity: 5 },     // $0.10 Ticket
+  TRADER: { allowDefault: false, minLevel: 1, ticketPrice: 1.00, defaultCapacity: 8 },     // $1.00 Ticket
+  WHALE: { allowDefault: false, minLevel: 4, ticketPrice: 10.00, defaultCapacity: 13 }      // $10.00 Ticket
+};
+
+// 🎮 ESTADOS DEL BUS (Reemplazan GAME_STATES para cada sala)
+export const BUS_STATES = {
+  BOARDING: 'BOARDING',        // Esperando pasajeros
+  LOCKED: 'LOCKED',            // Bus lleno, puertas cerradas
+  IN_PROGRESS: 'IN_PROGRESS',  // Viaje en curso (vela de 30s)
+  FINISHED: 'FINISHED'         // Llegada, distribuyendo premios
 };
 
 // 🔥 ECONOMÍA $WICK

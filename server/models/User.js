@@ -12,9 +12,34 @@ export default class User {
         this.balanceUSDT = 10000; // Demo balance (Testing)
         this.balanceWICK = 500;   // Demo WICK for repairs (Testing)
 
+        // 🎒 INVENTARIO DE SKINS
+        this.inventory = [];
+
+        // Crear Protocol Droid (siempre disponible)
+        // isDefault se calcula automáticamente en Skin.js basado en el tipo 'PROTOCOL_DROID'
+        const protocolDroid = new Skin('default_droid', 'PROTOCOL_DROID');
+        protocolDroid.userId = id;
+        this.inventory.push(protocolDroid);
+
+        // 🎨 DEMO: Crear 2 Skins NFT de prueba para el inventario
+        const neonPunk = new Skin(`skin_${id}_1`, 'NEON_PUNK');
+        neonPunk.userId = id;
+        neonPunk.level = 1;
+        neonPunk.currentIntegrity = 100;
+        neonPunk.maxIntegrity = 100;
+        neonPunk.totalInvestment = 300; // Demo value
+        this.inventory.push(neonPunk);
+
+        const cyberSamurai = new Skin(`skin_${id}_2`, 'CYBER_SAMURAI');
+        cyberSamurai.userId = id;
+        cyberSamurai.level = 0;
+        cyberSamurai.currentIntegrity = 60; // Dañada para mostrar reparación
+        cyberSamurai.maxIntegrity = 100;
+        cyberSamurai.totalInvestment = 150;
+        this.inventory.push(cyberSamurai);
+
         // Skin activa (por defecto Protocol Droid)
-        this.activeSkin = new Skin('default_droid', 'PROTOCOL_DROID');
-        this.activeSkin.userId = id; // Link skin to user for persistence
+        this.activeSkin = this.inventory[0]; // El primer elemento es el Droid
 
         this.createdAt = Date.now();
     }
@@ -134,12 +159,27 @@ export default class User {
             balanceUSDT: this.balanceUSDT,
             balanceWICK: this.balanceWICK,
             activeSkin: {
+                id: this.activeSkin.id,
                 type: this.activeSkin.type,
                 name: this.activeSkin.name,
+                level: this.activeSkin.level || 0,
                 integrity: this.activeSkin.currentIntegrity,
                 maxIntegrity: this.activeSkin.maxIntegrity,
-                isBurned: this.activeSkin.isBurned
-            }
+                isBurned: this.activeSkin.isBurned,
+                isDefault: this.activeSkin.isDefault || false
+            },
+            // 🎒 Inventario completo
+            inventory: this.inventory.map(skin => ({
+                id: skin.id,
+                type: skin.type,
+                name: skin.name,
+                level: skin.level || 0,
+                integrity: skin.currentIntegrity,
+                maxIntegrity: skin.maxIntegrity,
+                isBurned: skin.isBurned,
+                isDefault: skin.isDefault || false,
+                isActive: skin.id === this.activeSkin.id // Marcar cual está equipada
+            }))
         };
     }
 }

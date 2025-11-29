@@ -1,5 +1,5 @@
-// 🎮 GAME LOOP - Motor de Juego Síncrono de 30 Segundos
-// Este módulo controla el ciclo de vida de cada ronda del juego
+// 🚌 GAME LOOP - Motor de Juego por Bus (Instancias Múltiples)
+// Cada bus tiene su propio ciclo de juego de 30 segundos
 
 import {
     ROUND_DURATION,
@@ -7,6 +7,7 @@ import {
     PHASE_LOCK_TIME,
     PHASE_RESOLVE_TIME,
     GAME_STATES,
+    BUS_STATES,
     INTEGRITY_LOSS_PER_DEFEAT,
     ASH_INSURANCE_RATIO,
     DEFAULT_SKIN
@@ -16,137 +17,85 @@ import priceService from './priceService.js';
 import { userManager } from './userManager.js';
 import redisClient from '../config/redis.js';
 
-class GameLoop {
-    constructor(io, roomManager = null) {
-        this.io = io; // Socket.io instance
-        this.roomManager = roomManager; // 🚌 Room Manager para acceder a precios de tickets
-        this.currentState = GAME_STATES.WAITING;
-        this.roundNumber = 0;
+/**
+ * 🚌 BusGameLoop - Instancia de juego para un bus específico
+ * Cada bus opera independientemente con su propio temporizador
+ */
+class BusGameLoop {
+    /**
+     * Limpia recursos y timers al finalizar el ciclo del bus
+     */
+    cleanup() {
+        this.stopSyncTimer();
+        // Aquí puedes agregar más lógica de limpieza si es necesario
+        console.log(`🧹 [BUS LOOP] Cleanup ejecutado para bus ${this.room.id}`);
+    }
+    constructor(io, room, roomManager) {
+        this.io = io;
+        this.room = room; // Referencia al Room/Bus
+        this.roomManager = roomManager;
+        this.currentState = GAME_STATES.BETTING;
+        this.roundNumber = 1;
         this.startTime = null;
         this.phaseStartTime = null;
-        this.timeElapsed = 0;
-        this.syncInterval = null; // Intervalo para SYNC_TIME
+        this.syncInterval = null;
 
-        // Datos de la ronda actual
+        // Datos de la ronda
         this.currentRound = {
             startPrice: null,
             endPrice: null,
             bets: [],
-            bets: [],
             totalPool: 0
         };
 
-        // Bote acumulado (Rollover)
-        this.accumulatedPot = 0;
-        this.rolloverCount = 0; // Contador para dispersión de tesorería
-
-        // Estadísticas para Admin Dashboard
+        // Estadísticas
         this.stats = {
             revenue: 0,
             treasury: 0,
             burned: 0
         };
+
+        console.log(`🚌 [BUS LOOP] Instancia creada para bus ${room.id}`);
     }
 
     /**
-     * Recupera el estado del juego desde Redis
+     * Inicia el ciclo de juego para este bus
      */
-    async recoverState() {
-        if (!redisClient.isOpen) return;
+    async startBus() {
+        this.startTime = Date.now();
+        this.room.status = BUS_STATES.IN_PROGRESS;
 
-        try {
-            const data = await redisClient.get('GAME_STATE');
-            if (data) {
-                const state = JSON.parse(data);
+        console.log(`\n${'='.repeat(60)}`);
+        console.log(`🚀 BUS ${this.room.id} - PARTIDA INICIADA`);
+        console.log(`   Pasajeros: ${this.room.users.size}/${this.room.capacity}`);
+        console.log(`   Pozo Total: $${this.room.ticketPrice * this.room.users.size}`);
+        console.log(`${'='.repeat(60)}\n`);
 
-                this.roundNumber = state.roundNumber;
-                this.accumulatedPot = state.accumulatedPot;
-                this.currentState = state.currentState;
-                this.currentRound = state.currentRound || this.currentRound;
-                this.rolloverCount = state.rolloverCount || 0;
-
-                // Calcular tiempo restante para sincronizar
-                if (state.timeLeft > 0) {
-                    const phaseDuration = this.getPhaseDuration(this.currentState);
-                    this.phaseStartTime = Date.now() - (phaseDuration - state.timeLeft);
-                }
-
-                console.log('🔄 Estado recuperado de Redis');
-
-                if (this.currentState !== GAME_STATES.WAITING) {
-                    this.resumeRound();
-                }
-            }
-        } catch (error) {
-            console.error('❌ [RECOVERY] Error recuperando estado:', error);
-        }
-    }
-
-    getPhaseDuration(phase) {
-        switch (phase) {
-            case GAME_STATES.BETTING: return PHASE_BET_TIME;
-            case GAME_STATES.LOCKED: return PHASE_LOCK_TIME;
-            case GAME_STATES.RESOLVING: return PHASE_RESOLVE_TIME;
-            default: return 0;
-        }
-    }
-
-    /**
-     * Inicia el Game Loop infinito
-     */
-    async start() {
-        console.log('🚀 [GAME LOOP] Iniciando motor de juego...\n');
-
-        // Intentar recuperar estado previo
-        await this.recoverState();
-
+        // Iniciar sincronización
         this.startSyncTimer();
 
-        if (this.currentState === GAME_STATES.WAITING) {
-            this.runRound();
-        } else {
-            console.log(`🔄 [RESUME] Reanudando ronda #${this.roundNumber} en fase ${this.currentState}`);
-            this.resumeRound();
-        }
-    }
-
-    async resumeRound() {
         try {
-            switch (this.currentState) {
-                case GAME_STATES.BETTING:
-                    await this.phaseBetting(true);
-                    await this.phaseLocked();
-                    await this.phaseResolving();
-                    break;
-                case GAME_STATES.LOCKED:
-                    await this.phaseLocked(true);
-                    await this.phaseResolving();
-                    break;
-                case GAME_STATES.RESOLVING:
-                    await this.phaseResolving(true);
-                    break;
-                default:
-                    this.runRound();
-            }
+            // FASE 1: BETTING (0s - 10s)
+            await this.phaseBetting();
+
+            // FASE 2: LOCKED (10s - 25s)
+            await this.phaseLocked();
+
+            // FASE 3: RESOLVING (25s - 30s)
+            await this.phaseResolving();
+
         } catch (error) {
-            console.error('❌ [RESUME ERROR]', error);
-            this.resetRound();
-            this.runRound();
+            console.error(`❌ [BUS ${this.room.id}] Error en Game Loop:`, error);
         } finally {
-            // Loop continue
-            if (this.currentState !== GAME_STATES.WAITING) {
-                this.resetRound();
-                await this.wait(1000);
-                this.runRound();
-            }
+            // Cleanup
+            this.cleanup();
         }
     }
 
     /**
-     * Inicia el temporizador de sincronización (SYNC_TIME cada segundo)
+     * Emite SYNC_TIME a los usuarios de este bus
      */
     startSyncTimer() {
-        // Emitir SYNC_TIME cada 1 segundo a todos los clientes
         this.syncInterval = setInterval(() => {
             const now = Date.now();
             const phaseElapsed = this.phaseStartTime ? now - this.phaseStartTime : 0;
@@ -166,177 +115,118 @@ class GameLoop {
 
             const timeLeft = Math.max(0, phaseDuration - phaseElapsed);
 
-            this.io.emit('SYNC_TIME', {
-                state: this.currentState,
-                roundNumber: this.roundNumber,
-                timeLeft: timeLeft,
-                serverTime: now,
-                phaseElapsed: phaseElapsed
-            });
-
-            // Persistir estado en Redis (TTL 60s)
-            if (redisClient.isOpen) {
-                const state = {
+            // Emitir solo a los usuarios de este bus
+            for (const socketId of this.room.users.keys()) {
+                this.io.to(socketId).emit('SYNC_TIME', {
+                    state: this.currentState,
                     roundNumber: this.roundNumber,
-                    currentState: this.currentState,
-                    phaseStartTime: this.phaseStartTime,
-                    currentRound: this.currentRound,
-                    accumulatedPot: this.accumulatedPot
-                };
-                redisClient.set('GAME_STATE', JSON.stringify(state), { EX: 60 });
+                    timeLeft: timeLeft,
+                    serverTime: now,
+                    roomId: this.room.id
+                });
             }
-
         }, 1000);
-
-        console.log('⏰ [SYNC] Temporizador de sincronización iniciado (1s interval)\n');
     }
 
     /**
-     * Ejecuta una ronda completa de 30 segundos con manejo robusto de errores
+     * Detiene el temporizador de sincronización
      */
-    async runRound() {
-        this.roundNumber++;
-        this.startTime = Date.now();
-
-        console.log(`\n${'='.repeat(60)}`);
-        console.log(`🎯 RONDA #${this.roundNumber} INICIADA`);
-        console.log(`${'='.repeat(60)}\n`);
-
-        try {
-            // FASE 1: BETTING (0s - 10s)
-            await this.phaseBetting();
-
-            // FASE 2: LOCKED (10s - 25s)
-            await this.phaseLocked();
-
-            // FASE 3: RESOLVING (25s - 30s)
-            await this.phaseResolving();
-
-        } catch (error) {
-            console.error('❌ [ERROR] Error crítico en Game Loop:', error);
-            console.error('📊 Stack trace:', error.stack);
-
-            // Emitir error a clientes (opcional, para debugging)
-            this.io.emit('GAME_ERROR', {
-                message: 'Error en el servidor. Reiniciando ronda...',
-                roundNumber: this.roundNumber,
-                timestamp: Date.now()
-            });
-
-        } finally {
-            // SIEMPRE ejecutar cleanup y continuar, incluso si hay error
-            this.resetRound();
-
-            // Pequeña pausa antes de la siguiente ronda en caso de error
-            await this.wait(1000);
-
-            // Ejecutar siguiente ronda
-            this.runRound();
+    stopSyncTimer() {
+        if (this.syncInterval) {
+            clearInterval(this.syncInterval);
+            this.syncInterval = null;
         }
     }
+
+
 
     /**
      * FASE 1: Posicionamiento (0s - 10s)
-     * Los jugadores pueden realizar apuestas
      */
-    async phaseBetting(isResuming = false) {
+    async phaseBetting() {
         this.currentState = GAME_STATES.BETTING;
-        if (!isResuming) {
-            this.phaseStartTime = Date.now();
+        this.phaseStartTime = Date.now();
+
+        console.log(`🟢 [BUS ${this.room.id}] FASE 1 - BETTING (${PHASE_BET_TIME / 1000}s)`);
+
+        // Emitir estado solo a usuarios de este bus
+        for (const socketId of this.room.users.keys()) {
+            this.io.to(socketId).emit('GAME_STATE', {
+                state: this.currentState,
+                roundNumber: this.roundNumber,
+                timeLeft: PHASE_BET_TIME,
+                serverTime: Date.now(),
+                roomId: this.room.id
+            });
         }
 
-        console.log('🟢 [FASE 1] BETTING - Posicionamiento Abierto');
-        console.log(`⏱️  Duración: ${PHASE_BET_TIME / 1000}s`);
-        console.log(`📊 Estado: Aceptando apuestas LONG/SHORT\n`);
-
-        // Emitir estado a todos los clientes conectados
-        this.io.emit('GAME_STATE', {
-            state: this.currentState,
-            roundNumber: this.roundNumber,
-            timeLeft: PHASE_BET_TIME,
-            serverTime: Date.now()
-        });
-
-        // Simular el paso del tiempo
         await this.wait(PHASE_BET_TIME);
-
-        const elapsed = Date.now() - this.phaseStartTime;
-        console.log(`✅ Fase BETTING completada (${elapsed}ms)\n`);
+        console.log(`✅ [BUS ${this.room.id}] BETTING completada\n`);
     }
 
     /**
      * FASE 2: Lockdown (10s - 25s)
-     * No se aceptan más apuestas, visualización del precio
      */
-    async phaseLocked(isResuming = false) {
+    async phaseLocked() {
         this.currentState = GAME_STATES.LOCKED;
-        if (!isResuming) {
-            this.phaseStartTime = Date.now();
-        }
+        this.phaseStartTime = Date.now();
 
-        // Capturar precio de entrada (startPrice)
+        // Capturar precio de entrada
         const priceData = priceService.getCurrentPrice();
         if (priceData) {
             this.currentRound.startPrice = priceData.price;
-            console.log('🔴 [FASE 2] LOCKED - Cierre Criptográfico');
-            console.log(`⏱️  Duración: ${PHASE_LOCK_TIME / 1000}s`);
-            console.log(`🔒 Estado: Apuestas cerradas, renderizando precio`);
-            console.log(`💲 Precio de Entrada: $${this.currentRound.startPrice.toFixed(2)} (${priceData.sources} exchanges)\n`);
-        } else {
-            console.warn('⚠️  [FASE 2] No se pudo obtener precio de entrada');
-            this.currentRound.startPrice = null;
+            console.log(`🔴 [BUS ${this.room.id}] FASE 2 - LOCKED`);
+            console.log(`   Precio Entrada: $${this.currentRound.startPrice.toFixed(2)}\n`);
         }
 
-        this.io.emit('GAME_STATE', {
-            state: this.currentState,
-            roundNumber: this.roundNumber,
-            timeLeft: PHASE_LOCK_TIME,
-            serverTime: Date.now(),
-            startPrice: this.currentRound.startPrice
-        });
+        // Emitir estado
+        for (const socketId of this.room.users.keys()) {
+            this.io.to(socketId).emit('GAME_STATE', {
+                state: this.currentState,
+                roundNumber: this.roundNumber,
+                timeLeft: PHASE_LOCK_TIME,
+                serverTime: Date.now(),
+                startPrice: this.currentRound.startPrice,
+                roomId: this.room.id
+            });
+        }
 
-        // Renderizar el precio de Bitcoin en tiempo real
         await this.wait(PHASE_LOCK_TIME);
-
-        const elapsed = Date.now() - this.phaseStartTime;
-        console.log(`✅ Fase LOCKED completada (${elapsed}ms)\n`);
+        console.log(`✅ [BUS ${this.room.id}] LOCKED completada\n`);
     }
 
     /**
      * FASE 3: Resolución (25s - 30s)
-     * Determinar ganadores y liquidar perdedores
      */
-    async phaseResolving(isResuming = false) {
+    async phaseResolving() {
         this.currentState = GAME_STATES.RESOLVING;
-        if (!isResuming) {
-            this.phaseStartTime = Date.now();
+        this.phaseStartTime = Date.now();
+
+        console.log(`🟡 [BUS ${this.room.id}] FASE 3 - RESOLVING`);
+
+        // Emitir estado
+        for (const socketId of this.room.users.keys()) {
+            this.io.to(socketId).emit('GAME_STATE', {
+                state: this.currentState,
+                roundNumber: this.roundNumber,
+                timeLeft: PHASE_RESOLVE_TIME,
+                serverTime: Date.now(),
+                roomId: this.room.id
+            });
         }
 
-        console.log('🟡 [FASE 3] RESOLVING - Liquidación');
-        console.log(`⏱️  Duración: ${PHASE_RESOLVE_TIME / 1000}s`);
-        console.log(`⚖️  Estado: Calculando ganadores y distribuyendo premios\n`);
-
-        this.io.emit('GAME_STATE', {
-            state: this.currentState,
-            roundNumber: this.roundNumber,
-            timeLeft: PHASE_RESOLVE_TIME,
-            serverTime: Date.now()
-        });
-
-        // Aquí se calculará el resultado basado en startPrice vs endPrice
+        // Resolver resultado
         await this.resolveRound();
 
         await this.wait(PHASE_RESOLVE_TIME);
-
-        const elapsed = Date.now() - this.phaseStartTime;
-        console.log(`✅ Fase RESOLVING completada (${elapsed}ms)\n`);
+        console.log(`✅ [BUS ${this.room.id}] RESOLVING completada\n`);
     }
 
     /**
-     * Resuelve la ronda actual con precio final y determina ganadores
+     * Resuelve la ronda y distribuye premios para este bus
      */
     async resolveRound() {
-        // Capturar precio de salida (endPrice)
+        // Capturar precio final
         const priceData = priceService.getCurrentPrice();
 
         if (priceData) {
@@ -393,7 +283,7 @@ class GameLoop {
             const roundPool = this.currentRound.totalPool;
             const totalPot = roundPool + this.accumulatedPot;
 
-            if (winners.length > 0) {
+            if (winners.length > 0 && totalPot > 0) {
                 // Hay ganadores: Distribuir premio
                 houseFee = totalPot * 0.05; // 5% Fee
                 this.stats.revenue += houseFee;
@@ -401,38 +291,57 @@ class GameLoop {
 
                 netPool = totalPot - houseFee;
 
-                // Distribución simplificada: Igualitaria (se puede mejorar a prorrata)
-                // Para este MVP haremos prorrata basada en la apuesta
+                // Prorrata basada en la apuesta
                 const totalWinningBetAmount = winners.reduce((sum, bet) => sum + bet.amount, 0);
 
-                // Optimización: Pagos en paralelo
-                await Promise.all(winners.map(async (bet) => {
-                    const user = userManager.getUser(bet.socketId);
-                    if (user) {
-                        // Calcular parte proporcional del premio
-                        const share = bet.amount / totalWinningBetAmount;
-                        const prize = netPool * share;
+                // Validar que el totalWinningBetAmount sea válido
+                if (totalWinningBetAmount > 0 && !isNaN(netPool)) {
+                    // Optimización: Pagos en paralelo
+                    await Promise.all(winners.map(async (bet) => {
+                        const user = userManager.getUser(bet.socketId);
+                        if (user) {
+                            // Calcular parte proporcional del premio
+                            const share = bet.amount / totalWinningBetAmount;
+                            const prize = netPool * share;
+                            // Validar premio
+                            const safePrize = isNaN(prize) || !isFinite(prize) ? 0 : prize;
 
-                        // Devolver la apuesta original + ganancia
-                        await user.deposit(prize, 'WIN');
+                            // Devolver la apuesta original + ganancia
+                            await user.deposit(safePrize, 'WIN');
 
-                        console.log(`💰 [WINNER] ${user.id} gana $${prize.toFixed(2)}`);
+                            console.log(`💰 [WINNER] ${user.id} gana $${safePrize.toFixed(2)}`);
 
-                        this.io.emit('ADMIN_LOG', {
-                            type: 'WIN',
-                            user: user.id,
-                            detail: `$${prize.toFixed(2)}`,
-                            isWhale: prize >= 100
-                        });
+                            this.io.emit('ADMIN_LOG', {
+                                type: 'WIN',
+                                user: user.id,
+                                detail: `$${safePrize.toFixed(2)}`,
+                                isWhale: safePrize >= 100
+                            });
 
-                        // Notificar al usuario
-                        this.io.to(bet.socketId).emit('BET_RESULT', {
-                            won: true,
-                            amount: prize,
-                            balance: user.balanceUSDT
-                        });
-                    }
-                }));
+                            // Notificar al usuario
+                            this.io.to(bet.socketId).emit('BET_RESULT', {
+                                won: true,
+                                amount: safePrize,
+                                balance: user.balanceUSDT,
+                                isSoleWinner: winners.length === 1 // 🏆 Flag para indicar si ganó todo el pozo
+                            });
+                            // Emitir perfil actualizado
+                            this.io.to(bet.socketId).emit('USER_PROFILE', user.getProfile());
+                            // Notificar si ganó el bote mayor
+                            if (!this.stats.biggestWin || safePrize > this.stats.biggestWin.amount) {
+                                this.stats.biggestWin = { userId: user.id, amount: safePrize, round: this.roundNumber, bus: this.room.id };
+                                this.io.to(bet.socketId).emit('BIG_POT_WIN', {
+                                    message: `¡FELICIDADES! Has ganado el mayor bote histórico de este bus: $${safePrize.toFixed(2)} 🎉`,
+                                    amount: safePrize,
+                                    round: this.roundNumber,
+                                    bus: this.room.id
+                                });
+                            }
+                        }
+                    }));
+                } else {
+                    console.warn('❌ [PAYOUT] Error: totalWinningBetAmount o netPool inválido. No se distribuyen premios.');
+                }
 
                 // Resetear bote acumulado y contador
                 this.accumulatedPot = 0;
@@ -469,6 +378,8 @@ class GameLoop {
                         amount: bet.amount,
                         balance: user.balanceUSDT
                     });
+                    // Emitir perfil actualizado
+                    this.io.to(bet.socketId).emit('USER_PROFILE', user.getProfile());
                 }
             });
         }
@@ -506,6 +417,13 @@ class GameLoop {
                     },
                     refundAmount: refundAmount
                 });
+                // Emitir perfil actualizado
+                this.io.to(bet.socketId).emit('USER_PROFILE', user.getProfile());
+
+                // Sacar al perdedor de la sala/bus
+                if (user.currentRoom && this.roomManager) {
+                    this.roomManager.removeUserFromRoom(bet.socketId, user.currentRoom);
+                }
             }
         }
 
@@ -709,4 +627,73 @@ class GameLoop {
     }
 }
 
+/**
+ * 🎮 GameLoop - Clase de compatibilidad (Wrapper temporal)
+ * Mantiene la API existente mientras migramos al modelo Bus
+ */
+class GameLoop extends BusGameLoop {
+    constructor(io, roomManager = null) {
+        // Crear un room ficticio para compatibilidad
+        const dummyRoom = {
+            id: 'legacy_room',
+            name: 'LEGACY',
+            ticketPrice: 0.10,
+            capacity: 5,
+            users: new Map(),
+            status: BUS_STATES.BOARDING
+        };
+
+        super(io, dummyRoom, roomManager);
+
+        console.log('⚠️  [LEGACY MODE] GameLoop iniciado en modo compatibilidad');
+        console.log('   Recomendación: Migrar a GameLoopManager');
+    }
+
+    /**
+     * Método legacy para iniciar el loop
+     */
+    async start() {
+        console.log('🚀 [LEGACY LOOP] Iniciando en modo singleton...\n');
+        // Por ahora, simplemente esperar
+        // TODO: Implementar GameLoopManager completo
+    }
+
+    /**
+     * Método auxiliar para calcular duración de fase
+     */
+    getPhaseDuration(phase) {
+        switch (phase) {
+            case GAME_STATES.BETTING: return PHASE_BET_TIME;
+            case GAME_STATES.LOCKED: return PHASE_LOCK_TIME;
+            case GAME_STATES.RESOLVING: return PHASE_RESOLVE_TIME;
+            default: return 0;
+        }
+    }
+
+    /**
+     * Método legacy para manejar apuestas
+     * Redirige la apuesta a la instancia correcta del BusGameLoop
+     */
+    async handleBet(socketId, direction) {
+        const user = userManager.getUser(socketId);
+        if (!user) {
+            return { success: false, error: 'Usuario no encontrado' };
+        }
+
+        if (!user.currentRoom) {
+            return { success: false, error: 'No estás en ningún bus' };
+        }
+
+        // Obtener la sala y su instancia de juego
+        const room = this.roomManager.getRoom(user.currentRoom);
+        if (!room || !room.gameLoopInstance) {
+            return { success: false, error: 'Bus no activo o inválido' };
+        }
+
+        // Delegar la apuesta a la instancia específica del bus
+        return await room.gameLoopInstance.handleBet(socketId, direction);
+    }
+}
+
 export default GameLoop;
+export { BusGameLoop };

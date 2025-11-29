@@ -1,4 +1,4 @@
-// 🚀 BOOT SCENE - Carga de Assets y Preparación
+// [ BOOT SCENE ] - Carga de Assets y Preparación
 // Esta escena carga todos los recursos necesarios antes de iniciar el juego
 
 export default class BootScene extends Phaser.Scene {
@@ -16,11 +16,11 @@ export default class BootScene extends Phaser.Scene {
         // this.load.spritesheet('candle', 'assets/candle.png', { frameWidth: 32, frameHeight: 64 });
         // this.load.audio('win', 'assets/sounds/win.mp3');
 
-        console.log('🚀 [BOOT] Cargando assets...');
+        console.log('[BOOT] Cargando assets...');
     }
 
     create() {
-        console.log('✅ [BOOT] Assets cargados. Generando texturas...');
+        console.log('[BOOT] [OK] Assets cargados. Generando texturas...');
 
         // Generar textura para el JUGADOR (Sprite)
         const playerGraphics = this.make.graphics({ x: 0, y: 0, add: false });
@@ -46,7 +46,7 @@ export default class BootScene extends Phaser.Scene {
         particleGraphics.fillCircle(4, 4, 4);
         particleGraphics.generateTexture('particleTexture', 8, 8);
 
-        console.log('✅ [BOOT] Texturas generadas. Iniciando menú...');
+        console.log('[BOOT] [OK] Texturas generadas. Iniciando menú...');
 
         // Iniciar la escena de menú
         this.scene.start('MenuScene');
@@ -57,7 +57,7 @@ export default class BootScene extends Phaser.Scene {
         const height = this.cameras.main.height;
 
         // Texto de carga
-        const loadingText = this.add.text(width / 2, height / 2 - 50, 'Cargando...', {
+        const loadingText = this.add.text(width / 2, height / 2 - 50, 'LOADING_SYSTEM...', {
             font: '20px Courier New',
             fill: '#00ff88'
         });

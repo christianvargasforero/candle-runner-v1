@@ -1,4 +1,4 @@
-// 🎮 GAME SCENE - Endless Runner con Físicas Reales
+// [ GAME SCENE ] - Endless Runner con Físicas Reales
 // El jugador REALMENTE salta y puede caer al vacío
 
 export default class GameScene extends Phaser.Scene {
@@ -26,10 +26,14 @@ export default class GameScene extends Phaser.Scene {
         this.candleSpacing = 300; // Distancia entre velas
         this.priceScale = 0.1; // 1 USD = 0.1 pixels
         this.baseY = 400; // Línea de referencia
+
+        // Multiplayer avatars
+        this.remotePlayers = new Map(); // userId -> { sprite, skin }
+        this.localUserId = null;
     }
 
     create() {
-        console.log('🎮 [GAME] Escena principal iniciada');
+        console.log('[GAME] Escena principal iniciada');
 
         // Configurar mundo
         this.physics.world.setBounds(0, 0, 10000, 700);
@@ -49,8 +53,9 @@ export default class GameScene extends Phaser.Scene {
         // Crear vela inicial (plataforma de inicio)
         this.createInitialCandle();
 
-        // Crear jugador
-        this.createPlayer();
+        // Crear jugador (solo después de saber el userId)
+        // El userId se obtiene por USER_PROFILE
+        this.playerCreated = false;
 
         // UI
         this.createPhaseIndicator();
@@ -58,7 +63,6 @@ export default class GameScene extends Phaser.Scene {
 
         // Configurar cámara
         this.cameras.main.setBounds(0, 0, 10000, 700);
-        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
         // Controles
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -68,15 +72,32 @@ export default class GameScene extends Phaser.Scene {
     }
 
     setupSocketListeners() {
-        this.socket.on('connect', () => {
-            console.log('✅ [SOCKET] Conectado al servidor');
+        // Obtener el userId local
+        this.socket.on('USER_PROFILE', (profile) => {
+            if (!this.localUserId) {
+                this.localUserId = profile.id;
+                if (!this.playerCreated) {
+                    this.createPlayer();
+                    this.playerCreated = true;
+                }
+            }
         });
 
+        // Escuchar lista de jugadores en la sala
+        this.socket.on('ROOM_PLAYERS_UPDATE', ({ roomId, players }) => {
+            this.updateRemotePlayers(players);
+        });
+        this.socket.on('connect', () => {
+            console.log('[SOCKET] [OK] Conectado al servidor');
+        });
+
+
         this.socket.on('GAME_STATE', (data) => {
-            console.log('🎮 [GAME_STATE]', data);
+            console.log('[GAME_STATE]', data);
             this.gameState = data.state;
             this.roundNumber = data.roundNumber;
 
+            // Sincronizar precios de la ronda
             if (data.startPrice) {
                 this.startPrice = data.startPrice;
                 this.currentPrice = data.startPrice;
@@ -85,29 +106,24 @@ export default class GameScene extends Phaser.Scene {
             this.updatePhaseVisuals(data.state);
 
             // Iniciar renderizado de vela fantasma en LOCKED
-            if (data.state === 'LOCKED') {
-                this.startGhostCandleRendering();
+            if (data.state === 'LOCKED' && typeof data.startPrice === 'number') {
+                this.renderGhostCandleFromServer(data.startPrice);
             }
         });
 
+        // Ya no se simula fluctuación local en SYNC_TIME
         this.socket.on('SYNC_TIME', (data) => {
-            // Actualizar precio en tiempo real (simulado por ahora)
-            if (this.gameState === 'LOCKED' && this.startPrice) {
-                // En producción, esto vendría del servidor
-                // Por ahora simulamos fluctuación
-                const fluctuation = Phaser.Math.FloatBetween(-0.001, 0.001);
-                this.currentPrice = this.startPrice * (1 + fluctuation);
-                this.updateGhostCandle();
-            }
+            // Si el servidor decide enviar precios en tiempo real, aquí se usarían
+            // Por ahora, ignorar fluctuaciones locales
         });
 
         this.socket.on('ROUND_RESULT', (data) => {
-            console.log('🏆 [ROUND_RESULT]', data);
+            console.log('[ROUND_RESULT]', data);
             this.handleRoundResult(data);
         });
 
         this.socket.on('GAME_ERROR', (data) => {
-            console.error('❌ [GAME_ERROR]', data);
+            console.error('[GAME_ERROR]', data);
         });
     }
 
@@ -230,10 +246,51 @@ export default class GameScene extends Phaser.Scene {
             repeat: -1,
             paused: true
         });
+
+        // Marcar el sprite local para fácil referencia
+        this.player.isLocal = true;
+
+        // Ahora que el jugador existe, seguirlo con la cámara
+        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    }
+
+    updateRemotePlayers(players) {
+        // players: [{id, skin}]
+        // Eliminar los que ya no están
+        const currentIds = new Set(players.map(p => p.id));
+        for (const [userId, obj] of this.remotePlayers.entries()) {
+            if (!currentIds.has(userId)) {
+                obj.sprite.destroy();
+                this.remotePlayers.delete(userId);
+            }
+        }
+
+        // Añadir o actualizar los que están
+        for (const p of players) {
+            if (p.id === this.localUserId) continue; // No renderizar el local aquí
+            let remote = this.remotePlayers.get(p.id);
+            if (!remote) {
+                // Crear sprite para el jugador remoto
+                const sprite = this.physics.add.sprite(
+                    this.currentCandle ? this.currentCandle.x : 0,
+                    this.currentCandle ? this.currentCandle.y - 60 : 0,
+                    'playerTexture'
+                );
+                sprite.setAlpha(0.7);
+                sprite.setTint(0x00bfff); // Color azul para distinguir
+                sprite.setDepth(1);
+                sprite.isRemote = true;
+                this.remotePlayers.set(p.id, { sprite, skin: p.skin });
+            } else {
+                // Actualizar skin info si cambia (puedes expandir esto para cambiar textura)
+                remote.skin = p.skin;
+            }
+        }
+        // <--- Solo una llave de cierre aquí
     }
 
     createPhaseIndicator() {
-        this.phaseText = this.add.text(600, 50, 'ESPERANDO...', {
+        this.phaseText = this.add.text(600, 50, 'WAITING...', {
             font: 'bold 28px Courier New',
             fill: '#fff',
             stroke: '#000',
@@ -252,17 +309,25 @@ export default class GameScene extends Phaser.Scene {
 
     onBetPlaced(data) {
         this.playerBet = data.direction;
-        console.log(`🎯 [BET] Jugador apostó ${this.playerBet}`);
+        console.log(`[BET] Jugador apostó ${this.playerBet}`);
     }
 
     startGhostCandleRendering() {
+        // DEPRECATED: Ahora usamos renderGhostCandleFromServer
+    }
+
+    renderGhostCandleFromServer(startPrice) {
         // Limpiar fantasma anterior
         if (this.nextCandleGhost) {
             this.nextCandleGhost.destroy();
         }
 
-        // Crear contenedor para la vela fantasma
+        // Proteger si currentCandle aún no existe
+        if (!this.currentCandle) return;
+
+        // El servidor ya dictó el startPrice, y la posición X/Y base
         const nextX = this.currentCandle.x + this.candleSpacing;
+        // Por defecto, la Y es igual a la actual hasta que llegue el endPrice
         this.nextCandleGhost = this.add.container(nextX, this.currentCandle.y);
         this.nextCandleGhost.setAlpha(0.5);
 
@@ -276,25 +341,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     updateGhostCandle() {
-        if (!this.nextCandleGhost || !this.startPrice || !this.currentPrice) return;
-
-        const delta = this.currentPrice - this.startPrice;
-        const heightChange = delta * this.priceScale;
-
-        // Actualizar posición Y del fantasma
-        const targetY = this.currentCandle.y - heightChange;
-        this.nextCandleGhost.y = targetY;
-
-        // Actualizar color según dirección
-        const body = this.nextCandleGhost.getData('body');
-        const color = delta > 0 ? 0x00ff00 : (delta < 0 ? 0xff0000 : 0x888888);
-        body.setFillStyle(color);
-
-        // Actualizar display de precio
-        const changePercent = (delta / this.startPrice) * 100;
-        this.priceDisplay.setText(
-            `$${this.currentPrice.toFixed(2)} (${delta >= 0 ? '+' : ''}${changePercent.toFixed(3)}%)`
-        );
+        // DEPRECATED: Ya no se actualiza el fantasma localmente
+        // El cliente solo renderiza la vela real cuando llega ROUND_RESULT
     }
 
     handleRoundResult(data) {
@@ -302,22 +350,25 @@ export default class GameScene extends Phaser.Scene {
 
         // Verificar si el jugador apostó
         if (!this.playerBet) {
-            console.log('⚠️ [NO BET] Jugador no apostó - Destruyendo plataforma');
+            console.log('[NO BET] Jugador no apostó - Destruyendo plataforma');
             this.destroyCurrentPlatform();
             return;
         }
 
-        // 1. Solidificar la vela fantasma
+        // 1. Solidificar la vela fantasma usando el endPrice exacto del servidor
         if (this.nextCandleGhost) {
             const nextX = this.nextCandleGhost.x;
-            const nextY = this.nextCandleGhost.y;
+            // Calcular la Y exacta usando el endPrice y la escala
+            const delta = endPrice - this.startPrice;
+            const heightChange = delta * this.priceScale;
+            const nextY = this.currentCandle.y - heightChange;
             const color = result === 'LONG' ? 0x00ff00 : (result === 'SHORT' ? 0xff0000 : 0xFFD700);
 
             // Destruir fantasma
             this.nextCandleGhost.destroy();
             this.nextCandleGhost = null;
 
-            // Crear vela real
+            // Crear vela real sincronizada
             const newCandle = this.createCandlePlatform(nextX, nextY, endPrice, color);
             this.currentCandle = newCandle;
             this.candleHistory.push(newCandle);
@@ -337,6 +388,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     executePlayerMovement(result, targetCandle) {
+        if (!this.player) {
+            console.warn('⚠️ Player no existe aún');
+            return;
+        }
+
         if (!this.playerBet) {
             console.warn('⚠️ No hay apuesta registrada');
             return;
@@ -344,7 +400,7 @@ export default class GameScene extends Phaser.Scene {
 
         const won = this.playerBet === result;
 
-        console.log(`🎯 Ejecutando movimiento: ${this.playerBet}, Ganó: ${won}`);
+        console.log(`[MOVING] Ejecutando movimiento: ${this.playerBet}, Ganó: ${won}`);
         console.log(`📍 Target: x=${targetCandle.x}, y=${targetCandle.y}`);
 
         if (won) {
@@ -376,7 +432,7 @@ export default class GameScene extends Phaser.Scene {
                     }
                 },
                 onComplete: () => {
-                    console.log('✅ Jugador llegó a la plataforma');
+                    console.log('[ARRIVED] Jugador llegó a la plataforma');
                     this.player.setVelocity(0, 0);
                     this.createSuccessParticles(targetCandle.x, targetCandle.y);
                     this.runAnimation.pause();
@@ -388,11 +444,11 @@ export default class GameScene extends Phaser.Scene {
             if (this.playerBet === 'LONG') {
                 this.player.setVelocityX(300);
                 this.player.setVelocityY(-400);
-                console.log('💀 [LONG FAIL] Plataforma muy baja, jugador caerá');
+                console.log('[LONG FAIL] Plataforma muy baja, jugador caerá');
             } else {
                 this.player.setVelocityX(350);
                 this.player.setVelocityY(-100);
-                console.log('💀 [SHORT FAIL] Plataforma muy alta, jugador chocará');
+                console.log('[SHORT FAIL] Plataforma muy alta, jugador chocará');
             }
         }
 
@@ -462,7 +518,7 @@ export default class GameScene extends Phaser.Scene {
         const warningText = this.add.text(
             this.currentCandle.x,
             this.currentCandle.y - 100,
-            '⚠️ NO APOSTASTE\nPLATAFORMA DESTRUIDA',
+            '[!] NO BET DETECTED\n[!] PLATFORM DESTROYED',
             {
                 font: 'bold 24px Courier New',
                 fill: '#ff0000',
@@ -481,7 +537,7 @@ export default class GameScene extends Phaser.Scene {
         });
 
         // El jugador caerá al vacío por gravedad
-        console.log('💀 Plataforma destruida - Jugador caerá');
+        console.log('[PLATFORM DESTROYED] Plataforma destruida - Jugador caerá');
     }
 
     createSuccessParticles(x, y) {
@@ -509,40 +565,52 @@ export default class GameScene extends Phaser.Scene {
 
     updatePhaseVisuals(state) {
         const phaseConfig = {
-            'BETTING': { color: 0x00ff00, alpha: 0.2, text: '🟢 BETTING', textColor: '#00ff00' },
-            'LOCKED': { color: 0xff0000, alpha: 0.3, text: '🔴 LOCKED', textColor: '#ff0000' },
-            'RESOLVING': { color: 0xffd700, alpha: 0.25, text: '🟡 RESOLVING', textColor: '#ffd700' },
-            'WAITING': { color: 0x888888, alpha: 0.2, text: '⚪ WAITING', textColor: '#888888' }
+            'BETTING': { color: 0x00ff00, alpha: 0.2, text: '[ BETTING ]', textColor: '#00ff00' },
+            'LOCKED': { color: 0xff0000, alpha: 0.3, text: '[ LOCKED ]', textColor: '#ff0000' },
+            'RESOLVING': { color: 0xffd700, alpha: 0.25, text: '[ RESOLVING ]', textColor: '#ffd700' },
+            'WAITING': { color: 0x888888, alpha: 0.2, text: '[ WAITING ]', textColor: '#888888' }
         };
 
         const config = phaseConfig[state] || phaseConfig['WAITING'];
 
-        this.tweens.add({
-            targets: this.phaseOverlay,
-            fillColor: config.color,
-            fillAlpha: config.alpha,
-            duration: 500
-        });
+        if (this.phaseOverlay) {
+            this.tweens.add({
+                targets: this.phaseOverlay,
+                fillColor: config.color,
+                fillAlpha: config.alpha,
+                duration: 500
+            });
+        }
 
-        this.phaseText.setText(config.text);
-        this.phaseText.setColor(config.textColor);
+        if (this.phaseText) {
+            this.phaseText.setText(config.text);
+            this.phaseText.setColor(config.textColor);
+        }
 
-        if (state === 'LOCKED') {
-            this.runAnimation.resume();
-        } else {
-            this.runAnimation.pause();
-            this.player.setScale(1);
+        if (this.runAnimation && this.player) {
+            if (state === 'LOCKED') {
+                this.runAnimation.resume();
+            } else {
+                this.runAnimation.pause();
+                this.player.setScale(1);
+            }
         }
     }
 
     showResultText(result, priceChange) {
         const resultConfig = {
-            'LONG': { text: '📈 LONG GANA!', color: '#00ff00' },
-            'SHORT': { text: '📉 SHORT GANA!', color: '#ff0000' },
-            'DRAW': { text: '⚖️ EMPATE!', color: '#ffd700' }
+            'LONG': { text: '📈 LONG WINS', color: '#00ff88' },
+            'SHORT': { text: '📉 SHORT WINS', color: '#ff0055' },
+            'DRAW': { text: '⚖️ DRAW', color: '#FFD700' }
         };
 
         const config = resultConfig[result] || resultConfig['DRAW'];
+
+        // Verificar que el jugador existe antes de acceder a sus propiedades
+        if (!this.player) {
+            console.warn('⚠️ Player no existe, no se puede mostrar texto de resultado');
+            return;
+        }
 
         const text = this.add.text(this.player.x, this.player.y - 100, config.text, {
             font: 'bold 36px Courier New',
@@ -561,9 +629,10 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update() {
+        if (!this.player) return;
         // Detectar caída al vacío
         if (this.player.y > 700) {
-            console.log('💀 [GAME OVER] Jugador cayó al vacío');
+            console.log('[GAME OVER] Jugador cayó al vacío');
             this.handleGameOver();
         }
 
@@ -579,10 +648,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     handleGameOver() {
+        if (!this.player) return;
         this.player.setVelocity(0, 0);
         this.player.y = 700; // Fuera de pantalla
 
-        const gameOverText = this.add.text(600, 350, '💀 GAME OVER', {
+        const gameOverText = this.add.text(600, 350, '[ GAME OVER ]', {
             font: 'bold 64px Courier New',
             fill: '#ff0000',
             stroke: '#000',

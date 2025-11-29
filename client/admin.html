@@ -14,8 +14,48 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Socket.io -->
     <script src="/socket.io/socket.io.js"></script>
+    <!-- Bootstrap JS (Required for Tabs) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            min-width: 100vw;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container-fluid {
+            flex: 1 1 auto;
+            height: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .tab-content {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow: auto;
+        }
+
+        .row {
+            flex-wrap: wrap;
+        }
+
+        .card {
+            min-width: 0;
+        }
         :root {
             --bg-dark: #1a1a2e;
             --card-bg: #16213e;
@@ -147,117 +187,201 @@
         </div>
     </nav>
 
-    <div class="container-fluid p-4">
+    <div class="container-fluid p-4" style="height:calc(100vh - 64px);">
+        <!-- TABS NAVIGATION -->
+        <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard"
+                    type="button" role="tab">📊 Dashboard</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="fleet-tab" data-bs-toggle="tab" data-bs-target="#fleet" type="button"
+                    role="tab">🚌 Bus Fleet</button>
+            </li>
+        </ul>
 
-        <!-- ROW 1: KPIs -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card p-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="kpi-label">👥 Usuarios Online</div>
-                            <div class="kpi-value text-white" id="kpiUsers">0</div>
+        <div class="tab-content" id="adminTabsContent">
+            <!-- TAB 1: DASHBOARD -->
+            <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+                <!-- ROW 1: KPIs -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="kpi-label">👥 Usuarios Online</div>
+                                    <div class="kpi-value text-white" id="kpiUsers">0</div>
+                                </div>
+                                <i class="fas fa-users fa-3x text-white opacity-25"></i>
+                            </div>
                         </div>
-                        <i class="fas fa-users fa-3x text-white opacity-25"></i>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="kpi-label">💰 Pozo Actual (USDT)</div>
+                                    <div class="kpi-value text-success" id="kpiPot">$0.00</div>
+                                </div>
+                                <i class="fas fa-sack-dollar fa-3x text-success opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="kpi-label">🏦 Ganancia Casa</div>
+                                    <div class="kpi-value text-primary" id="kpiFee">$0.00</div>
+                                </div>
+                                <i class="fas fa-university fa-3x text-primary opacity-25"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="kpi-label">🕯️ Precio BTC</div>
+                                    <div class="kpi-value text-warning" id="kpiPrice">---</div>
+                                </div>
+                                <i class="fas fa-chart-line fa-3x text-warning opacity-25"></i>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card p-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="kpi-label">💰 Pozo Actual (USDT)</div>
-                            <div class="kpi-value text-success" id="kpiPot">$0.00</div>
-                        </div>
-                        <i class="fas fa-sack-dollar fa-3x text-success opacity-25"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card p-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="kpi-label">🏦 Ganancia Casa</div>
-                            <div class="kpi-value text-primary" id="kpiFee">$0.00</div>
-                        </div>
-                        <i class="fas fa-university fa-3x text-primary opacity-25"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card p-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <div class="kpi-label">🕯️ Precio BTC</div>
-                            <div class="kpi-value text-warning" id="kpiPrice">---</div>
-                        </div>
-                        <i class="fas fa-chart-line fa-3x text-warning opacity-25"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- ROW 2: Visualization -->
-        <div class="row mb-4">
-            <!-- Round Progress -->
-            <div class="col-md-8">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <i class="fas fa-stopwatch me-2"></i> ROUND MONITOR
+                <!-- ROW 2: Visualization -->
+                <div class="row mb-4">
+                    <!-- Round Progress -->
+                    <div class="col-md-8">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <i class="fas fa-stopwatch me-2"></i> ROUND MONITOR
+                            </div>
+                            <div class="card-body d-flex flex-column justify-content-center">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="h4" id="roundId">ROUND #0</span>
+                                    <span class="badge bg-info h4" id="roundPhase">WAITING</span>
+                                </div>
+                                <div class="progress mb-3" style="height: 40px;">
+                                    <div id="roundProgress" class="progress-bar bg-success" role="progressbar"
+                                        style="width: 0%">0s</div>
+                                </div>
+                                <div class="text-center text-muted">
+                                    <small>PHASE DURATION</small>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body d-flex flex-column justify-content-center">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="h4" id="roundId">ROUND #0</span>
-                            <span class="badge bg-info h4" id="roundPhase">WAITING</span>
+
+                    <!-- Pie Chart -->
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <i class="fas fa-chart-pie me-2"></i> SENTIMENT
+                            </div>
+                            <div class="card-body">
+                                <div style="position: relative; height: 200px; width: 100%;">
+                                    <canvas id="sentimentChart"></canvas>
+                                </div>
+                            </div>
                         </div>
-                        <div class="progress mb-3" style="height: 40px;">
-                            <div id="roundProgress" class="progress-bar bg-success" role="progressbar"
-                                style="width: 0%">0s</div>
-                        </div>
-                        <div class="text-center text-muted">
-                            <small>PHASE DURATION</small>
+                    </div>
+                </div>
+
+                <!-- ROW 3: Live Feed -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between">
+                                <span><i class="fas fa-terminal me-2"></i> LIVE EVENT FEED</span>
+                                <span class="badge bg-danger">REAL-TIME</span>
+                            </div>
+                            <div class="card-body p-0 kill-feed" id="killFeedContainer">
+                                <table class="table table-dark table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Type</th>
+                                            <th>User</th>
+                                            <th>Detail</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="killFeedBody">
+                                        <!-- Logs injected here -->
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Pie Chart -->
-            <div class="col-md-4">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <i class="fas fa-chart-pie me-2"></i> SENTIMENT
-                    </div>
-                    <div class="card-body">
-                        <div style="position: relative; height: 200px; width: 100%;">
-                            <canvas id="sentimentChart"></canvas>
+            <!-- TAB 2: BUS FLEET -->
+            <div class="tab-pane fade" id="fleet" role="tabpanel">
+                <div class="row">
+                    <!-- Create Bus Panel -->
+                    <div class="col-md-5">
+                        <div class="card p-3">
+                            <div class="card-header bg-dark text-white">
+                                <i class="fas fa-bus me-2"></i>CREAR NUEVO BUS
+                            </div>
+                            <form id="busForm" class="row g-2 align-items-end mt-2">
+                                <div class="col-md-12 mb-2">
+                                    <label for="busTier" class="form-label mb-0">Tier</label>
+                                    <select class="form-select" id="busTier" required>
+                                        <option value="TRAINING">TRAINING</option>
+                                        <option value="SATOSHI">SATOSHI</option>
+                                        <option value="TRADER">TRADER</option>
+                                        <option value="WHALE">WHALE</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-12 mb-3">
+                                    <label for="busCapacity" class="form-label mb-0">Capacidad (Fibonacci)</label>
+                                    <input type="number" class="form-control" id="busCapacity" min="2" max="144"
+                                        step="1" value="5" required>
+                                    <div class="form-text">Ej: 3, 5, 8, 13, 21, 34, 55, 89, 144</div>
+                                </div>
+                                <div class="col-md-12">
+                                    <button type="submit" class="btn btn-success w-100"><i class="fas fa-plus"></i>
+                                        Crear Bus</button>
+                                </div>
+                            </form>
+                            <div id="busFormMsg" class="mt-2"></div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- ROW 3: Live Feed -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card h-100">
-                    <div class="card-header d-flex justify-content-between">
-                        <span><i class="fas fa-terminal me-2"></i> LIVE EVENT FEED</span>
-                        <span class="badge bg-danger">REAL-TIME</span>
-                    </div>
-                    <div class="card-body p-0 kill-feed" id="killFeedContainer">
-                        <table class="table table-dark table-hover mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Type</th>
-                                    <th>User</th>
-                                    <th>Detail</th>
-                                </tr>
-                            </thead>
-                            <tbody id="killFeedBody">
-                                <!-- Logs injected here -->
-                            </tbody>
-                        </table>
+                    <!-- Active Buses List -->
+                    <div class="col-md-7">
+                        <div class="card h-100">
+                            <div
+                                class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <span><i class="fas fa-list me-2"></i>FLOTA ACTIVA</span>
+                                <button id="refreshBusesBtn" class="btn btn-sm btn-outline-light"><i
+                                        class="fas fa-sync"></i></button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-dark table-striped mb-0 text-center">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Tier</th>
+                                                <th>Ticket</th>
+                                                <th>Pasajeros</th>
+                                                <th>Estado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="busListBody">
+                                            <tr>
+                                                <td colspan="5" class="text-muted">Cargando flota...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -265,127 +389,249 @@
     </div>
 
     <script>
-        // Connect Socket as Admin
-        const socket = io({
-            query: { type: 'admin' }
-        });
+        // --- CREAR BUS (ADMIN) y LISTADO DE BUSES ---
+        let socket;
+        const FIBONACCI = [2, 3, 5, 8, 13, 21, 34, 55, 89, 144];
 
-        // DOM Elements
-        const els = {
-            status: document.getElementById('connectionStatus'),
-            users: document.getElementById('kpiUsers'),
-            pot: document.getElementById('kpiPot'),
-            fee: document.getElementById('kpiFee'),
-            price: document.getElementById('kpiPrice'),
-            roundId: document.getElementById('roundId'),
-            roundPhase: document.getElementById('roundPhase'),
-            progress: document.getElementById('roundProgress'),
-            feed: document.getElementById('killFeedBody')
-        };
+        // (Eliminado bloque duplicado de DOMContentLoaded, toda la lógica está en el bloque principal más abajo)
 
-        // Chart Setup
-        const ctx = document.getElementById('sentimentChart').getContext('2d');
-        const sentimentChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: ['LONG', 'SHORT'],
-                datasets: [{
-                    data: [50, 50],
-                    backgroundColor: ['#00ff88', '#ff0055'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: 'bottom', labels: { color: '#fff' } }
-                }
+        // Toda la lógica de socket y elementos DOM debe estar dentro de DOMContentLoaded
+
+        window.addEventListener('DOMContentLoaded', () => {
+            // Initialize Socket.io
+            socket = io('/?type=admin');
+
+            // DOM Elements
+            const els = {
+                status: document.getElementById('connectionStatus'),
+                users: document.getElementById('kpiUsers'),
+                pot: document.getElementById('kpiPot'),
+                fee: document.getElementById('kpiFee'),
+                price: document.getElementById('kpiPrice'),
+                roundId: document.getElementById('roundId'),
+                roundPhase: document.getElementById('roundPhase'),
+                progress: document.getElementById('roundProgress'),
+                feed: document.getElementById('killFeedBody')
+            };
+
+            // --- BUS CREATION LOGIC ---
+            const busForm = document.getElementById('busForm');
+            const busFormMsg = document.getElementById('busFormMsg');
+
+            if (busForm) {
+                busForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const tier = document.getElementById('busTier').value;
+                    const capacity = parseInt(document.getElementById('busCapacity').value);
+
+                    if (!FIBONACCI.includes(capacity)) {
+                        busFormMsg.innerHTML = '<div class="alert alert-danger py-1">Capacity must be a Fibonacci number!</div>';
+                        return;
+                    }
+
+                    console.log(`Creating bus: ${tier} with ${capacity} seats`);
+                    socket.emit('ADMIN_SET_BUS_SIZE', { tierName: tier, capacity: capacity });
+                });
             }
-        });
 
-        // Socket Events
-        socket.on('connect', () => {
-            els.status.className = 'badge bg-warning me-3';
-            els.status.innerText = 'AUTHENTICATING...';
-
-            // Subscribe
-            socket.emit('ADMIN_SUBSCRIBE', 'admin_secret');
-        });
-
-        socket.on('ADMIN_AUTH_SUCCESS', () => {
-            els.status.className = 'badge bg-success me-3';
-            els.status.innerText = 'CONNECTED';
-            console.log('✅ Authenticated');
-        });
-
-        socket.on('disconnect', () => {
-            els.status.className = 'badge bg-danger me-3';
-            els.status.innerText = 'DISCONNECTED';
-        });
-
-        // 📊 METRICS UPDATE
-        socket.on('ADMIN_METRICS', (data) => {
-            // KPIs
-            els.users.innerText = data.onlineUsers;
-            els.pot.innerText = `$${(data.totalPot || 0).toFixed(2)}`;
-            els.fee.innerText = `$${(data.houseFeeSession || 0).toFixed(2)}`;
-            if (data.price) els.price.innerText = `$${data.price.toFixed(2)}`;
-
-            // Round Info
-            els.roundId.innerText = `ROUND #${data.activeRound}`;
-            els.roundPhase.innerText = data.currentPhase;
-
-            // Progress Bar
-            // Assuming max times: BETTING=10s, LOCKED=15s, RESOLVING=5s
-            let maxTime = 10000;
-            let color = 'bg-success';
-
-            if (data.currentPhase === 'LOCKED') { maxTime = 15000; color = 'bg-danger'; }
-            else if (data.currentPhase === 'RESOLVING') { maxTime = 5000; color = 'bg-warning'; }
-
-            const timeLeft = data.timeLeft || 0;
-            const progressPct = ((maxTime - timeLeft) / maxTime) * 100;
-
-            els.progress.className = `progress-bar ${color}`;
-            els.progress.style.width = `${progressPct}%`;
-            els.progress.innerText = `${(timeLeft / 1000).toFixed(1)}s`;
-
-            // Chart Update
-            if (data.bets) {
-                const long = data.bets.long || 0;
-                const short = data.bets.short || 0;
-                // Only update if there is data to show
-                if (long + short > 0) {
-                    sentimentChart.data.datasets[0].data = [long, short];
-                    sentimentChart.update();
+            socket.on('BUS_CREATED', (result) => {
+                if (result.success) {
+                    busFormMsg.innerHTML = `<div class="alert alert-success py-1">✅ Bus ${result.room.id} created!</div>`;
+                    // Refresh list
+                    socket.emit('ADMIN_GET_BUSES');
+                } else {
+                    busFormMsg.innerHTML = `<div class="alert alert-danger py-1">❌ Error: ${result.error}</div>`;
                 }
+                setTimeout(() => busFormMsg.innerHTML = '', 5000);
+            });
+
+            // Feedback al eliminar bus
+            socket.on('BUS_DELETED', (result) => {
+                if (result.success) {
+                    // alert('Bus eliminado correctamente.'); // Optional: use toast or just refresh
+                    socket.emit('ADMIN_GET_BUSES');
+                } else {
+                    alert('Error al eliminar bus: ' + (result.error || 'desconocido'));
+                }
+            });
+
+            // --- BUS LIST LOGIC ---
+            const busListBody = document.getElementById('busListBody');
+            const refreshBusesBtn = document.getElementById('refreshBusesBtn');
+
+            function updateBusList(buses) {
+                console.log('🚌 Received bus list:', buses); // Debug log
+                busListBody.innerHTML = '';
+                if (!buses || buses.length === 0) {
+                    busListBody.innerHTML = '<tr><td colspan="5" class="text-muted">No active buses</td></tr>';
+                    return;
+                }
+
+                buses.forEach(bus => {
+                    const row = document.createElement('tr');
+
+                    let statusBadge = 'bg-secondary';
+                    if (bus.status === 'BOARDING') statusBadge = 'bg-success';
+                    if (bus.status === 'LOCKED') statusBadge = 'bg-danger';
+                    if (bus.status === 'IN_PROGRESS') statusBadge = 'bg-warning text-dark';
+
+                    const ticketPrice = bus.ticketPrice !== undefined ? bus.ticketPrice : 0;
+                    const occupancy = bus.occupancy !== undefined ? bus.occupancy : (bus.users || 0);
+
+                    row.innerHTML = `
+                        <td><small>${bus.id}</small></td>
+                        <td><span class="badge bg-primary">${bus.tier}</span></td>
+                        <td>$${Number(ticketPrice).toFixed(2)}</td>
+                        <td>${occupancy} / ${bus.capacity}</td>
+                        <td><span class="badge ${statusBadge}">${bus.status}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-danger btn-delete-bus" data-busid="${bus.id}" title="Eliminar bus">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    busListBody.appendChild(row);
+                });
             }
-        });
 
-        // 📜 LOGS (Reusing ADMIN_LOG from previous step if available, or mocking for now based on request)
-        // Request says: "Al recibir ROUND_RESULT o BET_CONFIRMED: Agregar fila"
-        // But server emits ADMIN_LOG. I will listen to ADMIN_LOG if available, or generic events.
-        // Since I implemented ADMIN_LOG in previous steps, I will use it.
-        // Also listen for raw events if needed? No, ADMIN_LOG is cleaner.
 
-        socket.on('ADMIN_LOG', (log) => {
-            const row = document.createElement('tr');
-            const time = new Date().toLocaleTimeString();
+            socket.on('ADMIN_BUSES', (buses) => {
+                updateBusList(buses);
+                // Asignar listeners a los botones de eliminar
+                document.querySelectorAll('.btn-delete-bus').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const busId = btn.getAttribute('data-busid');
+                        if (confirm('¿Eliminar este bus?')) {
+                            socket.emit('ADMIN_DELETE_BUS', { busId });
+                        }
+                    });
+                });
+            });
 
-            let typeColor = 'text-white';
-            if (log.type === 'WIN') typeColor = 'log-win';
-            if (log.type === 'BURN') typeColor = 'log-burn';
+            // Refresh button
+            if (refreshBusesBtn) {
+                refreshBusesBtn.addEventListener('click', () => {
+                    socket.emit('ADMIN_GET_BUSES');
+                });
+            }
 
-            row.innerHTML = `
-                <td class="text-muted">${time}</td>
-                <td><span class="badge bg-secondary">${log.type}</span></td>
-                <td>${log.user}</td>
-                <td class="${typeColor}">${log.detail}</td>
-            `;
+            // Initial fetch
+            socket.on('ADMIN_AUTH_SUCCESS', () => {
+                els.status.className = 'badge bg-success me-3';
+                els.status.innerText = 'CONNECTED';
+                console.log('✅ Authenticated');
 
-            els.feed.prepend(row);
-            if (els.feed.children.length > 50) els.feed.lastElementChild.remove();
+                // Fetch buses on connect
+                socket.emit('ADMIN_GET_BUSES');
+
+                // Auto-refresh every 5s
+                setInterval(() => {
+                    socket.emit('ADMIN_GET_BUSES');
+                }, 5000);
+            });
+            const ctx = document.getElementById('sentimentChart').getContext('2d');
+            const sentimentChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['LONG', 'SHORT'],
+                    datasets: [{
+                        data: [50, 50],
+                        backgroundColor: ['#00ff88', '#ff0055'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#fff' } }
+                    }
+                }
+            });
+
+            // Socket Events
+            socket.on('connect', () => {
+                els.status.className = 'badge bg-warning me-3';
+                els.status.innerText = 'AUTHENTICATING...';
+
+                // Subscribe
+                socket.emit('ADMIN_SUBSCRIBE', 'admin_secret');
+            });
+
+            socket.on('ADMIN_AUTH_SUCCESS', () => {
+                els.status.className = 'badge bg-success me-3';
+                els.status.innerText = 'CONNECTED';
+                console.log('✅ Authenticated');
+            });
+
+            socket.on('disconnect', () => {
+                els.status.className = 'badge bg-danger me-3';
+                els.status.innerText = 'DISCONNECTED';
+            });
+
+            // 📊 METRICS UPDATE
+            socket.on('ADMIN_METRICS', (data) => {
+                // KPIs
+                els.users.innerText = data.onlineUsers;
+                els.pot.innerText = `$${(data.totalPot || 0).toFixed(2)}`;
+                els.fee.innerText = `$${(data.houseFeeSession || 0).toFixed(2)}`;
+                if (data.price) els.price.innerText = `$${data.price.toFixed(2)}`;
+
+                // Round Info
+                els.roundId.innerText = `ROUND #${data.activeRound}`;
+                els.roundPhase.innerText = data.currentPhase;
+
+                // Progress Bar
+                // Assuming max times: BETTING=10s, LOCKED=15s, RESOLVING=5s
+                let maxTime = 10000;
+                let color = 'bg-success';
+
+                if (data.currentPhase === 'LOCKED') { maxTime = 15000; color = 'bg-danger'; }
+                else if (data.currentPhase === 'RESOLVING') { maxTime = 5000; color = 'bg-warning'; }
+
+                const timeLeft = data.timeLeft || 0;
+                const progressPct = ((maxTime - timeLeft) / maxTime) * 100;
+
+                els.progress.className = `progress-bar ${color}`;
+                els.progress.style.width = `${progressPct}%`;
+                els.progress.innerText = `${(timeLeft / 1000).toFixed(1)}s`;
+
+                // Chart Update
+                if (data.bets) {
+                    const long = data.bets.long || 0;
+                    const short = data.bets.short || 0;
+                    // Only update if there is data to show
+                    if (long + short > 0) {
+                        sentimentChart.data.datasets[0].data = [long, short];
+                        sentimentChart.update();
+                    }
+                }
+            });
+
+            // 📜 LOGS (Reusing ADMIN_LOG from previous step if available, or mocking for now based on request)
+            // Request says: "Al recibir ROUND_RESULT o BET_CONFIRMED: Agregar fila"
+            // But server emits ADMIN_LOG. I will listen to ADMIN_LOG if available, or generic events.
+            // Since I implemented ADMIN_LOG in previous steps, I will use it.
+            // Also listen for raw events if needed? No, ADMIN_LOG is cleaner.
+
+            socket.on('ADMIN_LOG', (log) => {
+                const row = document.createElement('tr');
+                const time = new Date().toLocaleTimeString();
+
+                let typeColor = 'text-white';
+                if (log.type === 'WIN') typeColor = 'log-win';
+                if (log.type === 'BURN') typeColor = 'log-burn';
+
+                row.innerHTML = `
+                    <td class="text-muted">${time}</td>
+                    <td><span class="badge bg-secondary">${log.type}</span></td>
+                    <td>${log.user}</td>
+                    <td class="${typeColor}">${log.detail}</td>
+                `;
+
+                els.feed.prepend(row);
+                if (els.feed.children.length > 50) els.feed.lastElementChild.remove();
+            });
         });
 
     </script>

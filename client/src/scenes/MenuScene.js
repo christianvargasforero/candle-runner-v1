@@ -1,4 +1,4 @@
-// 🎮 MENU SCENE - Pantalla de Inicio y Selector de Salas
+// [ MENU SCENE ] - Pantalla de Inicio y Selector de Salas
 // Muestra tutorial, salas disponibles y permite seleccionar
 
 import { ROOM_ACCESS_RULES } from '../../../shared/constants.js';
@@ -10,11 +10,26 @@ export default class MenuScene extends Phaser.Scene {
     }
 
     create() {
-        const { width, height } = this.cameras.main;
-
         // 🔌 Usar socket GLOBAL en lugar de crear uno nuevo
         this.socket = window.globalSocket;
         this.roomCounts = {};
+
+
+        // Forzar entrada a GameScene si el bus ya está en progreso
+        this.socket.on('GAME_STATE', (data) => {
+            if ((data.state === 'BETTING' || data.state === 'LOCKED' || data.state === 'RESOLVING') && !this.scene.isActive('GameScene')) {
+                this.scene.start('GameScene');
+                this.scene.launch('UIScene');
+            }
+        });
+
+        // Solicitar lista de buses al servidor
+        this.socket.emit('ADMIN_GET_BUSES');
+        this.socket.on('ADMIN_BUSES', (buses) => {
+            this.renderBusSelector(buses);
+        });
+
+        const { width, height } = this.cameras.main;
 
         // Listeners del socket
         this.socket.on('ROOM_COUNTS_UPDATE', (counts) => {
@@ -24,12 +39,12 @@ export default class MenuScene extends Phaser.Scene {
 
         // Solicitar conteos al conectar (puede que ya esté conectado)
         if (this.socket.connected) {
-            console.log('🔌 [MENU] Socket ya conectado');
+            console.log('[MENU] Socket ya conectado');
             this.socket.emit('GET_ROOM_COUNTS');
         } else {
             // Si aún no está conectado, esperar la conexión
             this.socket.once('connect', () => {
-                console.log('🔌 [MENU] Conectado al servidor');
+                console.log('[MENU] Conectado al servidor');
                 this.socket.emit('GET_ROOM_COUNTS');
             });
         }
@@ -41,47 +56,22 @@ export default class MenuScene extends Phaser.Scene {
             this.socket.off('ROOM_COUNTS_UPDATE');
         });
 
-        // Fondo oscuro con gradiente
+        // Fondo y título
         const bg = this.add.graphics();
         bg.fillGradientStyle(0x0a0e27, 0x0a0e27, 0x1a1f3a, 0x1a1f3a, 1);
         bg.fillRect(0, 0, width, height);
 
-        // ... (resto del código igual) ...
-
-        // ============================================
-        // HEADER - Logo y Título
-        // ============================================
-        this.add.text(width / 2, 60, '🕯️ CANDLE RUNNER', {
-            fontSize: '48px',
-            fontFamily: 'Arial Black',
-            color: '#FFD700',
-            stroke: '#000',
-            strokeThickness: 6
+        this.add.text(width / 2, 60, '[ CANDLE RUNNER ]', {
+            fontSize: '48px', fontFamily: 'Courier New', color: '#FFD700', stroke: '#000', strokeThickness: 6, fontStyle: 'bold'
+        }).setOrigin(0.5);
+        this.add.text(width / 2, 110, '>> SURVIVAL TRADING PROTOCOL <<', {
+            fontSize: '18px', fontFamily: 'Courier New', color: '#00ff88', fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, 110, 'Survival Trading Protocol', {
-            fontSize: '18px',
-            fontFamily: 'Arial',
-            color: '#888',
-            fontStyle: 'italic'
-        }).setOrigin(0.5);
-
-        // ============================================
-        // TUTORIAL PANEL
-        // ============================================
+        // Panel tutorial
         const tutorialY = 160;
         this.createTutorialPanel(width / 2, tutorialY);
-
-        // ============================================
-        // ROOM SELECTOR
-        // ============================================
-        const roomsY = tutorialY + 280;
-        this.createRoomSelector(width / 2, roomsY);
-
-        // ============================================
-        // START BUTTON
-        // ============================================
-        this.createStartButton(width / 2, height - 80);
+        // El selector de buses se renderiza vía renderBusSelector()
     }
 
     createTutorialPanel(x, y) {
@@ -91,113 +81,94 @@ export default class MenuScene extends Phaser.Scene {
         panel.lineStyle(2, 0xFFD700, 0.5);
         panel.strokeRoundedRect(x - 350, y, 700, 240, 10);
 
-        this.add.text(x, y + 20, '📖 CÓMO JUGAR', {
+        this.add.text(x, y + 20, '// SYSTEM MANUAL', {
             fontSize: '24px',
-            fontFamily: 'Arial Black',
-            color: '#FFD700'
+            fontFamily: 'Courier New',
+            color: '#FFD700',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
 
         const rules = [
-            '🎯 Apuesta LONG (sube) o SHORT (baja) en Bitcoin',
-            '⏱️  Tienes 10 segundos para apostar cada ronda',
-            '💰 Si aciertas, ganas parte del pozo acumulado',
-            '🔥 Si fallas, tu Skin pierde integridad (20 puntos)',
-            '🛡️  Repara tu Skin con $WICK o usa Protocol Droid (gratis)',
-            '💀 Si tu Skin llega a 0, se quema (recibes seguro de cenizas)'
+            '[+] BET LONG (UP) OR SHORT (DOWN) ON BITCOIN',
+            '[+] 10 SECONDS TO PLACE BET PER ROUND',
+            '[+] WIN: EARN SHARE OF THE POOL',
+            '[!] LOSE: SKIN INTEGRITY DROPS (-20)',
+            '[+] REPAIR: USE $WICK OR PROTOCOL DROID',
+            '[!] CRITICAL: 0 INTEGRITY = SKIN BURNED'
         ];
 
         rules.forEach((rule, i) => {
             this.add.text(x - 330, y + 60 + (i * 28), rule, {
                 fontSize: '14px',
-                fontFamily: 'Arial',
-                color: '#CCC'
+                fontFamily: 'Courier New',
+                color: '#00ff88'
             });
         });
     }
 
-    createRoomSelector(x, y) {
-        this.add.text(x, y, '🏛️ SELECCIONA TU SALA', {
-            fontSize: '24px',
-            fontFamily: 'Arial Black',
-            color: '#FFD700'
-        }).setOrigin(0.5);
 
-        const rooms = [
-            { key: 'TRAINING', name: '🎓 Training', color: 0x4CAF50, desc: 'Gratis • Practice' },
-            { key: 'SATOSHI', name: '🪙 Satoshi Pit', color: 0x2196F3, desc: 'Ticket: $0.10' },
-            { key: 'TRADER', name: '📈 Trader Lounge', color: 0xFF9800, desc: 'Ticket: $1.00 • Nivel 1+' },
-            { key: 'WHALE', name: '🐋 Whale Club', color: 0xE91E63, desc: 'Ticket: $10.00 • Nivel 4+' }
-        ];
+    // Renderiza la lista de buses activos por tier en el canvas
+    renderBusSelector(buses) {
+        // Limpiar buses previos
+        if (this.busGroup) this.busGroup.clear(true, true);
+        this.busGroup = this.add.group();
 
-        const startX = x - 360;
-        const spacing = 180;
-
-        this.roomTexts = {}; // Store references
-
-        rooms.forEach((room, i) => {
-            const roomX = startX + (i * spacing);
-            const roomY = y + 50;
-
-            // Card background
-            const card = this.add.graphics();
-            const isSelected = this.selectedRoom === room.key;
-            card.fillStyle(room.color, isSelected ? 0.3 : 0.1);
-            card.fillRoundedRect(roomX, roomY, 160, 120, 8);
-            card.lineStyle(3, room.color, isSelected ? 1 : 0.5);
-            card.strokeRoundedRect(roomX, roomY, 160, 120, 8);
-
-            // Room name
-            this.add.text(roomX + 80, roomY + 30, room.name, {
-                fontSize: '18px',
-                fontFamily: 'Arial Black',
-                color: '#FFF'
+        const { width } = this.cameras.main;
+        const startY = 420;
+        const tiers = ['TRAINING', 'SATOSHI', 'TRADER', 'WHALE'];
+        const tierColors = {
+            'TRAINING': 0x4CAF50,
+            'SATOSHI': 0x2196F3,
+            'TRADER': 0xFF9800,
+            'WHALE': 0xE91E63
+        };
+        let y = startY;
+        tiers.forEach(tier => {
+            const tierBuses = buses.filter(b => b.tier === tier);
+            if (tierBuses.length === 0) return;
+            // Título de tier
+            this.add.text(width / 2, y, `${tier} CLASS`, {
+                fontSize: '22px', fontFamily: 'Courier New', color: '#FFD700', fontStyle: 'bold'
             }).setOrigin(0.5);
+            y += 36;
+            // Renderizar buses de este tier
+            tierBuses.forEach((bus, i) => {
+                const cardX = width / 2 - (tierBuses.length * 180) / 2 + i * 180;
+                const cardY = y;
+                const color = tierColors[tier] || 0x888888;
+                const card = this.add.graphics();
+                card.fillStyle(color, 0.18);
+                card.fillRoundedRect(cardX, cardY, 160, 110, 10);
+                card.lineStyle(3, color, 0.7);
+                card.strokeRoundedRect(cardX, cardY, 160, 110, 10);
+                this.busGroup.add(card);
 
-            // Description
-            this.add.text(roomX + 80, roomY + 60, room.desc, {
-                fontSize: '11px',
-                fontFamily: 'Arial',
-                color: '#AAA',
-                align: 'center',
-                wordWrap: { width: 140 }
-            }).setOrigin(0.5);
+                // Info
+                this.add.text(cardX + 80, cardY + 22, `#${bus.id.split('_').pop()}`, {
+                    fontSize: '16px', fontFamily: 'Courier New', color: '#FFD700', fontStyle: 'bold'
+                }).setOrigin(0.5);
+                this.add.text(cardX + 80, cardY + 44, `${bus.status}`, {
+                    fontSize: '13px', fontFamily: 'Courier New', color: '#00ff88'
+                }).setOrigin(0.5);
+                this.add.text(cardX + 80, cardY + 64, `TICKET: $${bus.ticketPrice}`, {
+                    fontSize: '13px', fontFamily: 'Courier New', color: '#FFD700'
+                }).setOrigin(0.5);
+                this.add.text(cardX + 80, cardY + 84, `USERS: ${bus.users || 0}/${bus.capacity}`, {
+                    fontSize: '13px', fontFamily: 'Courier New', color: '#00ff88'
+                }).setOrigin(0.5);
 
-            // User Count
-            const countText = this.add.text(roomX + 80, roomY + 90, '👤 0', {
-                fontSize: '14px',
-                fontFamily: 'Arial',
-                color: '#00ff88',
-                fontStyle: 'bold'
-            }).setOrigin(0.5);
-
-            this.roomTexts[room.key] = countText;
-
-            // Make interactive
-            const hitArea = new Phaser.Geom.Rectangle(roomX, roomY, 160, 120);
-            const zone = this.add.zone(roomX, roomY, 160, 120).setOrigin(0).setInteractive();
-
-            zone.on('pointerdown', () => {
-                this.selectedRoom = room.key;
-                this.scene.restart(); // Refresh to show selection
-            });
-
-            zone.on('pointerover', () => {
-                card.clear();
-                card.fillStyle(room.color, 0.3);
-                card.fillRoundedRect(roomX, roomY, 160, 120, 8);
-                card.lineStyle(3, room.color, 1);
-                card.strokeRoundedRect(roomX, roomY, 160, 120, 8);
-            });
-
-            zone.on('pointerout', () => {
-                if (this.selectedRoom !== room.key) {
-                    card.clear();
-                    card.fillStyle(room.color, 0.1);
-                    card.fillRoundedRect(roomX, roomY, 160, 120, 8);
-                    card.lineStyle(3, room.color, 0.5);
-                    card.strokeRoundedRect(roomX, roomY, 160, 120, 8);
+                // Botón de unirse
+                if (bus.status === 'BOARDING') {
+                    const joinBtn = this.add.text(cardX + 80, cardY + 104, '[ JOIN BUS ]', {
+                        fontSize: '15px', fontFamily: 'Courier New', color: '#000', backgroundColor: '#00ff88', padding: { x: 12, y: 4 }
+                    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+                    joinBtn.on('pointerdown', () => {
+                        this.socket.emit('JOIN_ROOM', { roomId: bus.id });
+                    });
+                    this.busGroup.add(joinBtn);
                 }
             });
+            y += 140;
         });
     }
 
@@ -206,70 +177,10 @@ export default class MenuScene extends Phaser.Scene {
 
         Object.keys(this.roomTexts).forEach(key => {
             const count = this.roomCounts[key] || 0;
-            this.roomTexts[key].setText(`👤 ${count}`);
+            this.roomTexts[key].setText(`USERS: ${count}`);
         });
     }
 
-    createStartButton(x, y) {
-        const button = this.add.graphics();
-        button.fillStyle(0x4CAF50, 1);
-        button.fillRoundedRect(x - 150, y - 25, 300, 50, 25);
-        button.lineStyle(3, 0xFFD700, 1);
-        button.strokeRoundedRect(x - 150, y - 25, 300, 50, 25);
 
-        const text = this.add.text(x, y, '🚀 ENTRAR AL JUEGO', {
-            fontSize: '24px',
-            fontFamily: 'Arial Black',
-            color: '#FFF'
-        }).setOrigin(0.5);
-
-        const zone = this.add.zone(x - 150, y - 25, 300, 50).setOrigin(0).setInteractive();
-
-        zone.on('pointerdown', () => {
-            // 🚌 Emitir JOIN_ROOM antes de iniciar el juego
-            this.socket.emit('JOIN_ROOM', { roomName: this.selectedRoom });
-
-            // Guardar sala seleccionada
-            this.registry.set('selectedRoom', this.selectedRoom);
-
-            // Esperar confirmación y luego iniciar GameScene
-            this.socket.once('ROOM_JOINED', (data) => {
-                console.log(`✅ [MENU] Unido a sala: ${data.roomName} | Ticket: $${data.ticketPrice}`);
-
-                // Guardar ticketPrice en el registry para mostrarlo en UIScene
-                this.registry.set('ticketPrice', data.ticketPrice);
-
-                // Iniciar GameScene y UIScene en paralelo
-                this.scene.start('GameScene');
-                this.scene.launch('UIScene');
-            });
-
-            // Timeout de seguridad (5 segundos)
-            setTimeout(() => {
-                if (!this.scene.isActive('GameScene')) {
-                    console.warn('⚠️ Timeout esperando ROOM_JOINED, iniciando de todas formas...');
-                    this.scene.start('GameScene');
-                    this.scene.launch('UIScene');
-                }
-            }, 5000);
-        });
-
-        zone.on('pointerover', () => {
-            button.clear();
-            button.fillStyle(0x66BB6A, 1);
-            button.fillRoundedRect(x - 150, y - 25, 300, 50, 25);
-            button.lineStyle(3, 0xFFD700, 1);
-            button.strokeRoundedRect(x - 150, y - 25, 300, 50, 25);
-            text.setScale(1.05);
-        });
-
-        zone.on('pointerout', () => {
-            button.clear();
-            button.fillStyle(0x4CAF50, 1);
-            button.fillRoundedRect(x - 150, y - 25, 300, 50, 25);
-            button.lineStyle(3, 0xFFD700, 1);
-            button.strokeRoundedRect(x - 150, y - 25, 300, 50, 25);
-            text.setScale(1);
-        });
-    }
+    // Eliminado: createStartButton. Ahora la entrada es por bus.
 }

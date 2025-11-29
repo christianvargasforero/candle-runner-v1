@@ -1,7 +1,7 @@
 # 📘 WHITE PAPER: CANDLE RUNNER PROTOCOL
 
 **Survival Trading & Decentralized Creative Economy (DCE)**  
-**Versión 3.1 | Edición de Sistema de Integridad**  
+**Versión 4.0 | Edición "THE BUS MODEL"**  
 **Noviembre 2025**
 
 ---
@@ -28,20 +28,43 @@ Convertirse en el estándar global del "Arcade Financiero", evolucionando de una
 
 ---
 
-## 2. ARQUITECTURA DEL JUEGO: "SURVIVAL TRADING"
+## 2. MECÁNICAS DE JUEGO: "EL MODELO DE TRANSPORTE"
 
-### 2.1. El Motor de Decisiones Síncrono
+El juego abandona los ciclos de tiempo fijo. Ahora opera bajo el principio de **"Llenado de Capacidad"** (Capacity Trigger).
 
-El núcleo es un ciclo de juego de 30 segundos, sincronizado globalmente mediante servidores WebSocket distribuidos.
+### 2.1. La Estación y el Bus
 
-**Fase 1: Posicionamiento (0s - 10s)**  
-El usuario analiza el mercado y compromete su capital (USDT) y su activo (Skin) en una dirección (LONG/SHORT).
+**El Vehículo:** Cada sala de juego es un "Bus" con un número exacto de sillas (Asientos).
 
-**Fase 2: Lockdown & Visualización (10s - 25s)**  
-Cierre criptográfico de entradas. El motor renderiza la acción del precio de Bitcoin como terreno procedural en tiempo real.
+**El Ticket:** Para sentarse, el jugador paga el precio de la sala (ej. $0.10).
 
-**Fase 3: Liquidación y Decisión (25s - 30s)**  
-El oráculo de precios determina el resultado. Los perdedores sufren daño a su Skin. Los ganadores reciben su participación del Pozo Neto y enfrentan la "Decisión del Superviviente" (Retirar vs. Interés Compuesto).
+**El Disparador (Trigger):** El juego NO ARRANCA hasta que el último asiento esté ocupado.
+
+**La Salida:** En el milisegundo que se sienta el último pasajero:
+- Las puertas se cierran (**Lockdown**).
+- El Bus arranca (Inicia la visualización de la vela de 30s).
+- Al llegar a la "Parada" (Fin de vela), los perdedores son expulsados y los ganadores se reparten el botín.
+
+### 2.2. Flujo de una Partida "Sit & Go"
+
+1. **BOARDING (Cola):** Los jugadores compran su ticket y entran al bus.
+   - Estado: `WAITING_FOR_PLAYERS`
+   - Visual: "PASAJEROS: 3 / 5"
+   
+2. **TRIGGER (Bus Lleno):** Cuando `connectedUsers === capacity`:
+   - Estado cambia a `LOCKED`
+   - Animación: "¡BUS LLENO! SALIENDO..."
+   - El temporizador de 30s inicia SOLO para ese bus.
+
+3. **IN_PROGRESS (Viaje):** La vela de Bitcoin se renderiza durante 30s.
+   - Fase de Posicionamiento (0-10s): Los jugadores eligen LONG/SHORT.
+   - Fase de Lockdown (10-25s): Apuestas cerradas, visualización del precio.
+   - Fase de Resolución (25-30s): Se determina el ganador.
+
+4. **FINISH (Llegada):** Distribución de premios.
+   - Ganadores reciben su parte del pozo.
+   - Perdedores sufren daño a su Skin.
+   - El bus se vacía y vuelve a `BOARDING`.
 
 ### 2.2. Infraestructura de Oráculo de Precios (Fairness)
 
@@ -88,21 +111,40 @@ WICK es el combustible de la economía creativa. En la Fase 1, es un token Off-C
 
 ---
 
-## 4. GOBERNANZA ALGORÍTMICA Y ESCALABILIDAD
+## 4. ESCALABILIDAD BIOLÓGICA: "MITOSIS PROGRESIVA"
 
-Para gestionar el crecimiento masivo, el sistema utiliza leyes matemáticas universales en lugar de decisiones humanas arbitrarias.
+La capacidad de los buses no es estática; evoluciona con la demanda usando la **Secuencia de Fibonacci**.
 
-### 4.1. Mitosis de Salas (Escalabilidad Fractal)
+### 4.1. Fases de Crecimiento del Ecosistema
 
-Las salas de juego se auto-regulan utilizando la Secuencia de Fibonacci.
+**Fase Semilla:** El juego inicia con buses pequeños (3 o 5 sillas) para garantizar partidas rápidas.
 
-**Critical Mass:** 987 Jugadores.  
-**Evento:** División automática de la sala en dos nuevas instancias.  
-**Proporción Áurea (Φ):** El Pozo se divide en 61.8% (Sala Alpha, alta competencia) y 38.2% (Sala Beta, entrada accesible).
+**Fase de Crecimiento:**
+- Si los buses de 5 sillas se llenan en menos de 10 segundos (**Alta Demanda**), el sistema ejecuta la **Mitosis**.
+- Se abre una nueva ruta con buses de **8 sillas**.
+- Si se llenan rápido → **13 sillas** → **21 sillas** → **34 sillas**...
 
-### 4.2. Curvas de Recompensa y Costos
+**Control del Administrador:** El Admin puede forzar la creación de buses "Gigantes" (ej. 144 sillas) para eventos especiales o torneos.
 
-Todos los multiplicadores de rachas y los precios base del Marketplace siguen progresiones de Fibonacci, asegurando que el costo de adquisición de estatus aumente proporcionalmente al valor de la red.
+### 4.2. Ventajas del Modelo "Bus con Sillas"
+
+1. **Sin Espera Ociosa:** Los jugadores no pierden tiempo esperando un cronómetro global.
+2. **Engagement Máximo:** Cada partida inicia con la sensación de "evento completo".
+3. **Escalabilidad Orgánica:** El sistema adapta el tamaño de las salas a la demanda real.
+4. **Prevención de Bots:** Buses de capacidad variable dificultan el farming automatizado.
+
+### 4.3. Mitosis de Salas (Fibonacci Sharding)
+
+Cuando un nivel de capacidad se satura constantemente:
+
+**Critical Mass:** Si buses de **N** sillas se llenan en < 10 segundos durante 5 partidas consecutivas.  
+**Evento:** Se crea un nuevo tier con capacidad **Fibonacci(N+1)**.  
+**Ejemplo:**
+- Buses de 5 → Saturados → Se crean buses de 8.
+- Buses de 8 → Saturados → Se crean buses de 13.
+- Y así sucesivamente: 21, 34, 55, 89, 144...
+
+**Proporción Áurea (Φ) en Premios:** El pozo acumulado se divide siguiendo la Proporción Áurea (61.8% / 38.2%) entre salas Alpha (alta competencia) y Beta (accesible).
 
 ---
 

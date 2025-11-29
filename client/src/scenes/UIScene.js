@@ -52,6 +52,13 @@ export default class UIScene extends Phaser.Scene {
     }
 
     setupSocketListeners() {
+        // Evento: Ganador del mayor bote
+        this.socket.on('BIG_POT_WIN', (data) => {
+            // Mensaje destacado en pantalla
+            this.showFloatingText(data.message, '#FFD700');
+            // Efecto especial: parpadeo o animación
+            this.cameras.main.flash(500, 255, 215, 0);
+        });
         // Evento: Conexión establecida
         this.socket.on('connect', () => {
             this.connectionStatus = 'Conectado';
@@ -135,18 +142,23 @@ export default class UIScene extends Phaser.Scene {
 
             // NO deshabilitar botones - permitir cambiar de decisión
             // Los botones se deshabilitarán automáticamente en fase LOCKED
-            this.showFloatingText(`Apuesta: ${data.direction} $${data.amount.toFixed(2)}`, '#FFD700');
+            this.showFloatingText(`BET: ${data.direction} $${data.amount.toFixed(2)}`, '#FFD700');
             this.updateBettingButtons();
         });
 
         // Evento: Resultado de apuesta (Ganar/Perder)
         this.socket.on('BET_RESULT', (data) => {
-            console.log('💰 [BET RESULT]', data);
+            console.log('[BET RESULT]', data);
             this.balance = data.balance;
             this.updateBalanceDisplay();
 
             if (data.won) {
-                this.showFloatingText(`+$${data.amount.toFixed(2)}`, '#00ff00');
+                if (data.isSoleWinner) {
+                    this.showFloatingText(`🏆 JACKPOT! +$${data.amount.toFixed(2)}`, '#FFD700');
+                    this.cameras.main.flash(500, 255, 215, 0); // Flash dorado
+                } else {
+                    this.showFloatingText(`+$${data.amount.toFixed(2)}`, '#00ff88');
+                }
             } else if (data.refund) {
                 this.showFloatingText(`REFUND $${data.amount.toFixed(2)}`, '#ffd700');
             }
@@ -156,9 +168,9 @@ export default class UIScene extends Phaser.Scene {
                 this.isBurned = data.skinUpdate.isBurned;
                 this.updateIntegrityBar();
                 if (data.skinUpdate.isBurned) {
-                    this.showFloatingText('🔥 SKIN BURNED!', '#ff0000');
+                    this.showFloatingText('[!] SKIN BURNED [!]', '#ff0000');
                     if (data.refundAmount) {
-                        this.showFloatingText(`🛡️ +${data.refundAmount} $WICK`, '#00ffff');
+                        this.showFloatingText(`[+] +${data.refundAmount} $WICK`, '#00ffff');
                     }
                 }
             }
@@ -166,28 +178,28 @@ export default class UIScene extends Phaser.Scene {
 
         // Evento: Skin Reparada
         this.socket.on('SKIN_REPAIRED', (data) => {
-            console.log('🔧 [REPAIRED]', data);
+            console.log('[REPAIRED]', data);
             this.balanceWICK = data.balanceWICK;
             this.skinIntegrity = data.skin.integrity;
             this.isBurned = data.skin.isBurned;
 
             this.updateBalanceDisplay();
             this.updateIntegrityBar();
-            this.showFloatingText('🔧 REPARADO!', '#00ffff');
+            this.showFloatingText('[OK] REPAIRED', '#00ffff');
         });
 
         // Evento: Error
         this.socket.on('GAME_ERROR', (data) => {
-            console.error('❌ [ERROR]', data);
+            console.error('[ERROR]', data);
             this.showFloatingText(data.message, '#ff0000');
         });
 
         // Evento: Retiro exitoso
         this.socket.on('WITHDRAW_SUCCESS', (data) => {
-            console.log('💰 [WITHDRAW]', data);
+            console.log('[WITHDRAW]', data);
             this.balance = 0;
             this.updateBalanceDisplay();
-            this.showFloatingText(`✅ Retiro Exitoso!`, '#00ff88');
+            this.showFloatingText(`[OK] WITHDRAW SUCCESS`, '#00ff88');
 
             // Volver al menú (NO desconectar el socket compartido)
             this.time.delayedCall(2000, () => {
@@ -196,12 +208,12 @@ export default class UIScene extends Phaser.Scene {
             });
         });
 
-        // 🚌 Evento: Sala unida exitosamente
+        // Evento: Sala unida exitosamente
         this.socket.on('ROOM_JOINED', (data) => {
-            console.log('🚌 [ROOM JOINED]', data);
+            console.log('[ROOM JOINED]', data);
             // Actualizar el precio del ticket en la UI
             if (this.ticketPriceText) {
-                this.ticketPriceText.setText(`🎟️ TICKET: $${data.ticketPrice.toFixed(2)}`);
+                this.ticketPriceText.setText(`TICKET: $${data.ticketPrice.toFixed(2)}`);
             }
         });
     }
@@ -211,20 +223,20 @@ export default class UIScene extends Phaser.Scene {
         const x = this.cameras.main.width - 20;
         const y = 110;
 
-        this.balanceText = this.add.text(x, y, `Saldo: $${this.balance.toFixed(2)}`, {
+        this.balanceText = this.add.text(x, y, `BAL: $${this.balance.toFixed(2)}`, {
             font: 'bold 20px Courier New',
             fill: '#00ff88'
         });
         this.balanceText.setOrigin(1, 0);
 
-        this.wickText = this.add.text(x, y + 25, `WICK: ${this.balanceWICK}`, {
+        this.wickText = this.add.text(x, y + 25, `WICK: ${this.balanceWICK.toFixed(0)}`, {
             font: 'bold 16px Courier New',
             fill: '#00ffff'
         });
         this.wickText.setOrigin(1, 0);
 
         // Botón de Retiro
-        this.withdrawBtn = this.add.text(x, y + 55, '💰 RETIRAR', {
+        this.withdrawBtn = this.add.text(x, y + 55, '[ WITHDRAW ]', {
             font: 'bold 14px Courier New',
             fill: '#FFD700',
             backgroundColor: '#1a4d2e',
@@ -249,7 +261,7 @@ export default class UIScene extends Phaser.Scene {
     }
 
     updateBalanceDisplay() {
-        this.balanceText.setText(`Saldo: $${this.balance.toFixed(2)}`);
+        this.balanceText.setText(`BAL: $${this.balance.toFixed(2)}`);
         this.wickText.setText(`WICK: ${this.balanceWICK.toFixed(0)}`);
 
         // Efecto de pulso
@@ -262,6 +274,11 @@ export default class UIScene extends Phaser.Scene {
     }
 
     createBettingPanel() {
+        // 🧹 Limpieza preventiva: Evitar duplicados si la función se llama más de una vez
+        if (this.bettingContainer) {
+            this.bettingContainer.destroy();
+        }
+
         const centerX = this.cameras.main.width / 2;
         const bottomY = this.cameras.main.height - 150;
 
@@ -275,9 +292,9 @@ export default class UIScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.bettingContainer.add(this.currentBetText);
 
-        // 🎟️ Mostrar precio del ticket de la sala
+        // Mostrar precio del ticket de la sala
         const ticketPrice = this.registry.get('ticketPrice') || 0;
-        this.ticketPriceText = this.add.text(0, -50, `🎟️ TICKET: $${ticketPrice.toFixed(2)}`, {
+        this.ticketPriceText = this.add.text(0, -50, `TICKET: $${ticketPrice.toFixed(2)}`, {
             font: 'bold 20px Courier New',
             fill: '#00ffff',
             stroke: '#000000',
@@ -285,12 +302,12 @@ export default class UIScene extends Phaser.Scene {
         }).setOrigin(0.5);
         this.bettingContainer.add(this.ticketPriceText);
 
-        // Botón LONG (Verde) - Ahora dice "COMPRAR TICKET ▲"
-        this.btnLong = this.createButton(-110, 20, 'COMPRAR ▲', 0x00ff00, () => this.placeBet('LONG'));
+        // Botón LONG (Verde)
+        this.btnLong = this.createButton(-110, 20, 'BUY TICKET [UP]', 0x00ff00, () => this.placeBet('LONG'));
         this.bettingContainer.add(this.btnLong);
 
-        // Botón SHORT (Rojo) - Ahora dice "COMPRAR TICKET ▼"
-        this.btnShort = this.createButton(110, 20, 'COMPRAR ▼', 0xff0000, () => this.placeBet('SHORT'));
+        // Botón SHORT (Rojo)
+        this.btnShort = this.createButton(110, 20, 'BUY TICKET [DN]', 0xff0000, () => this.placeBet('SHORT'));
         this.bettingContainer.add(this.btnShort);
 
         // NOTA: ELIMINADOS los botones de selección de monto
@@ -300,16 +317,21 @@ export default class UIScene extends Phaser.Scene {
     createButton(x, y, text, color, callback) {
         const container = this.add.container(x, y);
 
-        const bg = this.add.rectangle(0, 0, 140, 50, color);
+        // Aumentar ancho a 180px para textos largos
+        const bg = this.add.rectangle(0, 0, 180, 50, color);
         bg.setStrokeStyle(2, 0xffffff);
 
         const label = this.add.text(0, 0, text, {
-            font: 'bold 20px Arial',
+            font: 'bold 16px Courier New', // Fuente monoespaciada
             fill: '#000000'
         }).setOrigin(0.5);
 
         container.add([bg, label]);
-        container.setSize(140, 50);
+        container.setSize(180, 50);
+
+        // Guardar referencias directas para acceso seguro
+        container.bg = bg;
+        container.label = label;
 
         // Interacción
         bg.setInteractive({ useHandCursor: true });
@@ -338,19 +360,19 @@ export default class UIScene extends Phaser.Scene {
     placeBet(direction) {
         if (!this.canBet) return;
 
-        console.log(`🎟️ Comprando ticket: ${direction}`);
+        console.log(`Comprando ticket: ${direction}`);
 
         // Comunicar apuesta a GameScene (solo dirección)
         this.registry.events.emit('betPlaced', { direction: direction });
 
-        // 🎫 Enviar solo la dirección - el servidor dicta el precio
+        // Enviar solo la dirección - el servidor dicta el precio
         this.socket.emit('PLACE_BET', { direction: direction });
     }
 
     updateBettingButtons() {
         const alpha = this.canBet ? 1 : 0.5;
 
-        // Resetear estilos
+        // Resetear estilos base
         this.btnLong.setAlpha(alpha);
         this.btnShort.setAlpha(alpha);
         this.btnLong.bg.setStrokeStyle(2, 0xffffff);
@@ -359,31 +381,42 @@ export default class UIScene extends Phaser.Scene {
         // Resaltar selección si existe y estamos en fase de apuestas
         if (this.currentBet && this.canBet) {
             if (this.currentBet.direction === 'LONG') {
-                this.btnLong.bg.setStrokeStyle(4, 0xffffff); // Borde grueso
+                this.btnLong.bg.setStrokeStyle(4, 0x00ff00); // Borde Verde Brillante
                 this.btnLong.setAlpha(1);
-                this.btnShort.setAlpha(0.3); // Atenuar el otro
+                this.btnShort.setAlpha(0.6); // Menos atenuado para indicar que aún se puede pulsar
             } else {
-                this.btnShort.bg.setStrokeStyle(4, 0xffffff); // Borde grueso
+                this.btnShort.bg.setStrokeStyle(4, 0xff0000); // Borde Rojo Brillante
                 this.btnShort.setAlpha(1);
-                this.btnLong.setAlpha(0.3); // Atenuar el otro
+                this.btnLong.setAlpha(0.6); // Menos atenuado para indicar que aún se puede pulsar
             }
         }
 
-        // Desactivar interacción si no se puede apostar
+        // Habilitar/Deshabilitar interacción
         if (!this.canBet) {
             this.btnLong.bg.disableInteractive();
             this.btnShort.bg.disableInteractive();
+            this.btnLong.label.setText('WAITING...'); // Cambiar texto
+            this.btnShort.label.setText('WAITING...');
         } else {
             this.btnLong.bg.setInteractive({ useHandCursor: true });
             this.btnShort.bg.setInteractive({ useHandCursor: true });
+
+            // Restaurar texto original o mostrar "CAMBIAR" si ya apostó
+            if (this.currentBet) {
+                this.btnLong.label.setText(this.currentBet.direction === 'LONG' ? 'HOLDING [UP]' : 'SWITCH [UP]');
+                this.btnShort.label.setText(this.currentBet.direction === 'SHORT' ? 'HOLDING [DN]' : 'SWITCH [DN]');
+            } else {
+                this.btnLong.label.setText('BUY TICKET [UP]');
+                this.btnShort.label.setText('BUY TICKET [DN]');
+            }
         }
     }
 
     updateCurrentBetDisplay() {
         if (this.currentBet) {
             const color = this.currentBet.direction === 'LONG' ? '#00ff00' : '#ff0000';
-            const arrow = this.currentBet.direction === 'LONG' ? '▲' : '▼';
-            this.currentBetText.setText(`APOSTADO: $${this.currentBet.amount} ${arrow}`);
+            const arrow = this.currentBet.direction === 'LONG' ? '[UP]' : '[DN]';
+            this.currentBetText.setText(`BET: $${this.currentBet.amount} ${arrow}`);
             this.currentBetText.setColor(color);
         } else {
             this.currentBetText.setText('');
@@ -396,7 +429,7 @@ export default class UIScene extends Phaser.Scene {
             this.cameras.main.height / 2 - 100,
             text,
             {
-                font: 'bold 40px Arial',
+                font: 'bold 40px Courier New',
                 fill: color,
                 stroke: '#000000',
                 strokeThickness: 4
@@ -416,7 +449,7 @@ export default class UIScene extends Phaser.Scene {
 
     createConnectionIndicator() {
         this.connectionCircle = this.add.circle(30, 30, 10, 0xff0000);
-        this.connectionText = this.add.text(50, 30, 'Desconectado', {
+        this.connectionText = this.add.text(50, 30, 'DISCONNECTED', {
             font: '14px Courier New',
             fill: '#ff0000'
         }).setOrigin(0, 0.5);
@@ -425,25 +458,25 @@ export default class UIScene extends Phaser.Scene {
     updateConnectionIndicator() {
         if (this.connectionStatus === 'Conectado') {
             this.connectionCircle.setFillStyle(0x00ff00);
-            this.connectionText.setText('Conectado');
+            this.connectionText.setText('CONNECTED');
             this.connectionText.setColor('#00ff00');
             this.tweens.add({ targets: this.connectionCircle, scale: 1.3, duration: 500, yoyo: true });
         } else {
             this.connectionCircle.setFillStyle(0xff0000);
-            this.connectionText.setText('Desconectado');
+            this.connectionText.setText('DISCONNECTED');
             this.connectionText.setColor('#ff0000');
         }
     }
 
     createRoundCounter() {
         this.roundText = this.add.text(
-            this.cameras.main.width / 2, 20, 'RONDA #0',
+            this.cameras.main.width / 2, 20, 'ROUND #0',
             { font: 'bold 24px Courier New', fill: '#ffd700', stroke: '#000000', strokeThickness: 4 }
         ).setOrigin(0.5, 0);
     }
 
     updateRoundCounter() {
-        this.roundText.setText(`RONDA #${this.roundNumber}`);
+        this.roundText.setText(`ROUND #${this.roundNumber}`);
         this.tweens.add({ targets: this.roundText, scale: 1.2, duration: 200, yoyo: true });
     }
 
@@ -451,7 +484,7 @@ export default class UIScene extends Phaser.Scene {
         const x = this.cameras.main.width - 20;
         const y = 20;
         this.priceBackground = this.add.rectangle(x, y, 250, 80, 0x000000, 0.7).setOrigin(1, 0);
-        this.priceLabelText = this.add.text(x - 10, y + 10, '💲 PRECIO BTC', { font: '12px Courier New', fill: '#888888' }).setOrigin(1, 0);
+        this.priceLabelText = this.add.text(x - 10, y + 10, 'BTC PRICE', { font: '12px Courier New', fill: '#888888' }).setOrigin(1, 0);
         this.priceValueText = this.add.text(x - 10, y + 35, '-', { font: 'bold 24px Courier New', fill: '#00ff88' }).setOrigin(1, 0);
     }
 
@@ -525,8 +558,8 @@ export default class UIScene extends Phaser.Scene {
     }
 
     createLogo() {
-        this.logoText = this.add.text(20, this.cameras.main.height - 20, '🕯️ CANDLE RUNNER', { font: 'bold 16px Courier New', fill: '#00ff88', stroke: '#000000', strokeThickness: 3 }).setOrigin(0, 1);
-        this.versionText = this.add.text(20, this.cameras.main.height - 5, 'v1.1 - Fase 4', { font: '10px Courier New', fill: '#555555' }).setOrigin(0, 1);
+        this.logoText = this.add.text(20, this.cameras.main.height - 20, '[ CANDLE RUNNER ]', { font: 'bold 16px Courier New', fill: '#00ff88', stroke: '#000000', strokeThickness: 3 }).setOrigin(0, 1);
+        this.versionText = this.add.text(20, this.cameras.main.height - 5, 'v1.1 - Phase 4', { font: '10px Courier New', fill: '#555555' }).setOrigin(0, 1);
     }
 
     createIntegrityBar() {
@@ -534,7 +567,7 @@ export default class UIScene extends Phaser.Scene {
         const y = 100;
 
         // Etiqueta
-        this.add.text(x, y - 20, '🛡️ INTEGRIDAD', {
+        this.add.text(x, y - 20, 'INTEGRITY', {
             font: '12px Courier New',
             fill: '#888888'
         });
@@ -548,10 +581,11 @@ export default class UIScene extends Phaser.Scene {
         this.integrityBar.setOrigin(0, 0);
 
         // Botón de Reparar
-        this.repairBtn = this.add.text(x + 210, y - 5, '🛠️', {
-            font: '16px Arial',
+        this.repairBtn = this.add.text(x + 210, y - 5, '[R]', {
+            font: '16px Courier New',
             backgroundColor: '#333333',
-            padding: { x: 5, y: 2 }
+            padding: { x: 5, y: 2 },
+            fill: '#00ffff'
         });
         this.repairBtn.setInteractive({ useHandCursor: true });
 
@@ -594,7 +628,7 @@ export default class UIScene extends Phaser.Scene {
 
     handleWithdraw() {
         if (this.balance <= 0) {
-            this.showFloatingText('Sin saldo para retirar', '#ff0000');
+            this.showFloatingText('NO FUNDS TO WITHDRAW', '#ff0000');
             return;
         }
 
@@ -605,10 +639,10 @@ export default class UIScene extends Phaser.Scene {
         const profitSign = isProfit ? '+' : '';
 
         const summaryText = `
-💰 RETIRO DE FONDOS
+:: WITHDRAW FUNDS ::
 
-Saldo Final: $${this.balance.toFixed(2)}
-Saldo Inicial: $${(this.initialBalance || 0).toFixed(2)}
+FINAL BALANCE: $${this.balance.toFixed(2)}
+INIT BALANCE: $${(this.initialBalance || 0).toFixed(2)}
 ----------------
 P/L: ${profitSign}$${profit.toFixed(2)}
         `;
@@ -617,7 +651,7 @@ P/L: ${profitSign}$${profit.toFixed(2)}
         const confirmText = this.add.text(
             this.cameras.main.width / 2,
             this.cameras.main.height / 2,
-            summaryText + '\n\n[ CLICK PARA CONFIRMAR Y SALIR ]',
+            summaryText + '\n\n[ CLICK TO CONFIRM ]',
             {
                 font: 'bold 20px Courier New',
                 fill: profitColor,
@@ -649,7 +683,7 @@ P/L: ${profitSign}$${profit.toFixed(2)}
             this.socket.emit('WITHDRAW', { amount: this.balance });
             overlay.destroy();
             confirmText.destroy();
-            this.showFloatingText('Retiro solicitado...', '#00ff88');
+            this.showFloatingText('PROCESSING WITHDRAWAL...', '#00ff88');
         });
 
         // Cancelar al hacer clic en el overlay
@@ -668,10 +702,10 @@ P/L: ${profitSign}$${profit.toFixed(2)}
     createSettingsButton() {
         const x = 30;
         const y = this.cameras.main.height - 30;
-        this.settingsBtn = this.add.text(x, y, '⚙️', { font: '24px Arial', fill: '#ffffff' }).setOrigin(0, 1);
+        this.settingsBtn = this.add.text(x, y, '[SET]', { font: '16px Courier New', fill: '#ffffff' }).setOrigin(0, 1);
         this.settingsBtn.setInteractive({ useHandCursor: true });
         this.settingsBtn.on('pointerover', () => this.settingsBtn.setScale(1.2));
         this.settingsBtn.on('pointerout', () => this.settingsBtn.setScale(1));
-        this.settingsBtn.on('pointerdown', () => console.log('⚙️ Settings clicked'));
+        this.settingsBtn.on('pointerdown', () => console.log('Settings clicked'));
     }
 }

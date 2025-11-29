@@ -5,6 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🕯️ Candle Runner - Survival Trading</title>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <style>
         * {
             margin: 0;
@@ -14,21 +17,53 @@
 
         body {
             font-family: 'Courier New', monospace;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
             color: #00ff88;
             overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
         }
 
+        /* Contenedor del Juego con estilo Cyberpunk */
         #game-container {
-            position: relative;
-            box-shadow: 0 0 50px rgba(0, 255, 136, 0.3);
-            border: 2px solid #00ff88;
-            border-radius: 10px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            box-shadow: none;
+            border: none;
+            border-radius: 0;
             overflow: hidden;
+            background: #000;
+            z-index: 1;
+        }
+
+        /* Esquinas decorativas */
+        #game-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            border-top: 2px solid #00ff88;
+            border-left: 2px solid #00ff88;
+            z-index: 10;
+        }
+
+        #game-container::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            border-bottom: 2px solid #00ff88;
+            border-right: 2px solid #00ff88;
+            z-index: 10;
         }
 
         #loading {
@@ -38,36 +73,726 @@
             transform: translate(-50%, -50%);
             text-align: center;
             z-index: 1000;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 30px;
-            border-radius: 10px;
-            border: 2px solid #00ff88;
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border: 1px solid #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            min-width: 300px;
         }
 
         #loading h1 {
-            font-size: 2rem;
+            font-size: 1.8rem;
             margin-bottom: 20px;
+            color: #fff;
             text-shadow: 0 0 10px #00ff88;
+            letter-spacing: 2px;
+        }
+
+        #loading i {
+            font-size: 3rem;
+            color: #00ff88;
+            margin-bottom: 20px;
+            animation: pulse 1.5s infinite;
         }
 
         #loading p {
-            font-size: 1rem;
-            color: #888;
+            font-size: 0.9rem;
+            color: #00ff88;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 0.7;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         .hidden {
+            display: none !important;
+        }
+
+        /* ===================================
+           🎨 CENTRO DE COMANDO DEL JUGADOR
+           =================================== */
+
+        /* Botón Flotante de Perfil */
+        #profile-toggle-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 999;
+            width: 64px;
+            height: 64px;
+            /* Forma hexagonal simple con clip-path */
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            background: linear-gradient(135deg, #00fff9 0%, #ff00c1 100%);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #000;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(0, 255, 249, 0.4);
+        }
+
+        /* Borde simulado para el hexágono */
+        #profile-toggle-btn::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            right: 2px;
+            bottom: 2px;
+            background: #000;
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            z-index: -1;
+        }
+
+        #profile-toggle-btn i {
+            color: #fff;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+        }
+
+        #profile-toggle-btn:hover {
+            transform: scale(1.1) rotate(180deg);
+            box-shadow: 0 0 40px rgba(255, 0, 193, 0.6);
+        }
+
+        /* Overlay del Perfil */
+        #profile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        #profile-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* Panel Principal */
+        #profile-panel {
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            background: rgba(10, 10, 20, 0.95);
+            border: 1px solid #00fff9;
+            box-shadow: 0 0 50px rgba(0, 255, 249, 0.15);
+            overflow-y: auto;
+            transform: scale(0.9);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            padding: 0;
+            position: relative;
+        }
+
+        /* Decoración Panel */
+        #profile-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #00fff9, #ff00c1);
+        }
+
+        #profile-overlay.active #profile-panel {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        /* Header */
+        .profile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(0, 255, 249, 0.2);
+        }
+
+        .profile-header h2 {
+            font-size: 1.2rem;
+            color: #fff;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .profile-header h2 i {
+            color: #00fff9;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #ff00c1;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: transform 0.3s;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid transparent;
+        }
+
+        .close-btn:hover {
+            color: #fff;
+            border: 1px solid #ff00c1;
+            background: rgba(255, 0, 193, 0.1);
+        }
+
+        /* Contenido */
+        .panel-content {
+            padding: 25px;
+        }
+
+        /* Sección A: Resumen Financiero */
+        .balance-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .balance-card {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            position: relative;
+        }
+
+        .balance-card.usdt {
+            border-color: rgba(0, 255, 136, 0.3);
+        }
+
+        .balance-card.wick {
+            border-color: rgba(255, 152, 0, 0.3);
+        }
+
+        .balance-label {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .balance-amount {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .balance-card.usdt .balance-amount {
+            color: #00ff88;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+        }
+
+        .balance-card.wick .balance-amount {
+            color: #ff9800;
+            text-shadow: 0 0 10px rgba(255, 152, 0, 0.4);
+        }
+
+        /* Sección B: Skin Activa */
+        .active-skin-section {
+            background: rgba(255, 0, 193, 0.05);
+            border: 1px solid rgba(255, 0, 193, 0.3);
+            padding: 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .active-skin-section::after {
+            content: 'ACTIVE UNIT';
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            background: #000;
+            padding: 0 10px;
+            font-size: 0.7rem;
+            color: #ff00c1;
+            letter-spacing: 1px;
+        }
+
+        .active-skin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .active-skin-name {
+            font-size: 1.2rem;
+            color: #fff;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .active-skin-level {
+            font-size: 0.8rem;
+            color: #ff00c1;
+            border: 1px solid #ff00c1;
+            padding: 2px 8px;
+        }
+
+        /* Barra de Integridad */
+        .integrity-bar-container {
+            margin: 15px 0;
+        }
+
+        .integrity-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            margin-bottom: 8px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .integrity-bar {
+            height: 6px;
+            background: #111;
+            display: flex;
+            gap: 2px;
+        }
+
+        .integrity-segment {
+            flex: 1;
+            background: #00ff88;
+            box-shadow: 0 0 5px #00ff88;
+            opacity: 0.3;
+            transition: all 0.3s;
+        }
+
+        .integrity-segment:not(.empty) {
+            opacity: 1;
+        }
+
+        .integrity-segment.damaged {
+            background: #ff9800;
+            box-shadow: 0 0 5px #ff9800;
+        }
+
+        /* Botón de Reparar */
+        .repair-btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            background: rgba(255, 152, 0, 0.1);
+            border: 1px solid #ff9800;
+            color: #ff9800;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .repair-btn:hover:not(:disabled) {
+            background: #ff9800;
+            color: #000;
+        }
+
+        .repair-btn:disabled {
+            border-color: #333;
+            color: #555;
+            background: transparent;
+            cursor: not-allowed;
+        }
+
+        /* Sección C: Inventario */
+        .inventory-header {
+            font-size: 0.9rem;
+            color: #00fff9;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 15px;
+        }
+
+        /* Tarjeta de Skin */
+        .skin-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .skin-card:hover {
+            border-color: #00fff9;
+            background: rgba(0, 255, 249, 0.05);
+        }
+
+        .skin-card.active {
+            border-color: #ff00c1;
+            background: rgba(255, 0, 193, 0.05);
+        }
+
+        .skin-card.active::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #ff00c1;
+            box-shadow: 0 0 10px #ff00c1;
+        }
+
+        .skin-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: #fff;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .skin-card.active .skin-icon {
+            color: #ff00c1;
+            text-shadow: 0 0 10px #ff00c1;
+        }
+
+        .skin-name {
+            font-size: 0.8rem;
+            color: #ccc;
+            margin-bottom: 5px;
+        }
+
+        .skin-level-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 0.6rem;
+            color: #888;
+            border: 1px solid #333;
+            padding: 1px 4px;
+        }
+
+        .skin-status {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .skin-status.intact {
+            color: #00ff88;
+        }
+
+        .skin-status.damaged {
+            color: #ff9800;
+        }
+
+        .skin-status.burned {
+            color: #ff0000;
+        }
+
+        /* Botón Equipar */
+        .equip-btn {
+            width: 100%;
+            padding: 5px;
+            margin-top: 10px;
+            background: transparent;
+            border: 1px solid #00fff9;
+            color: #00fff9;
+            font-family: inherit;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .equip-btn:hover {
+            background: #00fff9;
+            color: #000;
+        }
+
+        /* Toast */
+        #toast-notification {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: #000;
+            border: 1px solid #00fff9;
+            color: #00fff9;
+            padding: 15px 30px;
+            font-weight: bold;
+            box-shadow: 0 0 20px rgba(0, 255, 249, 0.3);
+            z-index: 2000;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #toast-notification.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Sección D: Manual */
+        .manual-section {
+            margin-top: 30px;
+            border-top: 1px solid rgba(0, 255, 249, 0.2);
+            padding-top: 20px;
+        }
+
+        .manual-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #00fff9;
+            cursor: pointer;
+            padding: 10px;
+            background: rgba(0, 255, 249, 0.05);
+            border: 1px solid rgba(0, 255, 249, 0.1);
+            transition: all 0.3s;
+        }
+
+        .manual-header:hover {
+            background: rgba(0, 255, 249, 0.1);
+        }
+
+        .manual-content {
             display: none;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 255, 249, 0.1);
+            border-top: none;
+            font-size: 0.8rem;
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        .manual-content.show {
+            display: block;
+        }
+
+        .manual-content h3 {
+            color: #ff00c1;
+            font-size: 0.9rem;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .manual-content ul {
+            padding-left: 20px;
+        }
+
+        .manual-content li {
+            margin-bottom: 5px;
+        }
+
+        /* Scrollbar */
+        #profile-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #profile-panel::-webkit-scrollbar-track {
+            background: #000;
+        }
+
+        #profile-panel::-webkit-scrollbar-thumb {
+            background: #333;
+            padding: 2px 6px;
+            border-radius: 2px;
+            text-transform: uppercase;
+        }
+
+        .status-boarding {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        .status-locked {
+            background: rgba(255, 0, 85, 0.2);
+            color: #ff0055;
+        }
+
+        .status-progress {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+        }
+
+        .join-btn {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px;
+            background: transparent;
+            border: 1px solid #00ff88;
+            color: #00ff88;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        .join-btn:hover {
+            background: #00ff88;
+            color: #000;
         }
     </style>
 </head>
 
 <body>
     <div id="game-container">
-        <div id="loading">
-            <h1>🕯️ CANDLE RUNNER</h1>
-            <p>Cargando juego...</p>
+        <div id="loading" class="hidden">
+            <i class="fa-solid fa-microchip"></i>
+            <h1>CANDLE RUNNER</h1>
+            <p>Inicializando Sistemas...</p>
+        </div>
+        <!-- El canvas de Phaser se generará dinámicamente y ocupará todo el contenedor -->
+    </div>
+
+
+    <!-- ===================================
+         🎒 HTML DEL CENTRO DE COMANDO
+         =================================== -->
+
+    <div id="profile-toggle-btn">
+        <i class="fa-solid fa-briefcase"></i>
+    </div>
+
+    <div id="profile-overlay">
+        <div id="profile-panel">
+            <!-- Header -->
+            <div class="profile-header">
+                <h2><i class="fa-solid fa-terminal"></i> COMMAND CENTER</h2>
+                <div style="display:flex; gap:10px;">
+                    <button class="close-btn" id="logout-btn" title="DISCONNECT"
+                        style="color: #ff0055; border-color: #ff0055;"><i class="fa-solid fa-power-off"></i></button>
+                    <button class="close-btn" id="close-profile-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <!-- Resumen Financiero -->
+                <div class="balance-section">
+                    <div class="balance-card usdt">
+                        <div class="balance-label">SALDO REAL</div>
+                        <div class="balance-amount" id="balance-usdt">$0.00</div>
+                    </div>
+                    <div class="balance-card wick">
+                        <div class="balance-label">UTILIDAD</div>
+                        <div class="balance-amount" id="balance-wick">0 WICK</div>
+                    </div>
+                </div>
+
+                <!-- Skin Activa -->
+                <div class="active-skin-section">
+                    <div class="active-skin-header">
+                        <span class="active-skin-name" id="active-skin-name">Cargando...</span>
+                        <span class="active-skin-level" id="active-skin-level">Lvl 0</span>
+                    </div>
+
+                    <div class="integrity-bar-container">
+                        <div class="integrity-label">
+                            <span>Integridad</span>
+                            <span id="integrity-text">100/100</span>
+                        </div>
+                        <div class="integrity-bar" id="integrity-bar-visual">
+                            <!-- Segmentos generados por JS -->
+                        </div>
+                    </div>
+
+                    <button class="repair-btn" id="repair-btn" disabled>
+                        <i class="fa-solid fa-screwdriver-wrench"></i> REPARAR SKIN (50 $WICK)
+                    </button>
+                </div>
+
+                <!-- Inventario -->
+                <div class="inventory-section">
+                    <div class="inventory-header"><i class="fa-solid fa-layer-group"></i> INVENTARIO DE SKINS</div>
+                    <div class="inventory-grid" id="inventory-grid">
+                        <!-- Skins generadas por JS -->
+                    </div>
+                </div>
+
+                <!-- Manual del Sistema -->
+                <div class="manual-section">
+                    <div class="manual-header" id="manual-toggle">
+                        <span><i class="fa-solid fa-book"></i> SYSTEM MANUAL</span>
+                        <i class="fa-solid fa-chevron-down" id="manual-arrow"></i>
+                    </div>
+                    <div class="manual-content" id="manual-content">
+                        <h3>// OBJECTIVE</h3>
+                        <p>Accumulate wealth ($USDT) and $WICK tokens by predicting market movements. Survive as long as
+                            possible.</p>
+
+                        <h3>// GAMEPLAY LOOP</h3>
+                        <ul>
+                            <li><strong>JOIN A BUS:</strong> Select a tier based on your risk appetite.</li>
+                            <li><strong>BET:</strong> Predict if the next candle will close <strong>LONG
+                                    (Green)</strong> or <strong>SHORT (Red)</strong>.</li>
+                            <li><strong>WIN:</strong> Earn $USDT and keep your Integrity.</li>
+                            <li><strong>LOSE:</strong> Take damage to your Skin Integrity.</li>
+                        </ul>
+
+                        <h3>// SURVIVAL MECHANICS</h3>
+                        <ul>
+                            <li><strong>INTEGRITY:</strong> Your life force. If it hits 0, your Skin is
+                                <strong>BURNED</strong> (NFT destroyed).</li>
+                            <li><strong>REPAIR:</strong> Use earned <strong>$WICK</strong> tokens to repair your Skin
+                                before it's too late.</li>
+                            <li><strong>SKINS:</strong> Higher level skins have more Integrity but cost more to repair.
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+
+    <div id="toast-notification"><i class="fa-solid fa-circle-info"></i> <span>Notificación</span></div>
 
     <!-- Phaser 3 desde CDN -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
@@ -77,6 +802,259 @@
 
     <!-- Nuestro código del juego (ES Modules) -->
     <script type="module" src="/src/main.js"></script>
-</body>
+
+    <!-- 🧠 LÓGICA DEL CENTRO DE COMANDO -->
+    <script>
+                // --- MOCKS PARA EVITAR ERRORES DE REFERENCIA DE BUSES (UI ahora en Phaser) ---
+                // Si la UI de buses ya no se usa en el DOM, estas funciones/elementos pueden ser mocks vacíos
+                function renderBusList(buses) {
+                    // Esta función ya no hace nada porque la selección de bus es in-game
+                    // Puedes implementar aquí un log si quieres depurar
+                    // console.log('[MOCK] renderBusList llamada', buses);
+                }
+                // Mock para evitar error si busModalOverlay no existe
+                const busModalOverlay = { classList: { remove: () => {} } };
+        document.addEventListener('DOMContentLoaded', () => {
+            // Referencias DOM
+            const toggleBtn = document.getElementById('profile-toggle-btn');
+            const overlay = document.getElementById('profile-overlay');
+            const closeBtn = document.getElementById('close-profile-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+            const panel = document.getElementById('profile-panel');
+            const toast = document.getElementById('toast-notification');
+
+            // Manual Elements
+            const manualToggle = document.getElementById('manual-toggle');
+            const manualContent = document.getElementById('manual-content');
+            const manualArrow = document.getElementById('manual-arrow');
+
+            // Elementos de Datos
+            const balanceUsdt = document.getElementById('balance-usdt');
+            const balanceWick = document.getElementById('balance-wick');
+            const activeSkinName = document.getElementById('active-skin-name');
+            const activeSkinLevel = document.getElementById('active-skin-level');
+            const integrityText = document.getElementById('integrity-text');
+            const integrityBar = document.getElementById('integrity-bar-visual');
+            const repairBtn = document.getElementById('repair-btn');
+            const inventoryGrid = document.getElementById('inventory-grid');
+
+            // Estado Local
+            let currentUserProfile = null;
+            let availableBuses = [];
+
+            // --- BUS MODAL LOGIC ---
+
+            // --- INTERACCIÓN UI ---
+            toggleBtn.addEventListener('click', () => {
+                overlay.classList.add('active');
+            });
+
+            closeBtn.addEventListener('click', () => {
+                overlay.classList.remove('active');
+            });
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('active');
+                }
+            });
+
+            // Logout Logic
+            logoutBtn.addEventListener('click', () => {
+                if (confirm('⚠️ DISCONNECT FROM SYSTEM?\nYou will leave the current bus.')) {
+                    window.location.reload();
+                }
+            });
+
+            // Manual Toggle Logic
+            manualToggle.addEventListener('click', () => {
+                manualContent.classList.toggle('show');
+                if (manualContent.classList.contains('show')) {
+                    manualArrow.classList.replace('fa-chevron-down', 'fa-chevron-up');
+                } else {
+                    manualArrow.classList.replace('fa-chevron-up', 'fa-chevron-down');
+                }
+            });
+
+            // --- SOCKET LISTENERS ---
+            // Esperar a que window.globalSocket esté disponible (creado en main.js)
+            const checkSocket = setInterval(() => {
+                if (window.globalSocket) {
+                    clearInterval(checkSocket);
+                    initSocketListeners(window.globalSocket);
+                }
+            }, 100);
+
+            function initSocketListeners(socket) {
+                console.log('[PROFILE] CONNECTING TO GLOBAL SOCKET...');
+
+                // Request initial bus list
+                socket.emit('ADMIN_GET_BUSES'); // Reusing admin event for now as it returns full info
+
+                // Listen for bus list updates (using ADMIN_BUSES for now)
+                socket.on('ADMIN_BUSES', (buses) => {
+                    console.log('[UI] Received Bus List:', buses);
+                    availableBuses = buses;
+                    renderBusList(buses);
+                });
+
+                // Listen for successful join to close modal
+                socket.on('ROOM_JOINED', (data) => {
+                    console.log('[UI] Joined Room:', data);
+                    busModalOverlay.classList.remove('active');
+                    showToast(`[OK] TICKET CONFIRMED: ${data.roomName}`);
+                });
+
+                // Escuchar actualizaciones de perfil
+                socket.on('USER_PROFILE', (profile) => {
+                    console.log('[PROFILE] DATA RECEIVED:', profile);
+                    currentUserProfile = profile;
+                    updateUI(profile);
+                });
+
+                // Escuchar eventos de reparación
+                socket.on('SKIN_REPAIRED', (data) => {
+                    showToast(`[OK] REPAIR SUCCESSFUL (-${data.cost} WICK)`);
+                    // USER_PROFILE se actualiza automáticamente
+                });
+
+                // Escuchar eventos de equipamiento
+                socket.on('SKIN_EQUIPPED', (data) => {
+                    showToast(data.message);
+                });
+
+                // Escuchar errores
+                socket.on('GAME_ERROR', (data) => {
+                    showToast(data.message, true);
+                });
+            }
+
+            // --- ACTUALIZACIÓN DE UI ---
+            function updateUI(profile) {
+                // 1. Saldos
+                balanceUsdt.textContent = `$${profile.balanceUSDT.toFixed(2)}`;
+                balanceWick.textContent = `${profile.balanceWICK} WICK`;
+
+                // 2. Skin Activa
+                const skin = profile.activeSkin;
+                activeSkinName.textContent = skin.name;
+                activeSkinLevel.textContent = `Lvl ${skin.level}`;
+                integrityText.textContent = `${skin.integrity}/${skin.maxIntegrity}`;
+
+                // Renderizar barra de integridad
+                renderIntegrityBar(skin.integrity, skin.maxIntegrity);
+
+                // Botón de Reparar
+                const damage = skin.maxIntegrity - skin.integrity;
+                const repairCost = Math.floor(50 * Math.pow(1.618, skin.level || 1));
+
+                if (damage > 0 && !skin.isBurned) {
+                    repairBtn.disabled = false;
+                    repairBtn.innerHTML = `<i class="fa-solid fa-screwdriver-wrench"></i> REPAIR SKIN (${repairCost} $WICK)`;
+                    repairBtn.onclick = () => {
+                        window.globalSocket.emit('REPAIR_SKIN');
+                    };
+                } else if (skin.isBurned) {
+                    repairBtn.disabled = true;
+                    repairBtn.innerHTML = '<i class="fa-solid fa-skull"></i> SKIN BURNED [FATAL]';
+                } else {
+                    repairBtn.disabled = true;
+                    repairBtn.innerHTML = '<i class="fa-solid fa-check"></i> SYSTEM OPTIMAL';
+                }
+
+                // 3. Inventario
+                renderInventory(profile.inventory);
+            }
+
+            function renderIntegrityBar(current, max) {
+                integrityBar.innerHTML = '';
+                const segments = 20; // Más segmentos para look más técnico
+                const healthPerSegment = max / segments;
+                const activeSegments = Math.ceil(current / healthPerSegment);
+
+                for (let i = 0; i < segments; i++) {
+                    const segment = document.createElement('div');
+                    segment.className = 'integrity-segment';
+
+                    if (i >= activeSegments) {
+                        segment.classList.add('empty');
+                    } else if (current < max * 0.3) {
+                        segment.classList.add('damaged');
+                    }
+
+                    integrityBar.appendChild(segment);
+                }
+            }
+
+            function renderInventory(inventory) {
+                inventoryGrid.innerHTML = '';
+
+                if (!inventory || inventory.length === 0) {
+                    inventoryGrid.innerHTML = '<p style="color:#888; text-align:center; grid-column:1/-1;">[ EMPTY INVENTORY ]</p>';
+                    return;
+                }
+
+                inventory.forEach(skin => {
+                    const card = document.createElement('div');
+                    card.className = `skin-card ${skin.isActive ? 'active' : ''} ${skin.isBurned ? 'burned' : ''}`;
+
+                    // Icono basado en tipo
+                    let iconClass = 'fa-robot';
+                    if (skin.name.includes('Punk')) iconClass = 'fa-guitar';
+                    if (skin.name.includes('Samurai')) iconClass = 'fa-khanda';
+                    if (skin.isBurned) iconClass = 'fa-skull-crossbones';
+
+                    // Estado texto
+                    let statusClass = 'intact';
+                    let statusText = '[OK] INTACT';
+                    if (skin.isBurned) { statusClass = 'burned'; statusText = '[!] BURNED'; }
+                    else if (skin.integrity < skin.maxIntegrity) { statusClass = 'damaged'; statusText = '[!] DAMAGED'; }
+
+                    card.innerHTML = `
+                        <div class="skin-level-badge">${skin.level}</div>
+                        <div class="skin-icon"><i class="fa-solid ${iconClass}"></i></div>
+                        <div class="skin-name">${skin.name}</div>
+                        <div class="skin-status ${statusClass}">${statusText}</div>
+                    `;
+
+                    // Botón Equipar (solo si no está activa y no está quemada)
+                    if (!skin.isActive && !skin.isBurned) {
+                        const equipBtn = document.createElement('button');
+                        equipBtn.className = 'equip-btn';
+                        equipBtn.textContent = '[ EQUIP ]';
+                        equipBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            window.globalSocket.emit('EQUIP_SKIN', { skinId: skin.id });
+                        };
+                        card.appendChild(equipBtn);
+                    }
+
+                    if (skin.isActive) {
+                        const activeLabel = document.createElement('div');
+                        activeLabel.style.color = '#ff00c1';
+                        activeLabel.style.fontSize = '0.6rem';
+                        activeLabel.style.marginTop = '10px';
+                        activeLabel.innerHTML = '<i class="fa-solid fa-circle-check"></i> [ EQUIPPED ]';
+                        card.appendChild(activeLabel);
+                    }
+
+                    inventoryGrid.appendChild(card);
+                });
+            }
+
+            // --- UTILIDADES ---
+            function showToast(message, isError = false) {
+                const icon = isError ? '<i class="fa-solid fa-triangle-exclamation"></i>' : '<i class="fa-solid fa-circle-info"></i>';
+                toast.innerHTML = `${icon} <span>${message}</span>`;
+                toast.style.borderColor = isError ? '#ff0000' : '#00fff9';
+                toast.style.color = isError ? '#ff0000' : '#00fff9';
+
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
+            }
+        });
+    </script>
 
 </html>
