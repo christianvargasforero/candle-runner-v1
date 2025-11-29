@@ -37,6 +37,50 @@ class GameLoop {
 
         // Bote acumulado (Rollover)
         this.accumulatedPot = 0;
+        this.rolloverCount = 0; // Contador para dispersión de tesorería
+    }
+
+    /**
+     * Recupera el estado del juego desde Redis
+     */
+    async recoverState() {
+        try {
+            const savedState = await redisClient.get('GAME_STATE');
+            if (savedState) {
+                const state = JSON.parse(savedState);
+
+                this.roundNumber = state.roundNumber;
+                this.accumulatedPot = state.accumulatedPot;
+                this.currentState = state.currentState;
+                this.currentRound = state.currentRound;
+                this.rolloverCount = state.rolloverCount || 0;
+
+                // Calcular tiempo restante para sincronizar
+                if (state.timeLeft > 0) {
+                    // Ajustar phaseStartTime para que coincida con el tiempo restante
+                    const phaseDuration = this.getPhaseDuration(this.currentState);
+                    this.phaseStartTime = Date.now() - (phaseDuration - state.timeLeft);
+                }
+
+                console.log(`🔄 [RECOVERY] Estado recuperado: Ronda #${this.roundNumber} en fase ${this.currentState}`);
+
+                // Reanudar ronda si estaba activa
+                if (this.currentState !== GAME_STATES.WAITING) {
+                    this.resumeRound();
+                }
+            }
+        } catch (error) {
+            console.error('❌ [RECOVERY] Error recuperando estado:', error);
+        }
+    }
+
+    getPhaseDuration(phase) {
+        switch (phase) {
+            case GAME_STATES.BETTING: return PHASE_BET_TIME;
+            case GAME_STATES.LOCKED: return PHASE_LOCK_TIME;
+            case GAME_STATES.RESOLVING: return PHASE_RESOLVE_TIME;
+            default: return 0;
+        }
     }
 
     /**
@@ -372,16 +416,26 @@ class GameLoop {
                     }
                 }));
 
-                // Resetear bote acumulado
+                // Resetear bote acumulado y contador
                 this.accumulatedPot = 0;
+                this.rolloverCount = 0;
                 console.log(`💸 [PAYOUT] Se distribuyeron $${netPool.toFixed(2)} entre ${winners.length} ganadores. Fee: $${houseFee.toFixed(2)}`);
 
             } else {
                 // No hay ganadores (todos perdieron): Rollover
-                // La casa se lleva el fee del roundPool solamente? O todo va al pozo?
-                // Regla típica: Todo al pozo siguiente.
                 this.accumulatedPot += roundPool;
-                console.log(`🔄 [ROLLOVER] Sin ganadores. Pozo acumulado: $${this.accumulatedPot.toFixed(2)}`);
+                this.rolloverCount++;
+
+                console.log(`🔄 [ROLLOVER] Sin ganadores. Pozo acumulado: $${this.accumulatedPot.toFixed(2)} (Racha: ${this.rolloverCount})`);
+
+                // Regla de Dispersión (3 rondas consecutivas sin ganadores)
+                if (this.rolloverCount >= 3) {
+                    const treasuryShare = this.accumulatedPot * 0.5;
+                    this.accumulatedPot -= treasuryShare;
+                    this.rolloverCount = 0; // Resetear contador tras dispersión
+
+                    console.log(`💸 [DISPERSION] Dispersión de Bote: $${treasuryShare.toFixed(2)} a Tesorería por inactividad.`);
+                }
             }
         } else {
             // EMPATE (DRAW): Devolver apuestas (Refund)

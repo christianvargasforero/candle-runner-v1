@@ -13,6 +13,7 @@ import GameLoop from './services/gameLoop.js';
 import RoomManager from './services/roomManager.js';
 import priceService from './services/priceService.js';
 import { userManager } from './services/userManager.js';
+import { REPAIR_COST_BASE, REPAIR_COST_MULTIPLIER } from '../shared/constants.js';
 
 // Configuración de ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -99,38 +100,46 @@ io.on('connection', async (socket) => {
         if (!user) return;
 
         const skin = user.activeSkin;
+        if (!skin) {
+            socket.emit('GAME_ERROR', { message: 'No tienes una skin activa para reparar.' });
+            return;
+        }
+
         if (skin.currentIntegrity >= skin.maxIntegrity) {
             socket.emit('GAME_ERROR', { message: 'La skin ya está en perfecto estado.' });
             return;
         }
 
-        // Calcular costo: 10 $WICK por punto de integridad
+        // Calcular costo exponencial
+        // Fórmula: Base * (Multiplicador ^ Nivel)
+        const skinLevel = skin.level || 1;
+        const costPerPoint = Math.floor(REPAIR_COST_BASE * Math.pow(REPAIR_COST_MULTIPLIER, skinLevel));
         const damage = skin.maxIntegrity - skin.currentIntegrity;
-        const cost = damage * 10;
+        const totalCost = damage * costPerPoint;
 
-        if (user.balanceWICK < cost) {
-            socket.emit('GAME_ERROR', { message: `Faltan $WICK. Costo: ${cost}, Tienes: ${user.balanceWICK}` });
+        // Verificar saldo WICK
+        if (!user.hasBalance(totalCost, 'WICK')) {
+            socket.emit('GAME_ERROR', { message: `Faltan $WICK. Costo: ${totalCost}, Tienes: ${user.balanceWICK}` });
             return;
         }
 
-        // Ejecutar reparación
-        user.balanceWICK -= cost;
-        await skin.repair(damage, cost); // Repara todo el daño
+        // Ejecutar reparación (Transacción atómica)
+        if (await user.withdraw(totalCost, 'REPAIR', 'WICK')) {
+            await skin.repair(damage);
 
-        console.log(`🔧 [REPAIR] Usuario ${user.id} reparó su skin por ${cost} $WICK`);
+            console.log(`🔧 [REPAIR] Usuario ${user.id} reparó su skin por ${totalCost} $WICK`);
 
-        // Emitir éxito
-        socket.emit('SKIN_REPAIRED', {
-            balanceWICK: user.balanceWICK,
-            skin: {
+            socket.emit('SKIN_UPDATE', {
                 integrity: skin.currentIntegrity,
                 maxIntegrity: skin.maxIntegrity,
                 isBurned: skin.isBurned
-            }
-        });
+            });
 
-        // Actualizar perfil completo también
-        socket.emit('USER_PROFILE', user.getProfile());
+            // Actualizar perfil completo también
+            socket.emit('USER_PROFILE', user.getProfile());
+        } else {
+            socket.emit('GAME_ERROR', { message: 'Error al procesar la reparación' });
+        }
     });
 
     // Evento: Retiro de fondos

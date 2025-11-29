@@ -37,6 +37,9 @@ class RoomManager {
     /**
      * Añade un usuario a una sala con validación de Gatekeeper
      */
+    /**
+     * Añade un usuario a una sala con validación de Gatekeeper
+     */
     async addUserToRoom(userId, roomId) {
         const room = this.rooms.get(roomId);
         if (!room) {
@@ -44,7 +47,7 @@ class RoomManager {
             return { success: false, error: 'Sala no encontrada' };
         }
 
-        const user = userManager.getUser(userId); // userId here is socketId in current context
+        const user = userManager.getUser(userId);
         if (!user) {
             return { success: false, error: 'Usuario no encontrado' };
         }
@@ -52,23 +55,20 @@ class RoomManager {
         // --- GATEKEEPER VALIDATION ---
         const rules = ROOM_ACCESS_RULES[room.tier] || ROOM_ACCESS_RULES.TRAINING;
 
-        // 1. Skin Level
-        // Assuming user.activeSkin has level, or we use defaults. 
-        // Skin model in schema has level. Skin.js might not have exposed it in 'activeSkin' object in User.
-        // Let's assume level 0 for now if missing.
-        const userLevel = user.activeSkin.level || 0;
+        // 1. Validar Nivel de Skin
+        // Asumimos que activeSkin tiene propiedad 'level', si no, es 1
+        const userLevel = user.activeSkin.level || 1;
         if (userLevel < rules.minLevel) {
             return { success: false, error: `Nivel insuficiente. Requiere Nivel ${rules.minLevel}` };
         }
 
-        // 2. Default Skin
-        if (!rules.allowDefault && user.activeSkin.type === 'PROTOCOL_DROID') {
+        // 2. Validar Protocol Droid (Anti-Farming)
+        const isDefaultSkin = user.activeSkin.type === 'PROTOCOL_DROID';
+        if (!rules.allowDefault && isDefaultSkin) {
             return { success: false, error: 'Protocol Droid no permitido en esta sala.' };
         }
 
-        // 3. Min Bet / Balance Check (Proof of Funds)
-        // The rule is minBet. User must have at least that balance to be useful?
-        // "Si el usuario no tiene el saldo mínimo (minBet) -> Rechazar"
+        // 3. Validar Saldo Mínimo (Proof of Funds)
         if (user.balanceUSDT < rules.minBet) {
             return { success: false, error: `Saldo insuficiente. Mínimo para entrar: $${rules.minBet}` };
         }
