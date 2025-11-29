@@ -161,6 +161,26 @@ class RoomManager {
     }
 
     /**
+     * Obtiene el conteo de usuarios por tipo de sala
+     */
+    getRoomCounts() {
+        const counts = {
+            'TRAINING': 0,
+            'SATOSHI': 0,
+            'TRADER': 0,
+            'WHALE': 0
+        };
+
+        this.rooms.forEach(room => {
+            if (counts[room.name] !== undefined) {
+                counts[room.name] += room.users.size;
+            }
+        });
+
+        return counts;
+    }
+
+    /**
      * Obtiene información de todas las salas
      */
     getRoomsInfo() {

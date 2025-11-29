@@ -60,6 +60,7 @@ io.on('connection', async (socket) => {
         const result = await roomManager.addUserToRoom(socket.id, mainRoom.id);
         if (result.success) {
             socket.join(mainRoom.id);
+            io.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
         } else {
             socket.emit('GAME_ERROR', { message: `Acceso denegado: ${result.error}` });
             // Desconectar o dejar en limbo? Dejamos conectado pero sin sala.
@@ -161,6 +162,11 @@ io.on('connection', async (socket) => {
         }
     });
 
+    // Evento: Solicitar conteo de salas
+    socket.on('GET_ROOM_COUNTS', () => {
+        socket.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
+    });
+
     // Evento: Desconexión
     socket.on('disconnect', () => {
         console.log(`❌ [SOCKET] Cliente desconectado: ${socket.id}`);
@@ -172,6 +178,9 @@ io.on('connection', async (socket) => {
         roomManager.rooms.forEach((room, roomId) => {
             roomManager.removeUserFromRoom(socket.id, roomId);
         });
+
+        // Actualizar conteos a todos
+        io.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
     });
 });
 

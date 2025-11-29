@@ -12,10 +12,33 @@ export default class MenuScene extends Phaser.Scene {
     create() {
         const { width, height } = this.cameras.main;
 
+        // Conectar socket para obtener datos en tiempo real
+        this.socket = io();
+        this.roomCounts = {};
+
+        this.socket.on('connect', () => {
+            console.log('🔌 [MENU] Conectado al servidor');
+            this.socket.emit('GET_ROOM_COUNTS');
+        });
+
+        this.socket.on('ROOM_COUNTS_UPDATE', (counts) => {
+            this.roomCounts = counts;
+            this.updateRoomCounts();
+        });
+
+        // Limpieza al salir de la escena
+        this.events.on('shutdown', () => {
+            if (this.socket) {
+                this.socket.disconnect();
+            }
+        });
+
         // Fondo oscuro con gradiente
         const bg = this.add.graphics();
         bg.fillGradientStyle(0x0a0e27, 0x0a0e27, 0x1a1f3a, 0x1a1f3a, 1);
         bg.fillRect(0, 0, width, height);
+
+        // ... (resto del código igual) ...
 
         // ============================================
         // HEADER - Logo y Título
@@ -101,6 +124,8 @@ export default class MenuScene extends Phaser.Scene {
         const startX = x - 360;
         const spacing = 180;
 
+        this.roomTexts = {}; // Store references
+
         rooms.forEach((room, i) => {
             const roomX = startX + (i * spacing);
             const roomY = y + 50;
@@ -121,13 +146,23 @@ export default class MenuScene extends Phaser.Scene {
             }).setOrigin(0.5);
 
             // Description
-            this.add.text(roomX + 80, roomY + 70, room.desc, {
+            this.add.text(roomX + 80, roomY + 60, room.desc, {
                 fontSize: '11px',
                 fontFamily: 'Arial',
                 color: '#AAA',
                 align: 'center',
                 wordWrap: { width: 140 }
             }).setOrigin(0.5);
+
+            // User Count
+            const countText = this.add.text(roomX + 80, roomY + 90, '👤 0', {
+                fontSize: '14px',
+                fontFamily: 'Arial',
+                color: '#00ff88',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+
+            this.roomTexts[room.key] = countText;
 
             // Make interactive
             const hitArea = new Phaser.Geom.Rectangle(roomX, roomY, 160, 120);
@@ -155,6 +190,15 @@ export default class MenuScene extends Phaser.Scene {
                     card.strokeRoundedRect(roomX, roomY, 160, 120, 8);
                 }
             });
+        });
+    }
+
+    updateRoomCounts() {
+        if (!this.roomTexts) return;
+
+        Object.keys(this.roomTexts).forEach(key => {
+            const count = this.roomCounts[key] || 0;
+            this.roomTexts[key].setText(`👤 ${count}`);
         });
     }
 
