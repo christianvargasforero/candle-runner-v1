@@ -12,6 +12,11 @@ export default class GameScene extends Phaser.Scene {
         this.localUserId = null;
         this.passengers = [];
         
+        // 📊 LIVE TICKER STATE
+        this.liveCandleHigh = null;  // Máximo alcanzado en vela activa
+        this.liveCandleLow = null;   // Mínimo alcanzado en vela activa
+        this.liveStartPrice = null;  // Precio de apertura (open)
+        
         // Configuración visual
         this.CANDLE_SPACING = 140;
         this.CANDLE_WIDTH = 50;
@@ -91,10 +96,21 @@ export default class GameScene extends Phaser.Scene {
         // Capas de profundidad
         this.bgLayer = this.add.container(0, 0).setDepth(0);
         this.gridLayer = this.add.container(0, 0).setDepth(1);
-        this.candleLayer = this.add.container(0, 0).setDepth(10);
+        this.candleLayer = this.add.container(0, 0).setDepth(10);  // 📦 Velas históricas (estáticas)
         this.lineLayer = this.add.container(0, 0).setDepth(15);
         // NO usar container para playerLayer - los sprites físicos no funcionan bien en containers
+        this.liveCandleLayer = this.add.container(0, 0).setDepth(20); // 🔴 Vela en formación (dinámica)
         this.uiLayer = this.add.container(0, 0).setDepth(100);
+        
+        // 🎨 Graphics exclusivo para vela activa (se limpia y redibuja en cada tick)
+        this.liveCandleGraphics = this.add.graphics();
+        this.liveCandleGraphics.setDepth(21);
+        this.liveCandleLayer.add(this.liveCandleGraphics);
+        
+        // 🎨 Graphics para línea elástica de precio (conecta última histórica con live)
+        this.liveLineGraphics = this.add.graphics();
+        this.liveLineGraphics.setDepth(16);
+        this.lineLayer.add(this.liveLineGraphics);
         
         // Crear fondo con parallax animado
         this.createAnimatedBackground();
@@ -278,6 +294,11 @@ export default class GameScene extends Phaser.Scene {
             this.candleHistory = data.candleHistory || [];
             this.passengers = data.passengers || [];
             
+            // 🔄 RESETEAR ESTADO DE LIVE TICKER
+            this.liveStartPrice = null;
+            this.liveCandleHigh = null;
+            this.liveCandleLow = null;
+            
             console.log('[BUS_START] ' + this.candleHistory.length + ' velas, ' + this.passengers.length + ' pasajeros');
             
             // Ocultar UI de espera
@@ -298,6 +319,15 @@ export default class GameScene extends Phaser.Scene {
         // ROUND_RESULT: Resultado de la ronda
         this.socket.on('ROUND_RESULT', (data) => {
             console.log('[ROUND_RESULT]', data);
+            
+            // 🔄 RESETEAR ESTADO DE LIVE TICKER para próxima ronda
+            this.liveStartPrice = null;
+            this.liveCandleHigh = null;
+            this.liveCandleLow = null;
+            
+            // Limpiar gráficos dinámicos
+            if (this.liveCandleGraphics) this.liveCandleGraphics.clear();
+            if (this.liveLineGraphics) this.liveLineGraphics.clear();
             
             if (data.candleHistory) {
                 this.candleHistory = data.candleHistory;
@@ -470,12 +500,39 @@ export default class GameScene extends Phaser.Scene {
     updateLiveCandle(price) {
         if (!this.candleHistory.length) return;
         
-        // Actualizar última vela
+        // ============================================
+        // 📊 ACTUALIZAR DATOS DE LA VELA ACTIVA
+        // ============================================
         const lastIndex = this.candleHistory.length - 1;
         const last = this.candleHistory[lastIndex];
+        
+        // Inicializar open si es la primera actualización
+        if (!this.liveStartPrice) {
+            this.liveStartPrice = last.open || price;
+            this.liveCandleHigh = price;
+            this.liveCandleLow = price;
+        }
+        
+        // Actualizar precio actual
         last.close = price;
-        if (price > (last.high || price)) last.high = price;
-        if (price < (last.low || price)) last.low = price;
+        
+        // Actualizar high/low dinámicos (mechas)
+        if (price > this.liveCandleHigh) this.liveCandleHigh = price;
+        if (price < this.liveCandleLow) this.liveCandleLow = price;
+        
+        // Actualizar en historial para consistencia
+        last.high = this.liveCandleHigh;
+        last.low = this.liveCandleLow;
+        
+        // ============================================
+        // 🎨 RENDERIZAR VELA EN TIEMPO REAL
+        // ============================================
+        this.renderLiveCandleTicker(lastIndex, this.liveStartPrice, price, this.liveCandleHigh, this.liveCandleLow);
+        
+        // ============================================
+        // 📈 ACTUALIZAR LÍNEA ELÁSTICA DE PRECIO
+        // ============================================
+        this.renderElasticPriceLine(lastIndex, price);
         
         // ============================================
         // 🔄 SINCRONIZACIÓN: Actualizar cuerpo físico
@@ -493,14 +550,181 @@ export default class GameScene extends Phaser.Scene {
             physicsBody.body.updateFromGameObject();
         }
         
-        // Re-renderizar visual
-        this.renderHolographicCandles();
-        this.renderPriceLine();
+        // ============================================
+        // 📷 SMOOTH CAMERA FOLLOW (Eje Y)
+        // ============================================
+        this.adjustCameraForPrice(price);
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // 🔴 LIVE TICKER: Vela en Formación (Dinámica)
+    // ═══════════════════════════════════════════════════════════════
+    
+    renderLiveCandleTicker(index, open, current, high, low) {
+        // Limpiar gráfico anterior
+        this.liveCandleGraphics.clear();
+        
+        // Calcular posición X de la vela
+        const x = this.BASE_X + index * this.CANDLE_SPACING;
+        
+        // ============================================
+        // 📊 CONVERTIR PRECIOS A COORDENADAS Y
+        // ============================================
+        // Calcular rango de precios para normalización
+        let minPrice = Infinity, maxPrice = -Infinity;
+        this.candleHistory.forEach(c => {
+            minPrice = Math.min(minPrice, c.low || c.close);
+            maxPrice = Math.max(maxPrice, c.high || c.close);
+        });
+        const priceRange = Math.max(1, maxPrice - minPrice);
+        
+        // Función auxiliar: Precio → Píxel Y
+        const priceToY = (price) => {
+            const priceNorm = (price - minPrice) / priceRange;
+            return this.baseY - priceNorm * this.priceScale;
+        };
+        
+        const yOpen = priceToY(open);
+        const yCurrent = priceToY(current);
+        const yHigh = priceToY(high);
+        const yLow = priceToY(low);
+        
+        // ============================================
+        // 🎨 COLOR DINÁMICO: Verde si sube, Rojo si baja
+        // ============================================
+        const isGreen = current >= open;
+        const color = isGreen ? this.COLORS.LONG : this.COLORS.SHORT;
+        
+        // ============================================
+        // 1️⃣ DIBUJAR MECHAS (Sombras High/Low)
+        // ============================================
+        this.liveCandleGraphics.lineStyle(3, color, 0.6);
+        this.liveCandleGraphics.lineBetween(x, yHigh, x, yLow);
+        
+        // ============================================
+        // 2️⃣ DIBUJAR CUERPO (Open → Current)
+        // ============================================
+        const bodyTop = Math.min(yOpen, yCurrent);
+        const bodyBottom = Math.max(yOpen, yCurrent);
+        const bodyHeight = Math.max(4, bodyBottom - bodyTop); // Mínimo 4px para visibilidad
+        
+        // Glow exterior (resplandor)
+        this.liveCandleGraphics.fillStyle(color, 0.15);
+        this.liveCandleGraphics.fillRoundedRect(
+            x - this.CANDLE_WIDTH/2 - 6,
+            bodyTop - 6,
+            this.CANDLE_WIDTH + 12,
+            bodyHeight + 12,
+            6
+        );
+        
+        // Cuerpo principal (semitransparente)
+        this.liveCandleGraphics.fillStyle(color, 0.4);
+        this.liveCandleGraphics.fillRoundedRect(
+            x - this.CANDLE_WIDTH/2,
+            bodyTop,
+            this.CANDLE_WIDTH,
+            bodyHeight,
+            4
+        );
+        
+        // Borde sólido
+        this.liveCandleGraphics.lineStyle(2, color, 1);
+        this.liveCandleGraphics.strokeRoundedRect(
+            x - this.CANDLE_WIDTH/2,
+            bodyTop,
+            this.CANDLE_WIDTH,
+            bodyHeight,
+            4
+        );
+        
+        // ============================================
+        // 3️⃣ GLOW DOT: Punto brillante en precio actual
+        // ============================================
+        // Círculo exterior (glow)
+        this.liveCandleGraphics.fillStyle(color, 0.3);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH/2 + 15, yCurrent, 12);
+        
+        // Círculo brillante
+        this.liveCandleGraphics.fillStyle(color, 1);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH/2 + 15, yCurrent, 6);
+        
+        // Core blanco
+        this.liveCandleGraphics.fillStyle(0xffffff, 0.8);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH/2 + 15, yCurrent, 3);
+        
+        // ============================================
+        // 4️⃣ PRECIO NUMÉRICO (Etiqueta flotante)
+        // ============================================
+        const priceText = current.toFixed(2);
+        const priceLabel = this.add.text(
+            x + this.CANDLE_WIDTH/2 + 30,
+            yCurrent,
+            priceText,
+            {
+                font: 'bold 14px "Courier New"',
+                fill: isGreen ? '#00ff88' : '#ff0055',
+                stroke: '#000',
+                strokeThickness: 3
+            }
+        ).setOrigin(0, 0.5).setDepth(22);
+        
+        // Autodestrucción en próximo tick (evita acumulación)
+        this.time.delayedCall(50, () => {
+            if (priceLabel) priceLabel.destroy();
+        });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
     // 📈 LÍNEA DE PRECIO (Chart Line)
     // ═══════════════════════════════════════════════════════════════
+    
+    renderElasticPriceLine(liveIndex, currentPrice) {
+        // Limpiar gráfico anterior
+        this.liveLineGraphics.clear();
+        
+        if (this.candleHistory.length < 2) return;
+        
+        // ============================================
+        // 📊 CALCULAR COORDENADAS
+        // ============================================
+        const prevIndex = liveIndex - 1;
+        if (prevIndex < 0) return;
+        
+        const prevCandle = this.candleHistory[prevIndex];
+        const prevX = this.BASE_X + prevIndex * this.CANDLE_SPACING;
+        const liveX = this.BASE_X + liveIndex * this.CANDLE_SPACING;
+        
+        // Normalización de precios
+        let minPrice = Infinity, maxPrice = -Infinity;
+        this.candleHistory.forEach(c => {
+            minPrice = Math.min(minPrice, c.low || c.close);
+            maxPrice = Math.max(maxPrice, c.high || c.close);
+        });
+        const priceRange = Math.max(1, maxPrice - minPrice);
+        
+        const priceToY = (price) => {
+            const priceNorm = (price - minPrice) / priceRange;
+            return this.baseY - priceNorm * this.priceScale;
+        };
+        
+        const prevY = priceToY(prevCandle.close);
+        const currentY = priceToY(currentPrice);
+        
+        // ============================================
+        // 🎨 SEGMENTO ELÁSTICO (Última histórica → Live)
+        // ============================================
+        const isGreen = currentPrice >= prevCandle.close;
+        const color = isGreen ? this.COLORS.LONG : this.COLORS.SHORT;
+        
+        // Línea animada (grosor mayor para visibilidad)
+        this.liveLineGraphics.lineStyle(3, color, 0.8);
+        this.liveLineGraphics.lineBetween(prevX, prevY, liveX, currentY);
+        
+        // Punto pulsante en la conexión
+        this.liveLineGraphics.fillStyle(color, 0.6);
+        this.liveLineGraphics.fillCircle(liveX, currentY, 5);
+    }
     
     renderPriceLine() {
         this.lineLayer.removeAll(true);
@@ -558,6 +782,45 @@ export default class GameScene extends Phaser.Scene {
         this.lineLayer.add(lineGraphics);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // 📷 SMOOTH CAMERA FOLLOW (Eje Y)
+    // ═══════════════════════════════════════════════════════════════
+    
+    adjustCameraForPrice(price) {
+        if (!this.candleHistory.length) return;
+        
+        // Calcular Y del precio actual
+        let minPrice = Infinity, maxPrice = -Infinity;
+        this.candleHistory.forEach(c => {
+            minPrice = Math.min(minPrice, c.low || c.close);
+            maxPrice = Math.max(maxPrice, c.high || c.close);
+        });
+        const priceRange = Math.max(1, maxPrice - minPrice);
+        const priceNorm = (price - minPrice) / priceRange;
+        const targetY = this.baseY - priceNorm * this.priceScale;
+        
+        // Obtener posición actual de la cámara
+        const currentCamY = this.cameras.main.scrollY + this.scale.height / 2 / this.zoomLevel;
+        
+        // ============================================
+        // 🎯 PAN SUAVE SI EL PRECIO SE SALE DEL VIEWPORT
+        // ============================================
+        const margin = 150; // Margen de seguridad (píxeles)
+        const viewportTop = currentCamY - this.scale.height / 2 / this.zoomLevel + margin;
+        const viewportBottom = currentCamY + this.scale.height / 2 / this.zoomLevel - margin;
+        
+        // Si el precio está fuera del área visible, hacer pan suave
+        if (targetY < viewportTop || targetY > viewportBottom) {
+            this.cameras.main.pan(
+                this.cameras.main.scrollX + this.scale.width / 2 / this.zoomLevel,
+                targetY,
+                300, // Duración del pan (ms)
+                'Sine.easeInOut',
+                false // No forzar interrupción de pans anteriores
+            );
+        }
+    }
+    
     // Fuente de verdad para la posición "encima" de una vela
     getCandleSpot(index) {
         // Índice seguro
