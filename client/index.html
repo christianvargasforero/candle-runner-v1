@@ -273,6 +273,46 @@
             background: rgba(255, 0, 193, 0.1);
         }
 
+        /* Sección de Usuario Logueado */
+        .user-info-section {
+            padding: 15px 25px;
+            background: rgba(0, 255, 249, 0.03);
+            border-top: 1px solid rgba(0, 255, 249, 0.1);
+            border-bottom: 1px solid rgba(0, 255, 249, 0.1);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .user-info-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-info-item>i {
+            font-size: 1.2rem;
+            color: #00fff9;
+            width: 30px;
+            text-align: center;
+        }
+
+        .user-info-label {
+            font-size: 0.6rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+
+        .user-info-value {
+            font-size: 0.75rem;
+            color: #00ff88;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
         /* Contenido */
         .panel-content {
             padding: 25px;
@@ -892,7 +932,180 @@
         }
 
         /* ===================================
-           �📱 RESPONSIVE DESIGN (MOBILE)
+           🦊 PANTALLA DE LOGIN (WALLET)
+           =================================== */
+
+        #login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        #login-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .login-container {
+            text-align: center;
+            max-width: 500px;
+            padding: 40px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00fff9;
+            box-shadow: 0 0 50px rgba(0, 255, 249, 0.3), inset 0 0 30px rgba(0, 255, 249, 0.05);
+            position: relative;
+        }
+
+        .login-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #00fff9, #ff00c1, #00fff9);
+            box-shadow: 0 0 10px rgba(0, 255, 249, 0.5);
+            animation: pulse-line 2s infinite;
+        }
+
+        @keyframes pulse-line {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .login-logo {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .login-title {
+            font-size: 2rem;
+            color: #fff;
+            text-shadow: 0 0 15px #00fff9;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+        }
+
+        .login-subtitle {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .connect-wallet-btn {
+            width: 100%;
+            padding: 20px 30px;
+            background: linear-gradient(135deg, #00fff9 0%, #00bfff 100%);
+            border: none;
+            color: #000;
+            font-family: inherit;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .connect-wallet-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .connect-wallet-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .connect-wallet-btn:hover {
+            background: linear-gradient(135deg, #00bfff 0%, #00fff9 100%);
+            box-shadow: 0 0 30px rgba(0, 255, 249, 0.6);
+            transform: scale(1.05);
+        }
+
+        .connect-wallet-btn i {
+            margin-right: 10px;
+            font-size: 1.3rem;
+        }
+
+        .login-info {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(0, 255, 249, 0.05);
+            border: 1px solid rgba(0, 255, 249, 0.2);
+            font-size: 0.75rem;
+            color: #aaa;
+            line-height: 1.6;
+        }
+
+        .login-info strong {
+            color: #00ff88;
+        }
+
+        /* Loading state */
+        .connect-wallet-btn.loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .connect-wallet-btn.loading i {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ===================================
+           📱 RESPONSIVE DESIGN (MOBILE)
            =================================== */
 
         @media (max-width: 768px) {
@@ -912,6 +1125,16 @@
 
             .profile-header h2 {
                 font-size: 1rem;
+            }
+
+            .user-info-section {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 10px 15px;
+            }
+
+            .user-info-value {
+                font-size: 0.7rem;
             }
 
             .balance-section {
@@ -971,6 +1194,25 @@
 </head>
 
 <body>
+    <!-- 🦊 PANTALLA DE LOGIN (WALLET) -->
+    <div id="login-overlay">
+        <div class="login-container">
+            <div class="login-logo">🕯️</div>
+            <h1 class="login-title">CANDLE RUNNER</h1>
+            <p class="login-subtitle">Survival Trading Platform</p>
+
+            <button class="connect-wallet-btn" id="connect-wallet-btn">
+                <i class="fa-solid fa-wallet"></i> CONNECT METAMASK (SIMULATOR)
+            </button>
+
+            <div class="login-info">
+                <strong>🎁 Welcome Bonus:</strong> New players receive 1,000 USDT<br>
+                <strong>🔒 Security:</strong> Simulated wallet - No real funds required<br>
+                <strong>💾 Persistence:</strong> Your progress is saved automatically
+            </div>
+        </div>
+    </div>
+
     <div id="game-container">
         <div id="loading" class="hidden">
             <i class="fa-solid fa-microchip"></i>
@@ -998,6 +1240,24 @@
                     <button class="close-btn" id="logout-btn" title="DISCONNECT"
                         style="color: #ff0055; border-color: #ff0055;"><i class="fa-solid fa-power-off"></i></button>
                     <button class="close-btn" id="close-profile-btn"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <!-- 🦊 INFORMACIÓN DEL USUARIO LOGUEADO -->
+            <div class="user-info-section">
+                <div class="user-info-item">
+                    <i class="fa-solid fa-wallet"></i>
+                    <div>
+                        <div class="user-info-label">WALLET ADDRESS</div>
+                        <div class="user-info-value" id="user-wallet">0x0000...0000</div>
+                    </div>
+                </div>
+                <div class="user-info-item">
+                    <i class="fa-solid fa-id-card"></i>
+                    <div>
+                        <div class="user-info-label">USER ID</div>
+                        <div class="user-info-value" id="user-id">Loading...</div>
+                    </div>
                 </div>
             </div>
 
@@ -1104,7 +1364,123 @@
     <!-- Nuestro código del juego (ES Modules) -->
     <script type="module" src="/src/main.js"></script>
 
-    <!-- 🧠 LÓGICA DEL CENTRO DE COMANDO -->
+    <!-- � LÓGICA DE WALLET LOGIN -->
+    <script>
+        // 🛡️ NO CONECTAR SOCKET AUTOMÁTICAMENTE - Esperar login
+        const STORAGE_KEY = 'candle_runner_wallet';
+        const loginOverlay = document.getElementById('login-overlay');
+        const connectBtn = document.getElementById('connect-wallet-btn');
+
+        // Función para generar wallet ficticia
+        function generateWallet() {
+            const randomHex = () => Math.floor(Math.random() * 16).toString(16);
+            let wallet = '0x';
+            for (let i = 0; i < 40; i++) {
+                wallet += randomHex();
+            }
+            return wallet;
+        }
+
+        // Función para conectar wallet
+        async function connectWallet() {
+            try {
+                // Mostrar loading
+                connectBtn.classList.add('loading');
+                connectBtn.innerHTML = '<i class="fa-solid fa-spinner"></i> CONNECTING...';
+
+                // Esperar un poco para simular conexión
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                // Verificar si ya hay una wallet guardada
+                let wallet = localStorage.getItem(STORAGE_KEY);
+
+                if (!wallet) {
+                    // Generar nueva wallet
+                    wallet = generateWallet();
+                    localStorage.setItem(STORAGE_KEY, wallet);
+                    console.log('🎁 [WALLET] Nueva wallet generada:', wallet);
+                } else {
+                    console.log('🔄 [WALLET] Wallet recuperada:', wallet);
+                }
+
+                // Conectar socket con autenticación
+                window.globalSocket = io({
+                    auth: {
+                        wallet: wallet
+                    }
+                });
+
+                // Escuchar eventos de autenticación
+                window.globalSocket.on('AUTH_SUCCESS', (data) => {
+                    console.log('✅ [AUTH] Autenticación exitosa:', data);
+
+                    // 🦊 ACTUALIZAR DATOS DEL USUARIO EN EL DASHBOARD
+                    const userWalletEl = document.getElementById('user-wallet');
+                    const userIdEl = document.getElementById('user-id');
+
+                    if (userWalletEl && wallet) {
+                        // Mostrar wallet abreviada: 0x1234...5678
+                        const walletShort = `${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}`;
+                        userWalletEl.textContent = walletShort;
+                        userWalletEl.title = wallet; // Tooltip con wallet completa
+                    }
+
+                    if (userIdEl && data.userId) {
+                        // Mostrar user ID abreviado
+                        const userIdShort = data.userId.length > 12
+                            ? `${data.userId.substring(0, 8)}...${data.userId.substring(data.userId.length - 4)}`
+                            : data.userId;
+                        userIdEl.textContent = userIdShort;
+                        userIdEl.title = data.userId; // Tooltip con ID completo
+                    }
+
+                    // Ocultar login overlay
+                    loginOverlay.classList.add('hidden');
+
+                    // Mostrar mensaje de bienvenida
+                    const isNewUser = !localStorage.getItem(`${STORAGE_KEY}_seen`);
+                    if (isNewUser) {
+                        setTimeout(() => {
+                            showToast('🎁 Welcome! You received 1,000 USDT bonus!', 'success');
+                            localStorage.setItem(`${STORAGE_KEY}_seen`, 'true');
+                        }, 500);
+                    } else {
+                        setTimeout(() => {
+                            showToast('✅ Welcome back, trader!', 'success');
+                        }, 500);
+                    }
+                });
+
+                window.globalSocket.on('AUTH_ERROR', (data) => {
+                    console.error('❌ [AUTH] Error de autenticación:', data);
+                    connectBtn.classList.remove('loading');
+                    connectBtn.innerHTML = '<i class="fa-solid fa-wallet"></i> CONNECT METAMASK (SIMULATOR)';
+                    alert('Authentication failed: ' + data.message);
+                });
+
+                window.globalSocket.on('connect_error', (error) => {
+                    console.error('❌ [SOCKET] Error de conexión:', error);
+                    connectBtn.classList.remove('loading');
+                    connectBtn.innerHTML = '<i class="fa-solid fa-wallet"></i> CONNECT METAMASK (SIMULATOR)';
+                    alert('Connection error. Please try again.');
+                });
+
+            } catch (error) {
+                console.error('❌ [WALLET] Error:', error);
+                connectBtn.classList.remove('loading');
+                connectBtn.innerHTML = '<i class="fa-solid fa-wallet"></i> CONNECT METAMASK (SIMULATOR)';
+                alert('An error occurred. Please try again.');
+            }
+        }
+
+        // Event listener del botón
+        connectBtn.addEventListener('click', connectWallet);
+
+        // Para debugging - mostrar wallet en consola al cargar
+        console.log('💾 [WALLET] Wallet guardada:', localStorage.getItem(STORAGE_KEY) || 'Ninguna');
+    </script>
+
+    <!-- �🧠 LÓGICA DEL CENTRO DE COMANDO -->
     <script>
         // 🚌 RENDERIZAR LISTA DE BUSES DISPONIBLES
         function renderBusList(buses) {

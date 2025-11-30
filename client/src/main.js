@@ -7,20 +7,12 @@ import GameScene from './scenes/GameScene.js';
 import UIScene from './scenes/UIScene.js';
 
 // [ SOCKET GLOBAL COMPARTIDO ]
-// Creamos UNA SOLA conexión que se reutiliza en todas las escenas
-console.log('[MAIN] Creando socket global...');
-const globalSocket = io();
+// ⚠️ IMPORTANTE: El socket se crea en index.html DESPUÉS del login con wallet
+// NO creamos el socket aquí para evitar conexiones sin autenticación
+console.log('[MAIN] Socket será creado después del login con wallet...');
 
-// Exponer socket globalmente para que las escenas puedan acceder
-window.globalSocket = globalSocket;
-
-globalSocket.on('connect', () => {
-    console.log(`[SOCKET GLOBAL] [OK] Conectado: ${globalSocket.id}`);
-});
-
-globalSocket.on('disconnect', () => {
-    console.log('[SOCKET GLOBAL] [DISCONNECTED] Desconectado');
-});
+// El socket se expondrá como window.globalSocket desde index.html
+// después de que el usuario haga clic en "Connect Wallet"
 
 // Configuración del juego
 const config = {
@@ -58,4 +50,3 @@ game.events.once('ready', () => {
 
 // Exportar para debugging
 window.game = game;
-window.socket = globalSocket; // También exportar como window.socket para fácil acceso

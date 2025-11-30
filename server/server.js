@@ -183,21 +183,45 @@ io.on('connection', async (socket) => {
     // 👤 PLAYER CONNECTION
     console.log(`👤 [PLAYER] Conectado: ${socket.id}`);
 
-    // Recuperar ID de usuario si existe (Persistencia)
-    const userId = socket.handshake.auth.userId;
+    // 🦊 LEER WALLET ADDRESS DEL HANDSHAKE
+    const walletAddress = socket.handshake.auth.wallet;
 
-    // Crear o recuperar usuario
-    const user = await userManager.createUser(socket.id, userId);
+    // 🛡️ VALIDACIÓN: Si no hay wallet, desconectar
+    if (!walletAddress) {
+        console.warn(`⚠️ [AUTH] Socket ${socket.id} sin wallet - DESCONECTANDO`);
+        socket.emit('AUTH_ERROR', { message: 'Wallet address required. Please connect your wallet.' });
+        socket.disconnect();
+        return;
+    }
 
-    // 🚌 MODELO BUS: El usuario NO entra a ninguna sala automáticamente
-    // Debe elegir explícitamente su sala mediante JOIN_ROOM
-    user.currentRoom = null;
+    try {
+        // 🔐 CREAR O RECUPERAR USUARIO POR WALLET
+        const user = await userManager.createUser(socket.id, walletAddress);
 
-    // Enviar estado inicial
-    socket.emit('SYNC_TIME', gameLoop.getState());
+        // 🚌 MODELO BUS: El usuario NO entra a ninguna sala automáticamente
+        // Debe elegir explícitamente su sala mediante JOIN_ROOM
+        user.currentRoom = null;
 
-    // Enviar perfil de usuario (saldo inicial)
-    socket.emit('USER_PROFILE', user.getProfile());
+        // ✅ AUTENTICACIÓN EXITOSA
+        socket.emit('AUTH_SUCCESS', {
+            userId: user.id,
+            wallet: walletAddress
+        });
+
+        // Enviar estado inicial
+        socket.emit('SYNC_TIME', gameLoop.getState());
+
+        // Enviar perfil de usuario (saldo desde DB)
+        socket.emit('USER_PROFILE', user.getProfile());
+
+        console.log(`✅ [AUTH] Usuario autenticado: ${user.id} (${walletAddress})`);
+
+    } catch (error) {
+        console.error(`❌ [AUTH] Error al crear usuario:`, error);
+        socket.emit('AUTH_ERROR', { message: 'Authentication failed. Please try again.' });
+        socket.disconnect();
+        return;
+    }
 
     // 🚌 Evento: Unirse a una sala (elegir el "Bus")
     socket.on('JOIN_ROOM', async (data) => {

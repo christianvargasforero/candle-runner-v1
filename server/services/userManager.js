@@ -7,29 +7,33 @@ class UserManager {
     }
 
     /**
-     * Create or restore a user session
+     * Create or restore a user session based on wallet address
      * @param {string} socketId 
-     * @param {string} [existingUserId] Optional ID to restore session
+     * @param {string} walletAddress Wallet address from client
      * @returns {Promise<User>}
      */
-    async createUser(socketId, existingUserId = null) {
+    async createUser(socketId, walletAddress) {
+        if (!walletAddress) {
+            throw new Error('Wallet address is required');
+        }
+
         let dbUser;
 
-        if (existingUserId) {
-            dbUser = await prisma.user.findUnique({
-                where: { id: existingUserId },
-                include: { skins: true }
-            });
-        }
+        // 🔍 BUSCAR USUARIO POR WALLET ADDRESS
+        dbUser = await prisma.user.findUnique({
+            where: { walletAddress },
+            include: { skins: true }
+        });
 
         let user;
 
         if (!dbUser) {
-            // Crear nuevo usuario en DB
+            // 🆕 CREAR NUEVO USUARIO CON WELCOME BONUS
             dbUser = await prisma.user.create({
                 data: {
-                    balanceUSDT: 10000, // Testing balance
-                    balanceWICK: 500,   // Testing WICK
+                    walletAddress: walletAddress,
+                    balanceUSDT: 1000, // 🎁 Welcome Bonus
+                    balanceWICK: 0,
                     skins: {
                         create: {
                             type: 'PROTOCOL_DROID',
@@ -41,7 +45,7 @@ class UserManager {
                 },
                 include: { skins: true }
             });
-            console.log(`👤 [DB] Nuevo usuario creado: ${dbUser.id}`);
+            console.log(`🎁 [DB] Nuevo usuario creado con Welcome Bonus: ${dbUser.id} (${walletAddress})`);
 
             // Instanciar User y persistir skins iniciales
             user = new User(dbUser.id, socketId);
@@ -66,7 +70,9 @@ class UserManager {
             user.activeSkin = user.inventory.find(s => s.isDefault) || user.inventory[0];
 
         } else {
-            console.log(`👤 [DB] Usuario recuperado: ${dbUser.id}`);
+            // 🔄 USUARIO EXISTENTE - RESTAURAR SESIÓN
+            console.log(`🔄 [DB] Usuario restaurado: ${dbUser.id} (${walletAddress})`);
+            console.log(`💰 [DB] Saldo: $${dbUser.balanceUSDT} USDT, ${dbUser.balanceWICK} WICK`);
 
             // Instanciar User
             user = new User(dbUser.id, socketId);
