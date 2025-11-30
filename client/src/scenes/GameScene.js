@@ -204,9 +204,48 @@ export default class GameScene extends Phaser.Scene {
     // ═══════════════════════════════════════════════════════════════
     
     setupSocketListeners() {
-        // BUS_START: El bus arrancó
+        // ============================================
+        // 🛡️ SISTEMA DE RECUPERACIÓN DE ESTADO
+        // ============================================
+        
+        // Solicitar estado del juego inmediatamente (proactivo)
+        console.log('[🔍 RECOVERY] Solicitando estado del juego...');
+        this.socket.emit('REQUEST_GAME_STATE');
+        
+        // CURRENT_GAME_STATE: Respuesta del servidor con estado actual
+        this.socket.on('CURRENT_GAME_STATE', (data) => {
+            console.log('[📦 CURRENT_GAME_STATE] Recibido:', data);
+            
+            if (data.status === 'IN_PROGRESS') {
+                console.log('[🚨 CATCH-UP] El bus ya salió! Sincronizando...');
+                
+                this.busStarted = true;
+                this.candleHistory = data.candleHistory || [];
+                this.passengers = data.passengers || [];
+                
+                // Ocultar UI de espera
+                this.waitPanel.setVisible(false);
+                
+                // Renderizar escena completa
+                this.renderHolographicCandles();
+                this.renderPriceLine();
+                this.spawnDifferentiatedPlayers(this.passengers);
+                
+                console.log('[✅ CATCH-UP] Sincronización completa!');
+            } else {
+                console.log('[⏳ WAITING] Bus aún no inicia. Estado:', data.status);
+            }
+        });
+        
+        // BUS_START: El bus arrancó (listener normal)
         this.socket.on('BUS_START', (data) => {
             console.log('[BUS_START] Recibido:', data);
+            
+            // Evitar doble inicialización
+            if (this.busStarted) {
+                console.log('[⚠️ BUS_START] Ya iniciado, ignorando...');
+                return;
+            }
             
             this.busStarted = true;
             this.candleHistory = data.candleHistory || [];

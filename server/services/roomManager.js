@@ -158,9 +158,8 @@ class RoomManager {
      * Añade un usuario a un bus con validación Gatekeeper estricta
      * @param {string} socketId - ID del socket del usuario
      * @param {string} roomId - ID del bus
-     * @param {function} onBusFull - Callback cuando el bus se llena
      */
-    async addUserToRoom(socketId, roomId, onBusFull = null) {
+    async addUserToRoom(socketId, roomId) {
         const room = this.rooms.get(roomId);
         if (!room) {
             console.error(`❌ Bus ${roomId} no existe`);
@@ -205,18 +204,13 @@ class RoomManager {
         // Actualizar referencia en el usuario
         user.currentRoom = roomId;
 
-        // 🚨 TRIGGER: Verificar si el bus está lleno
+        // 🚨 MARCAR BUS COMO LLENO (sin iniciar juego aquí)
         if (room.isFull()) {
             room.status = BUS_STATES.LOCKED; // Cerrar puertas
             room.lastFillTime = Date.now() - room.createdAt;
 
-            console.log(`\n🚨 [TRIGGER] Bus ${roomId} LLENO! Iniciando partida...`);
-            console.log(`⏱️  Tiempo de llenado: ${(room.lastFillTime / 1000).toFixed(1)}s\n`);
-
-            // Llamar callback para iniciar el GameLoop
-            if (onBusFull) {
-                onBusFull(room);
-            }
+            console.log(`\n🚨 [ROOM FULL] Bus ${roomId} alcanzó capacidad máxima`);
+            console.log(`⏱️  Tiempo de llenado: ${(room.lastFillTime / 1000).toFixed(1)}s`);
 
             // Verificar si necesitamos Mitosis (llenado rápido)
             this.checkMitosis(roomId);

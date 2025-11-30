@@ -66,6 +66,36 @@ class BusGameLoop {
         this.initCandleHistory();
 
         console.log(`🚌 [BUS LOOP] Instancia creada para bus ${room.id}`);
+        
+        // 🛡️ Flag para sistema de recuperación de estado
+        this.busStarted = false;
+    }
+
+    /**
+     * 🛡️ Obtiene el estado actual de los pasajeros del bus
+     * Usado para sincronizar jugadores que se conectan tarde
+     */
+    getBusPassengersState() {
+        const passengers = [];
+        
+        for (const [socketId, userId] of this.room.users.entries()) {
+            const user = userManager.getUser(socketId);
+            if (user) {
+                passengers.push({
+                    odId: socketId,
+                    userId: user.id,
+                    skinId: user.activeSkin?.id ?? 'default',
+                    skinName: user.activeSkin?.name ?? 'Protocol Droid',
+                    skinColor: user.activeSkin?.color ?? 0x00fff9,
+                    skinLevel: user.activeSkin?.level ?? 0,
+                    integrity: user.activeSkin?.currentIntegrity ?? 100,
+                    maxIntegrity: user.activeSkin?.maxIntegrity ?? 100,
+                    isBurned: user.activeSkin?.isBurned ?? false
+                });
+            }
+        }
+        
+        return passengers;
     }
 
     /** Inicializa el historial de velas con 20 velas base (ficticias) */
@@ -143,6 +173,9 @@ class BusGameLoop {
         // Esto garantiza que todos los jugadores en la sala reciban el evento
         console.log(`🚀 [BUS START] Emitiendo a sala ${this.room.id} con ${passengerStates.length} pasajeros`);
         console.log(`📋 [DEBUG] Pasajeros:`, passengerStates.map(p => `${p.odId?.slice(-4)} (${p.skinName})`).join(', '));
+        
+        // 🛡️ Marcar bus como iniciado (para sistema de recuperación)
+        this.busStarted = true;
         
         this.io.to(this.room.id).emit('BUS_START', {
             busId: this.room.id,

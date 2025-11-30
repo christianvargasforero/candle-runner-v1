@@ -254,34 +254,27 @@ io.on('connection', async (socket) => {
             roomManager.removeUserFromRoom(socket.id, user.currentRoom);
         }
 
-        // 🔐 ROOM JOINING ATÓMICO - Unirse al room ANTES de validaciones
-        // Esto garantiza que el socket esté en la sala de Socket.io cuando se emita BUS_START
-        socket.join(roomId);
-        console.log(`🔌 [SOCKET.JOIN] Socket ${socket.id} unido a sala ${roomId}`);
-        console.log(`📋 [ROOMS DEBUG] Socket rooms:`, Array.from(socket.rooms));
+        // ============================================
+        // 🔐 NUEVO FLUJO ATÓMICO Y SECUENCIAL
+        // ============================================
         
-        // 🐛 DEBUG: Verificar estado de salas en el adaptador
-        const roomSockets = io.sockets.adapter.rooms.get(roomId);
-        console.log(`👥 [ADAPTER] Sockets en sala ${roomId}:`, roomSockets ? roomSockets.size : 0);
-
-        // Intentar unirse a la nueva sala (lógica de negocio)
-        const { BusGameLoop } = await import('./services/gameLoop.js');
-        const result = await roomManager.addUserToRoom(socket.id, roomId, (room) => {
-            // Solo arrancar si no hay ya un gameLoopInstance
-            if (!room.gameLoopInstance) {
-                room.gameLoopInstance = new BusGameLoop(io, room, roomManager);
-                room.gameLoopInstance.startBus();
-            }
-        });
+        // 1️⃣ AÑADIR A LA DATA DE LA SALA (sin callback)
+        const result = await roomManager.addUserToRoom(socket.id, roomId);
 
         if (result.success) {
+            // 2️⃣ UNIR SOCKET AL CANAL (CRÍTICO: antes de iniciar juego)
+            socket.join(roomId);
             user.currentRoom = roomId;
-            // socket.join ya se hizo arriba (atómico) hizo arriba (atómico)
-
+            
+            console.log(`🔌 [ATOMIC] Socket ${socket.id} unido a sala ${roomId}`);
+            console.log(`📋 [ROOMS] Socket rooms:`, Array.from(socket.rooms));
+            
             const room = roomManager.getRoom(roomId);
+            
+            // 3️⃣ CONFIRMAR AL CLIENTE PARA QUE CAMBIE DE ESCENA
             socket.emit('ROOM_JOINED', {
                 roomId: roomId,
-                roomName: room.name, // Tier name
+                roomName: room.name,
                 ticketPrice: room.ticketPrice
             });
 
@@ -295,7 +288,7 @@ io.on('connection', async (socket) => {
             const currentPlayers = [];
             for (const [socketId, userId] of room.users.entries()) {
                 const player = userManager.getUser(socketId);
-                if (player && player.id !== user.id) { // Excluir al jugador recién unido
+                if (player && player.id !== user.id) {
                     currentPlayers.push({
                         id: player.id,
                         skin: player.activeSkin ? player.activeSkin.name : 'Default'
@@ -307,17 +300,28 @@ io.on('connection', async (socket) => {
 
             io.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
 
-            // Actualizar lista de buses para todos (admin y jugadores)
+            // Actualizar lista de buses para todos
             const busesInfo = roomManager.getRoomsInfo();
             io.emit('ADMIN_BUSES', busesInfo);
-            io.emit('BUS_LIST_UPDATE', busesInfo); // Para jugadores en MenuScene
+            io.emit('BUS_LIST_UPDATE', busesInfo);
 
             console.log(`🚌 [JOIN] Usuario ${user.id} subió al bus ${roomId} (${room.name})`);
             console.log(`👥 [PRESENCE] ${currentPlayers.length} jugadores ya en el bus`);
+            
+            // 4️⃣ AHORA VERIFICAR SI EL BUS DEBE SALIR
+            if (room.isFull() && !room.gameLoopInstance) {
+                console.log(`\n🚨 [BUS FULL] Bus ${roomId} lleno! Iniciando en 1s para asegurar carga de escenas...\n`);
+                
+                // Pequeño delay para asegurar que todos los clientes cargaron GameScene
+                setTimeout(async () => {
+                    const { BusGameLoop } = await import('./services/gameLoop.js');
+                    room.gameLoopInstance = new BusGameLoop(io, room, roomManager);
+                    room.gameLoopInstance.startBus();
+                }, 1000);
+            }
         } else {
-            // 🔐 ROLLBACK: Si la lógica de negocio falla, sacar del room de Socket.io
-            socket.leave(roomId);
-            console.log(`⚠️ [ROLLBACK] Socket ${socket.id} removido de sala ${roomId} por error: ${result.error}`);
+            // ❌ ERROR: No pudo unirse a la sala
+            console.log(`⚠️ [JOIN FAILED] Socket ${socket.id} rechazado: ${result.error}`);
             socket.emit('GAME_ERROR', { message: `No puedes entrar a ${roomId}: ${result.error}` });
         }
     });
@@ -457,6 +461,62 @@ io.on('connection', async (socket) => {
         });
     });
 
+
+    // ============================================
+    // 🛡️ SISTEMA DE RECUPERACIÓN DE ESTADO
+    // ============================================
+    
+    // Evento: Cliente solicita estado actual del juego (para rezagados)
+    socket.on('REQUEST_GAME_STATE', () => {
+        const user = userManager.getUser(socket.id);
+        if (!user || !user.currentRoom) {
+            // No está en ninguna sala, devolver estado de espera
+            socket.emit('CURRENT_GAME_STATE', {
+                status: 'WAITING',
+                message: 'No estás en ningún bus'
+            });
+            return;
+        }
+
+        const room = roomManager.getRoom(user.currentRoom);
+        if (!room) {
+            socket.emit('CURRENT_GAME_STATE', {
+                status: 'ERROR',
+                message: 'Bus no encontrado'
+            });
+            return;
+        }
+
+        // Verificar si el juego ya empezó
+        if (room.gameLoopInstance && room.gameLoopInstance.busStarted) {
+            console.log(`🔄 [RECOVERY] Usuario ${user.id} solicitó catch-up en bus ${room.id}`);
+            
+            // Obtener estado completo del juego
+            const passengers = room.gameLoopInstance.getBusPassengersState 
+                ? room.gameLoopInstance.getBusPassengersState()
+                : [];
+            
+            // Enviar estado completo para sincronización
+            socket.emit('CURRENT_GAME_STATE', {
+                status: 'IN_PROGRESS',
+                candleHistory: room.gameLoopInstance.candleHistory || [],
+                passengers: passengers,
+                roundNumber: room.gameLoopInstance.roundNumber || 1,
+                currentState: room.gameLoopInstance.currentState,
+                isCatchUp: true
+            });
+            
+            console.log(`✅ [RECOVERY] Estado enviado: ${room.gameLoopInstance.candleHistory?.length || 0} velas, ${passengers.length} pasajeros`);
+        } else {
+            // El juego aún no ha iniciado
+            socket.emit('CURRENT_GAME_STATE', {
+                status: 'BOARDING',
+                message: 'Esperando que el bus se llene...',
+                occupancy: room.users.size,
+                capacity: room.capacity
+            });
+        }
+    });
 
     // Evento: Solicitar conteo de salas
     socket.on('GET_ROOM_COUNTS', () => {
