@@ -1441,6 +1441,9 @@
                     }
                 });
 
+                // También exponer como window.socket para compatibilidad
+                window.socket = window.globalSocket;
+
                 // Escuchar eventos de autenticación
                 window.globalSocket.on('AUTH_SUCCESS', (data) => {
                     console.log('✅ [AUTH] Autenticación exitosa:', data);
@@ -1601,6 +1604,47 @@
             const logoutBtn = document.getElementById('logout-btn');
             const panel = document.getElementById('profile-panel');
             const toast = document.getElementById('toast-notification');
+
+            // ⚠️ DEFINIR showToast AL PRINCIPIO (antes de ser usado)
+            function showToast(message, type = 'info') {
+                // Tipos: 'info', 'success', 'error', 'warning'
+                let icon, borderColor, textColor;
+
+                switch (type) {
+                    case 'success':
+                        icon = '<i class="fa-solid fa-circle-check"></i>';
+                        borderColor = '#00ff88';
+                        textColor = '#00ff88';
+                        break;
+                    case 'error':
+                        icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
+                        borderColor = '#ff0000';
+                        textColor = '#ff0000';
+                        break;
+                    case 'warning':
+                        icon = '<i class="fa-solid fa-exclamation-circle"></i>';
+                        borderColor = '#ff9800';
+                        textColor = '#ff9800';
+                        break;
+                    default: // 'info'
+                        icon = '<i class="fa-solid fa-circle-info"></i>';
+                        borderColor = '#00fff9';
+                        textColor = '#00fff9';
+                }
+
+                toast.innerHTML = `${icon} <span>${message}</span>`;
+                toast.style.borderColor = borderColor;
+                toast.style.color = textColor;
+                toast.style.background = '#000';
+
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
+            }
+
+            // Hacer showToast accesible globalmente
+            window.showToast = showToast;
 
             // Manual Elements
             const manualToggle = document.getElementById('manual-toggle');
@@ -1840,44 +1884,6 @@
 
                     inventoryGrid.appendChild(card);
                 });
-            }
-
-            // --- UTILIDADES ---
-            function showToast(message, type = 'info') {
-                // Tipos: 'info', 'success', 'error', 'warning'
-                let icon, borderColor, textColor;
-
-                switch (type) {
-                    case 'success':
-                        icon = '<i class="fa-solid fa-circle-check"></i>';
-                        borderColor = '#00ff88';
-                        textColor = '#00ff88';
-                        break;
-                    case 'error':
-                        icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
-                        borderColor = '#ff0000';
-                        textColor = '#ff0000';
-                        break;
-                    case 'warning':
-                        icon = '<i class="fa-solid fa-exclamation-circle"></i>';
-                        borderColor = '#ff9800';
-                        textColor = '#ff9800';
-                        break;
-                    default: // 'info'
-                        icon = '<i class="fa-solid fa-circle-info"></i>';
-                        borderColor = '#00fff9';
-                        textColor = '#00fff9';
-                }
-
-                toast.innerHTML = `${icon} <span>${message}</span>`;
-                toast.style.borderColor = borderColor;
-                toast.style.color = textColor;
-                toast.style.background = '#000';
-
-                toast.classList.add('show');
-                setTimeout(() => {
-                    toast.classList.remove('show');
-                }, 3000);
             }
         });
     </script>
