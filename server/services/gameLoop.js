@@ -23,6 +23,14 @@ import redisClient, { safeRedisSet, safeRedisGet } from '../config/redis.js';
  */
 class BusGameLoop {
     /**
+     * Detiene el bucle de juego de forma segura
+     */
+    stopBus() {
+        console.log(`🛑 [BUS ${this.room.id}] Deteniendo bucle de juego...`);
+        this.running = false;
+    }
+
+    /**
      * Limpia recursos y timers al finalizar el ciclo del bus
      */
     cleanup() {
@@ -191,18 +199,34 @@ class BusGameLoop {
         // Recuperar estado persistente (acumulado, etc)
         await this.recoverState();
 
+        // 🔄 BUCLE INFINITO DE RONDAS
+        // El bus continúa ejecutando rondas hasta que se cierre manualmente
+        this.running = true;
+        
         try {
-            // FASE 1: BETTING (0s - 10s)
-            await this.phaseBetting();
+            while (this.running) {
+                console.log(`\n${'='.repeat(60)}`);
+                console.log(`🔄 [BUS ${this.room.id}] INICIANDO RONDA #${this.roundNumber}`);
+                console.log(`${'='.repeat(60)}\n`);
+                
+                // FASE 1: BETTING (0s - 10s)
+                await this.phaseBetting();
 
-            // FASE 2: LOCKED (10s - 25s)
-            await this.phaseLocked();
+                // FASE 2: LOCKED (10s - 25s)
+                await this.phaseLocked();
 
-            // FASE 3: RESOLVING (25s - 30s)
-            await this.phaseResolving();
-            
-            // 🛡️ FASE 4: COOLDOWN (30s - 33s) - Tiempo para animaciones
-            await this.phaseCooldown();
+                // FASE 3: RESOLVING (25s - 30s)
+                await this.phaseResolving();
+                
+                // 🛡️ FASE 4: COOLDOWN (30s - 33s) - Tiempo para animaciones
+                await this.phaseCooldown();
+                
+                // Incrementar número de ronda y resetear
+                this.roundNumber++;
+                this.resetRound();
+                
+                console.log(`\n✅ [BUS ${this.room.id}] RONDA COMPLETADA. Iniciando ronda #${this.roundNumber}...\n`);
+            }
 
         } catch (error) {
             console.error(`❌ [BUS ${this.room.id}] Error en Game Loop:`, error);

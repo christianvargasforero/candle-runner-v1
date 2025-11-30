@@ -22,6 +22,28 @@ export default class MenuScene extends Phaser.Scene {
         this.socket = window.globalSocket;
         console.log('[MENU] ✅ Socket conectado');
 
+        // 🔴 MODO ESPECTADOR: Bypass completo
+        if (window.SPECTATOR_MODE) {
+            console.log('[MENU] 🔴 Modo espectador detectado. Configurando listeners y uniéndose...');
+
+            // Ocultar lobby por si acaso
+            if (window.hideBusLobby) window.hideBusLobby();
+
+            // 1. Configurar listeners PRIMERO
+            this.setupSocketListeners();
+
+            // 2. Emitir JOIN_ROOM después de tener listeners listos
+            const busId = window.SPECTATOR_BUS_ID;
+            if (busId) {
+                console.log(`[MENU] 🔴 Enviando solicitud JOIN_ROOM para ${busId}...`);
+                this.socket.emit('JOIN_ROOM', { roomId: busId, isSpectator: true });
+            } else {
+                console.error('[MENU] ❌ Error: No se encontró ID de bus para espectar');
+            }
+
+            return;
+        }
+
         // 🎮 ACTIVAR LOBBY HTML
         this.showLobbyOverlay();
 

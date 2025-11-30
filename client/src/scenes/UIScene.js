@@ -46,7 +46,6 @@ export default class UIScene extends Phaser.Scene {
         this.createBalanceDisplay();
         this.createTimer();
         this.createBettingPanel();
-        this.createBettingPanel();
         this.createIntegrityBar();
         this.createLogo();
 
@@ -99,18 +98,24 @@ export default class UIScene extends Phaser.Scene {
 
         // Evento: Estado del juego
         this.socket.on('GAME_STATE', (data) => {
+            console.log('[UI] GAME_STATE recibido:', data.state);
             this.roundNumber = data.roundNumber;
             this.updateRoundCounter();
 
             // Habilitar/Deshabilitar apuestas según fase
-            this.canBet = (data.state === 'BETTING');
-            this.updateBettingButtons();
-
-            // Resetear apuesta visual al inicio de ronda
             if (data.state === 'BETTING') {
-                this.currentBet = null;
+                this.canBet = true;
+                this.currentBet = null; // Resetear apuesta visual
                 this.updateCurrentBetDisplay();
+                this.enableBettingUI(); // FORZAR reactivación explícita
+                console.log('[UI] ✅ Botones de apuesta HABILITADOS');
+            } else {
+                this.canBet = false;
+                this.disableBettingUI();
+                console.log('[UI] ⛔ Botones de apuesta DESHABILITADOS');
             }
+            
+            this.updateBettingButtons();
         });
 
         // Evento: Sincronización de tiempo
@@ -303,6 +308,30 @@ export default class UIScene extends Phaser.Scene {
 
         // Contenedor del panel
         this.bettingContainer = this.add.container(centerX, bottomY);
+
+        // 🔴 MODO ESPECTADOR
+        if (window.SPECTATOR_MODE) {
+            const spectatorLabel = this.add.text(0, 0, '🔴 ADMIN SPECTATOR MODE', {
+                font: 'bold 24px Courier New',
+                fill: '#ff0000',
+                backgroundColor: '#000000',
+                padding: { x: 10, y: 5 },
+                stroke: '#ffffff',
+                strokeThickness: 2
+            }).setOrigin(0.5);
+
+            // Animación de parpadeo
+            this.tweens.add({
+                targets: spectatorLabel,
+                alpha: 0.5,
+                duration: 1000,
+                yoyo: true,
+                repeat: -1
+            });
+
+            this.bettingContainer.add(spectatorLabel);
+            return; // 🛑 Salir, no crear botones de apuesta
+        }
 
         // Texto de apuesta actual (arriba de los botones)
         this.currentBetText = this.add.text(0, -80, '', {
@@ -807,5 +836,49 @@ P/L: ${profitSign}$${profit.toFixed(2)}
         this.settingsBtn.on('pointerover', () => this.settingsBtn.setScale(1.2));
         this.settingsBtn.on('pointerout', () => this.settingsBtn.setScale(1));
         this.settingsBtn.on('pointerdown', () => console.log('Settings clicked'));
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🎮 MÉTODOS DE CONTROL DE UI
+    // ═══════════════════════════════════════════════════════════════
+
+    enableBettingUI() {
+        if (!this.btnLong || !this.btnShort) return;
+        
+        // Remover tinte gris y reactivar interactividad
+        this.btnLong.setAlpha(1);
+        this.btnShort.setAlpha(1);
+        this.btnLong.clearTint();
+        this.btnShort.clearTint();
+        
+        // Restaurar interactividad
+        if (this.btnLong.bg) this.btnLong.bg.setInteractive({ useHandCursor: true });
+        if (this.btnShort.bg) this.btnShort.bg.setInteractive({ useHandCursor: true });
+        
+        // Restaurar texto original
+        if (this.btnLong.label) this.btnLong.label.setText('BUY TICKET [UP]');
+        if (this.btnShort.label) this.btnShort.label.setText('BUY TICKET [DN]');
+        
+        console.log('[UI] 🟢 Botones HABILITADOS explícitamente');
+    }
+
+    disableBettingUI() {
+        if (!this.btnLong || !this.btnShort) return;
+        
+        // Aplicar tinte gris
+        this.btnLong.setAlpha(0.5);
+        this.btnShort.setAlpha(0.5);
+        this.btnLong.setTint(0x666666);
+        this.btnShort.setTint(0x666666);
+        
+        // Deshabilitar interactividad
+        if (this.btnLong.bg) this.btnLong.bg.disableInteractive();
+        if (this.btnShort.bg) this.btnShort.bg.disableInteractive();
+        
+        // Cambiar texto
+        if (this.btnLong.label) this.btnLong.label.setText('WAITING...');
+        if (this.btnShort.label) this.btnShort.label.setText('WAITING...');
+        
+        console.log('[UI] 🔴 Botones DESHABILITADOS explícitamente');
     }
 }

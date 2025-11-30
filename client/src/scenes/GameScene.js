@@ -68,6 +68,9 @@ export default class GameScene extends Phaser.Scene {
         this.cameras.main.setBackgroundColor(this.COLORS.BG);
         this.cameras.main.setZoom(this.zoomLevel);
         this.cameras.main.setBounds(0, 0, 20000, 2000);
+        
+        // CRÍTICO: Detener cualquier paneo automático previo
+        this.cameras.main.stopFollow();
 
         // Capas de profundidad
         this.bgLayer = this.add.container(0, 0).setDepth(0);

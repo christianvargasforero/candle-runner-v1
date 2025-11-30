@@ -18,7 +18,8 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <style>
-        html, body {
+        html,
+        body {
             height: 100%;
             margin: 0;
             padding: 0;
@@ -56,6 +57,7 @@
         .card {
             min-width: 0;
         }
+
         :root {
             --bg-dark: #0a0a0a;
             --card-bg: #1a1a2e;
@@ -92,7 +94,7 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         .card::before {
             content: '';
             position: absolute;
@@ -103,10 +105,15 @@
             background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
             animation: scan 3s linear infinite;
         }
-        
+
         @keyframes scan {
-            0% { left: -100%; }
-            100% { left: 100%; }
+            0% {
+                left: -100%;
+            }
+
+            100% {
+                left: 100%;
+            }
         }
 
         .card-header {
@@ -118,10 +125,17 @@
             color: #000;
             text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
         }
-        
+
         @keyframes gradientShift {
-            0%, 100% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
+
+            0%,
+            100% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
         }
 
         .kpi-value {
@@ -130,10 +144,17 @@
             text-shadow: 0 0 10px currentColor;
             animation: pulse 2s ease-in-out infinite;
         }
-        
+
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
         }
 
         .kpi-label {
@@ -180,15 +201,15 @@
             padding: 8px;
             border-bottom: 1px solid rgba(0, 255, 249, 0.2);
         }
-        
+
         .table-dark {
             background-color: rgba(0, 0, 0, 0.8) !important;
         }
-        
+
         .table-dark thead {
             border-bottom: 2px solid var(--accent-cyan);
         }
-        
+
         .table-dark tbody tr:hover {
             background-color: rgba(0, 255, 249, 0.1) !important;
         }
@@ -225,34 +246,34 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--accent-cyan);
         }
-        
+
         /* Badges con efecto neón */
         .badge {
             text-shadow: 0 0 5px currentColor;
             border: 1px solid currentColor;
         }
-        
+
         .badge.bg-success {
             background: linear-gradient(135deg, #00cc77, #0099cc) !important;
             box-shadow: 0 0 10px rgba(0, 204, 119, 0.4);
         }
-        
+
         .badge.bg-primary {
             background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta)) !important;
             box-shadow: 0 0 10px var(--glow-cyan);
         }
-        
+
         .badge.bg-danger {
             background: linear-gradient(135deg, #cc0044, #cc3500) !important;
             box-shadow: 0 0 10px rgba(204, 0, 68, 0.4);
         }
-        
+
         .badge.bg-warning {
             background: linear-gradient(135deg, #ccaa00, #cc8800) !important;
             box-shadow: 0 0 10px rgba(204, 170, 0, 0.4);
             color: #000 !important;
         }
-        
+
         /* Botones con efecto cyberpunk */
         .btn {
             font-family: 'Courier New', monospace;
@@ -261,43 +282,43 @@
             border: 2px solid currentColor;
             transition: all 0.3s ease;
         }
-        
+
         .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 20px currentColor;
         }
-        
+
         .btn-success {
             background: linear-gradient(135deg, #00cc77, #0099cc);
             border-color: #00cc77;
         }
-        
+
         .btn-primary {
             background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
             border-color: var(--accent-cyan);
         }
-        
+
         .btn-danger {
             background: linear-gradient(135deg, #cc0044, #cc3500);
             border-color: #cc0044;
         }
-        
+
         .btn-info {
             background: linear-gradient(135deg, #0099cc, #00b8c4);
             border-color: #00b8c4;
         }
-        
+
         .btn-warning {
             background: linear-gradient(135deg, #ccaa00, #cc8800);
             border-color: #ccaa00;
             color: #000;
         }
-        
+
         /* Nav tabs cyberpunk */
         .nav-tabs {
             border-bottom: 2px solid var(--accent-cyan);
         }
-        
+
         .nav-tabs .nav-link {
             color: var(--text-secondary);
             border: 1px solid transparent;
@@ -305,45 +326,47 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        
+
         .nav-tabs .nav-link:hover {
             border-color: var(--accent-cyan);
             color: var(--accent-cyan);
         }
-        
+
         .nav-tabs .nav-link.active {
             background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
             border-color: var(--accent-cyan);
             color: #000;
             box-shadow: 0 0 20px var(--glow-cyan);
         }
-        
+
         /* Forms cyberpunk */
-        .form-control, .form-select {
+        .form-control,
+        .form-select {
             background-color: rgba(0, 0, 0, 0.8);
             border: 1px solid var(--accent-cyan);
             color: var(--text-primary);
             font-family: 'Courier New', monospace;
         }
-        
-        .form-control:focus, .form-select:focus {
+
+        .form-control:focus,
+        .form-select:focus {
             background-color: rgba(0, 0, 0, 0.9);
             border-color: var(--accent-magenta);
             box-shadow: 0 0 10px var(--glow-magenta);
             color: var(--text-primary);
         }
-        
+
         /* Modal cyberpunk */
         .modal-content {
             background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
             border: 2px solid var(--accent-cyan);
             box-shadow: 0 0 40px var(--glow-cyan);
         }
-        
+
         .modal-header {
             border-bottom: 2px solid var(--accent-cyan);
         }
-        
+
         .modal-footer {
             border-top: 2px solid var(--accent-cyan);
         }
@@ -553,6 +576,7 @@
                                                 <th>Ticket</th>
                                                 <th>Pasajeros</th>
                                                 <th>Estado</th>
+                                                <th>Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody id="busListBody">
@@ -605,7 +629,7 @@
                                 <i class="fas fa-search me-2"></i>BUSCAR USUARIO
                             </div>
                             <div class="card-body">
-                                <input type="text" id="userSearchInput" class="form-control mb-2" 
+                                <input type="text" id="userSearchInput" class="form-control mb-2"
                                     placeholder="Buscar por wallet o ID...">
                                 <button id="searchUserBtn" class="btn btn-primary w-100">
                                     <i class="fas fa-search"></i> Buscar
@@ -617,7 +641,8 @@
                     <!-- Users List -->
                     <div class="col-md-8">
                         <div class="card h-100">
-                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                            <div
+                                class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                                 <span><i class="fas fa-users me-2"></i>LISTA DE USUARIOS</span>
                                 <button id="refreshUsersBtn" class="btn btn-sm btn-outline-light">
                                     <i class="fas fa-sync"></i> Refresh
@@ -626,7 +651,8 @@
                             <div class="card-body p-0">
                                 <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
                                     <table class="table table-dark table-striped table-hover mb-0">
-                                        <thead style="position: sticky; top: 0; background-color: var(--card-bg); z-index: 10;">
+                                        <thead
+                                            style="position: sticky; top: 0; background-color: var(--card-bg); z-index: 10;">
                                             <tr>
                                                 <th>Wallet</th>
                                                 <th>USDT</th>
@@ -655,7 +681,8 @@
                         <div class="modal-content bg-dark text-white">
                             <div class="modal-header">
                                 <h5 class="modal-title"><i class="fas fa-user me-2"></i>Detalles del Usuario</h5>
-                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                <button type="button" class="btn-close btn-close-white"
+                                    data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body" id="userDetailsContent">
                                 <!-- Content injected by JavaScript -->
@@ -767,6 +794,9 @@
                         <td>${occupancy} / ${bus.capacity}</td>
                         <td><span class="badge ${statusBadge}">${bus.status}</span></td>
                         <td>
+                            <button class="btn btn-sm btn-info btn-spectate me-1" data-busid="${bus.id}" title="Espectar Partida">
+                                <i class="fas fa-eye"></i>
+                            </button>
                             <button class="btn btn-sm btn-danger btn-delete-bus" data-busid="${bus.id}" title="Eliminar bus">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -774,12 +804,40 @@
                     `;
                     busListBody.appendChild(row);
                 });
+
+                // ============================================
+                // 👁️ MODO ESPECTADOR - Botones de Ojo
+                // ============================================
+                document.querySelectorAll('.btn-spectate').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const busId = btn.getAttribute('data-busid');
+                        console.log(`🔴 [ADMIN] Abriendo modo espectador para bus: ${busId}`);
+                        // Abrir nueva ventana con el cliente de juego en modo espectador
+                        window.open(`/?spectate=${busId}`, '_blank', 'width=1280,height=720');
+                    });
+                });
             }
 
 
             socket.on('ADMIN_BUSES', (buses) => {
                 updateBusList(buses);
                 // Asignar listeners a los botones de eliminar
+                document.querySelectorAll('.btn-delete-bus').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const busId = btn.getAttribute('data-busid');
+                        if (confirm('¿Eliminar este bus?')) {
+                            socket.emit('ADMIN_DELETE_BUS', { busId });
+                        }
+                    });
+                });
+            });
+
+            // 🔄 ACTUALIZACIÓN REACTIVA EN TIEMPO REAL
+            socket.on('BUS_LIST_UPDATE', (buses) => {
+                // console.log('🔄 [ADMIN] Actualización de buses recibida'); // Comentado para no saturar consola
+                updateBusList(buses);
+
+                // Reasignar listeners de eliminar (necesario porque se recreó el DOM)
                 document.querySelectorAll('.btn-delete-bus').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         const busId = btn.getAttribute('data-busid');
@@ -821,14 +879,14 @@
             const refreshUsersBtn = document.getElementById('refreshUsersBtn');
             const userSearchInput = document.getElementById('userSearchInput');
             const searchUserBtn = document.getElementById('searchUserBtn');
-            
+
             let allUsers = []; // Cache de usuarios
 
             function updateUsersTable(users) {
                 console.log('👥 Received users list:', users);
                 allUsers = users || [];
                 usersTableBody.innerHTML = '';
-                
+
                 if (!users || users.length === 0) {
                     usersTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No hay usuarios registrados</td></tr>';
                     return;
@@ -845,26 +903,26 @@
                     if (user.isOnline) onlineCount++;
 
                     const row = document.createElement('tr');
-                    
+
                     // Wallet truncada
-                    const walletShort = user.wallet ? 
-                        `${user.wallet.slice(0, 6)}...${user.wallet.slice(-4)}` : 
+                    const walletShort = user.wallet ?
+                        `${user.wallet.slice(0, 6)}...${user.wallet.slice(-4)}` :
                         'N/A';
-                    
+
                     // Skin activa
                     const skinName = user.activeSkin?.name || 'Default';
                     const integrity = user.activeSkin?.currentIntegrity || 100;
                     const maxIntegrity = user.activeSkin?.maxIntegrity || 100;
                     const isBurned = user.activeSkin?.isBurned || false;
-                    
+
                     // Color de integridad
                     let integrityColor = 'success';
                     if (integrity < 50) integrityColor = 'warning';
                     if (integrity < 20 || isBurned) integrityColor = 'danger';
-                    
+
                     // Estado online
-                    const statusBadge = user.isOnline ? 
-                        '<span class="badge bg-success">Online</span>' : 
+                    const statusBadge = user.isOnline ?
+                        '<span class="badge bg-success">Online</span>' :
                         '<span class="badge bg-secondary">Offline</span>';
 
                     row.innerHTML = `
@@ -917,14 +975,14 @@
                 if (!user) return;
 
                 const modalContent = document.getElementById('userDetailsContent');
-                
+
                 const inventory = user.inventory || [];
-                const inventoryHTML = inventory.length > 0 ? 
+                const inventoryHTML = inventory.length > 0 ?
                     inventory.map(skin => `
                         <div class="badge bg-secondary me-1">
                             ${skin.name} (${skin.currentIntegrity}/${skin.maxIntegrity})
                         </div>
-                    `).join('') : 
+                    `).join('') :
                     '<span class="text-muted">Sin skins en inventario</span>';
 
                 modalContent.innerHTML = `
@@ -933,9 +991,9 @@
                             <h6>Información General</h6>
                             <p><strong>ID:</strong> ${user.id}</p>
                             <p><strong>Wallet:</strong><br><code>${user.wallet || 'N/A'}</code></p>
-                            <p><strong>Estado:</strong> ${user.isOnline ? 
-                                '<span class="badge bg-success">Online</span>' : 
-                                '<span class="badge bg-secondary">Offline</span>'}
+                            <p><strong>Estado:</strong> ${user.isOnline ?
+                        '<span class="badge bg-success">Online</span>' :
+                        '<span class="badge bg-secondary">Offline</span>'}
                             </p>
                             <p><strong>Sala Actual:</strong> ${user.currentRoom || 'Ninguna'}</p>
                         </div>
@@ -948,9 +1006,9 @@
                             <p><strong>Nombre:</strong> ${user.activeSkin?.name || 'Default'}</p>
                             <p><strong>Level:</strong> ${user.activeSkin?.level || 0}</p>
                             <p><strong>Integridad:</strong> ${user.activeSkin?.currentIntegrity || 100} / ${user.activeSkin?.maxIntegrity || 100}</p>
-                            <p><strong>Estado:</strong> ${user.activeSkin?.isBurned ? 
-                                '<span class="badge bg-danger">💀 BURNED</span>' : 
-                                '<span class="badge bg-success">✅ OK</span>'}
+                            <p><strong>Estado:</strong> ${user.activeSkin?.isBurned ?
+                        '<span class="badge bg-danger">💀 BURNED</span>' :
+                        '<span class="badge bg-success">✅ OK</span>'}
                             </p>
                         </div>
                     </div>
@@ -988,7 +1046,7 @@
                     return;
                 }
 
-                const filtered = allUsers.filter(user => 
+                const filtered = allUsers.filter(user =>
                     (user.wallet && user.wallet.toLowerCase().includes(searchTerm.toLowerCase())) ||
                     (user.id && user.id.toLowerCase().includes(searchTerm.toLowerCase()))
                 );

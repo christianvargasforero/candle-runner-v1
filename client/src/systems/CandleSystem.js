@@ -94,9 +94,8 @@ export class CandleSystem {
         // Renderizar línea de precio
         this.renderPriceLine();
 
-        // Centrar cámara en última vela
-        const lastX = this.BASE_X + (this.candleHistory.length - 1) * this.CANDLE_SPACING;
-        this.scene.cameras.main.pan(lastX, this.baseY - 50, 800, 'Quad.easeOut');
+        // NO panear cámara automáticamente - solo seguir al jugador
+        // La cámara está configurada para seguir this.myPlayer en GameScene.spawnMyPlayer
 
         console.log(`[🏗️ CandleSystem] ${this.candleHistory.length} velas creadas`);
     }
@@ -262,8 +261,7 @@ export class CandleSystem {
             physicsBody.body.updateFromGameObject();
         }
 
-        // Ajustar cámara si es necesario
-        this.adjustCameraForPrice(price);
+        // NO ajustar cámara automáticamente - solo sigue al jugador
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -617,37 +615,10 @@ export class CandleSystem {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 📷 AJUSTE DE CÁMARA
+    // 📷 CÁMARA FIJA AL JUGADOR
     // ═══════════════════════════════════════════════════════════════
-
-    adjustCameraForPrice(price) {
-        if (!this.candleHistory.length) return;
-
-        let minPrice = Infinity, maxPrice = -Infinity;
-        this.candleHistory.forEach(c => {
-            minPrice = Math.min(minPrice, c.low || c.close);
-            maxPrice = Math.max(maxPrice, c.high || c.close);
-        });
-        const priceRange = Math.max(1, maxPrice - minPrice);
-        const priceNorm = (price - minPrice) / priceRange;
-        const targetY = this.baseY - priceNorm * this.priceScale;
-
-        const currentCamY = this.scene.cameras.main.scrollY + this.scene.scale.height / 2 / this.scene.cameras.main.zoom;
-
-        const margin = 150;
-        const viewportTop = currentCamY - this.scene.scale.height / 2 / this.scene.cameras.main.zoom + margin;
-        const viewportBottom = currentCamY + this.scene.scale.height / 2 / this.scene.cameras.main.zoom - margin;
-
-        if (targetY < viewportTop || targetY > viewportBottom) {
-            this.scene.cameras.main.pan(
-                this.scene.cameras.main.scrollX + this.scene.scale.width / 2 / this.scene.cameras.main.zoom,
-                targetY,
-                300,
-                'Sine.easeInOut',
-                false
-            );
-        }
-    }
+    // La cámara SOLO sigue al jugador local (configurado en GameScene)
+    // NO se manipula desde CandleSystem
 
     // ═══════════════════════════════════════════════════════════════
     // 📍 OBTENER POSICIÓN DE VELA (FUENTE DE VERDAD)
