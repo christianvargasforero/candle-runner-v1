@@ -26,6 +26,12 @@ export const ASH_INSURANCE_RATIO = 0.618; // 61.8% refund en Permadeath
 // 🎨 SISTEMA DE SKINS (NIVELES)
 export const SKIN_LEVEL_REQ = [0, 2, 3, 5, 8, 13]; // Rondas sobrevividas para subir nivel (Fibonacci)
 
+export const FREE_SKINS = [
+    { id: 'droid_cyan', name: 'Droid Alpha', color: 0x00fff9 },
+    { id: 'droid_magenta', name: 'Droid Beta', color: 0xff00c1 },
+    { id: 'droid_yellow', name: 'Droid Gamma', color: 0xffea00 }
+];
+
 // 🛡️ SISTEMA DE INTEGRIDAD (DURABILIDAD)
 export const MAX_INTEGRITY_BASE = 100; // Integridad inicial de Skins NFT
 export const INTEGRITY_LOSS_PER_DEFEAT = 10; // Daño por derrota

@@ -248,6 +248,8 @@ export default class UIScene extends Phaser.Scene {
     }
 
     createBalanceDisplay() {
+        if (window.SPECTATOR_MODE) return; // 🔴 No mostrar saldo en modo espectador
+
         // Display de Saldo (Esquina superior derecha, debajo del precio)
         const x = this.cameras.main.width - 20;
         const y = 110;
@@ -316,9 +318,9 @@ export default class UIScene extends Phaser.Scene {
 
         // 🔴 MODO ESPECTADOR
         if (window.SPECTATOR_MODE) {
-            const spectatorLabel = this.add.text(0, 0, '🔴 ADMIN SPECTATOR MODE', {
+            const spectatorLabel = this.add.text(0, 0, '👁️ VIEWING LIVE MATCH', {
                 font: 'bold 24px Courier New',
-                fill: '#ff0000',
+                fill: '#00ff88',
                 backgroundColor: '#000000',
                 padding: { x: 10, y: 5 },
                 stroke: '#ffffff',

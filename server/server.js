@@ -218,6 +218,66 @@ io.on('connection', async (socket) => {
         return;
     }
 
+    // 🔴 SPECTATOR CONNECTION
+    if (clientType === 'spectator') {
+        console.log(`👁️ [SPECTATOR] Conectado: ${socket.id}`);
+        socket.isSpectator = true;
+
+        // 🚌 Evento: Unirse a una sala (Espectador)
+        socket.on('JOIN_ROOM', (data) => {
+            const { roomId } = data;
+            console.log(`👁️ [SPECTATOR] Uniéndose a sala ${roomId}`);
+
+            const room = roomManager.getRoom(roomId);
+            if (!room) {
+                socket.emit('GAME_ERROR', { message: 'Bus not found' });
+                return;
+            }
+
+            socket.join(roomId);
+
+            // Confirmar unión
+            socket.emit('ROOM_JOINED', {
+                roomId: roomId,
+                roomName: room.name,
+                ticketPrice: room.ticketPrice,
+                isSpectator: true
+            });
+
+            // Enviar estado actual si el juego está corriendo
+            if (room.gameLoopInstance) {
+                const state = room.gameLoopInstance.getState();
+                socket.emit('BUS_START', {
+                    roomId: roomId,
+                    candleHistory: state.candleHistory,
+                    passengers: state.passengers,
+                    state: state.status
+                });
+                
+                if (room.gameLoopInstance.lastPrice) {
+                    socket.emit('PRICE_UPDATE', {
+                        price: room.gameLoopInstance.lastPrice,
+                        timestamp: Date.now()
+                    });
+                }
+            } else {
+                // Si está en boarding, enviar estado de espera
+                socket.emit('CURRENT_GAME_STATE', {
+                    status: 'BOARDING',
+                    message: 'Waiting for bus to start...',
+                    occupancy: room.users.size,
+                    capacity: room.capacity
+                });
+            }
+        });
+
+        socket.on('disconnect', () => {
+            console.log(`👁️ [SPECTATOR] Desconectado: ${socket.id}`);
+        });
+
+        return;
+    }
+
     // 👤 PLAYER CONNECTION
     console.log(`👤 [PLAYER] Conectado: ${socket.id}`);
 

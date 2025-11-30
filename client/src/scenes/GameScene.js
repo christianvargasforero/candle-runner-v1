@@ -172,6 +172,17 @@ export default class GameScene extends Phaser.Scene {
     // 🎥 CÁMARA: RE-CENTER
     // ═══════════════════════════════════════════════════════════════
 
+    centerOnLatestCandle() {
+        if (this.candleSystem && this.candleSystem.candleHistory.length > 0) {
+            const lastIndex = this.candleSystem.candleHistory.length - 1;
+            const spot = this.candleSystem.getCandleSpot(lastIndex);
+            
+            // Centrar inmediatamente en la última vela
+            this.cameras.main.centerOnX(spot.x);
+            console.log('[🎥 CAMERA] Centrado inicial en última vela:', spot.x);
+        }
+    }
+
     recenterCamera() {
         const player = this.playerSystem.getMyPlayer();
         if (player) {
@@ -328,6 +339,7 @@ export default class GameScene extends Phaser.Scene {
                 // 🎯 DELEGAR A SISTEMAS
                 // ============================================
                 this.candleSystem.buildChart(data.candleHistory);
+                this.centerOnLatestCandle(); // Fix de Cámara (Tarea 3)
                 this.playerSystem.spawnPlayers(data.passengers || [], this.candleSystem);
 
                 console.log('[✅ CATCH-UP] Sincronización completa!');
@@ -359,6 +371,7 @@ export default class GameScene extends Phaser.Scene {
             // 🎯 DELEGAR A SISTEMAS
             // ============================================
             this.candleSystem.buildChart(data.candleHistory);
+            this.centerOnLatestCandle(); // Fix de Cámara (Tarea 3)
             this.playerSystem.spawnPlayers(data.passengers || [], this.candleSystem);
         });
 
@@ -390,6 +403,16 @@ export default class GameScene extends Phaser.Scene {
             // 🎯 ANIMAR RESULTADOS DE JUGADORES
             if (data.passengerStatuses) {
                 this.playerSystem.animatePlayerResults(data.passengerStatuses, this.candleSystem);
+            }
+        });
+
+        // ============================================
+        // 🔄 GAME_STATE: Actualización de fase
+        // ============================================
+        this.socket.on('GAME_STATE', (data) => {
+            // Actualizar fase en CandleSystem para visualización
+            if (this.candleSystem) {
+                this.candleSystem.setPhase(data.state);
             }
         });
 

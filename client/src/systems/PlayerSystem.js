@@ -193,7 +193,17 @@ export class PlayerSystem {
         const jitter = (column - 2) * 18;
         const x = spot.x + jitter;
         const y = spot.y - 20 - row * 6;
-        const color = playerData.skinColor || this.SKIN_COLORS[index % this.SKIN_COLORS.length];
+        
+        // TAREA 3: Diferenciación Visual
+        // Usar color de skin si existe, sino generar hash consistente
+        let color;
+        if (playerData.skinColor) {
+            color = playerData.skinColor;
+        } else {
+            // Hash simple del ID para color consistente
+            const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            color = this.SKIN_COLORS[hash % this.SKIN_COLORS.length];
+        }
 
         // Sprite visual simple (sin física)
         const sprite = this.scene.add.sprite(x, y, null);

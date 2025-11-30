@@ -276,6 +276,18 @@ class BusGameLoop {
                     roomId: this.room.id
                 });
             }
+
+            // 🎯 STREAMING DE PRECIOS CONTINUO (TAREA 2)
+            // Emitir precio siempre que haya un startPrice definido, sin importar la fase
+            if (this.currentRound.startPrice) {
+                const currentPriceData = priceService.getCurrentPrice();
+                if (currentPriceData) {
+                    this.io.to(this.room.id).emit('PRICE_UPDATE', {
+                        price: currentPriceData.price,
+                        timestamp: Date.now()
+                    });
+                }
+            }
         }, 1000);
     }
 
@@ -298,6 +310,14 @@ class BusGameLoop {
         this.currentState = GAME_STATES.BETTING;
         this.phaseStartTime = Date.now();
 
+        // 🎯 INICIALIZACIÓN DE PRECIO (TAREA 2)
+        // Establecer startPrice inmediatamente usando el precio actual
+        // Esto permite que el ticker se mueva desde el segundo 0
+        const priceData = priceService.getCurrentPrice();
+        if (priceData) {
+            this.currentRound.startPrice = priceData.price;
+        }
+
         console.log(`🟢 [BUS ${this.room.id}] FASE 1 - BETTING (${PHASE_BET_TIME / 1000}s)`);
 
         // Emitir estado solo a usuarios de este bus
@@ -307,7 +327,8 @@ class BusGameLoop {
                 roundNumber: this.roundNumber,
                 timeLeft: PHASE_BET_TIME,
                 serverTime: Date.now(),
-                roomId: this.room.id
+                roomId: this.room.id,
+                startPrice: this.currentRound.startPrice // Enviar startPrice al cliente
             });
         }
 
@@ -322,10 +343,15 @@ class BusGameLoop {
         this.currentState = GAME_STATES.LOCKED;
         this.phaseStartTime = Date.now();
 
-        // Capturar precio de entrada
-        const priceData = priceService.getCurrentPrice();
-        if (priceData) {
-            this.currentRound.startPrice = priceData.price;
+        // Capturar precio de entrada (si no se capturó en betting, aunque debería estar)
+        if (!this.currentRound.startPrice) {
+            const priceData = priceService.getCurrentPrice();
+            if (priceData) {
+                this.currentRound.startPrice = priceData.price;
+            }
+        }
+        
+        if (this.currentRound.startPrice) {
             console.log(`🔴 [BUS ${this.room.id}] FASE 2 - LOCKED`);
             console.log(`   Precio Entrada: $${this.currentRound.startPrice.toFixed(2)}\n`);
         }
@@ -342,27 +368,9 @@ class BusGameLoop {
             });
         }
 
-        // 🎯 STREAMING DE PRECIOS EN TIEMPO REAL
-        // Emitir actualizaciones de precio cada 500ms para sincronizar la vela
-        this.priceStreamInterval = setInterval(() => {
-            const currentPriceData = priceService.getCurrentPrice();
-            if (currentPriceData) {
-                // Emitir a todos los pasajeros del bus
-                this.io.to(this.room.id).emit('PRICE_UPDATE', {
-                    price: currentPriceData.price,
-                    timestamp: Date.now()
-                });
-            }
-        }, 500);
+        // NOTA: El streaming de precios ahora se maneja en startSyncTimer (Tarea 2)
 
         await this.wait(PHASE_LOCK_TIME);
-
-        // 🧹 LIMPIAR INTERVALO AL TERMINAR LA FASE
-        if (this.priceStreamInterval) {
-            clearInterval(this.priceStreamInterval);
-            this.priceStreamInterval = null;
-            console.log(`✅ [BUS ${this.room.id}] Price streaming detenido`);
-        }
 
         console.log(`✅ [BUS ${this.room.id}] LOCKED completada\n`);
     }

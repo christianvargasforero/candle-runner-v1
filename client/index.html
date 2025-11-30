@@ -1621,13 +1621,12 @@
         // 👁️ MODO ESPECTADOR - Detección
         // ============================================
         const urlParams = new URLSearchParams(window.location.search);
-        const spectateMode = urlParams.get('spectate');
-        const isSpectator = !!spectateMode;
+        const spectateBusId = urlParams.get('spectate');
 
-        if (isSpectator) {
-            console.log(`🔴 [SPECTATOR] Modo espectador activado para bus: ${spectateMode}`);
+        if (spectateBusId) {
+            console.log(`🔴 [SPECTATOR] Modo espectador activado para bus: ${spectateBusId}`);
             window.SPECTATOR_MODE = true;
-            window.SPECTATOR_BUS_ID = spectateMode;
+            window.SPECTATOR_BUS_ID = spectateBusId;
 
             // Ocultar overlay de login inmediatamente
             const loginOverlay = document.getElementById('login-overlay');
@@ -1637,30 +1636,40 @@
             const profileBtn = document.getElementById('profile-toggle-btn');
             if (profileBtn) profileBtn.style.display = 'none';
 
+            // Mostrar Banner
+            const banner = document.createElement('div');
+            banner.innerHTML = `👁️ SPECTATOR MODE: ${spectateBusId}`;
+            banner.style.cssText = 'position:fixed; top:0; left:0; width:100%; background:rgba(255,0,0,0.8); color:white; text-align:center; z-index:99999; font-weight:bold; padding:5px; font-family: "Courier New"; pointer-events:none;';
+            document.body.appendChild(banner);
+
             // Conectar socket como espectador
             window.globalSocket = io({
-                auth: {
-                    type: 'spectator',
-                    token: 'admin_secret_token' // En prod esto debería ser un token real
-                }
+                auth: { type: 'spectator' },
+                query: { busId: spectateBusId }
             });
             window.socket = window.globalSocket;
 
-            // NO unirse aquí. Dejar que MenuScene maneje la unión para asegurar que los listeners estén listos.
             window.globalSocket.on('connect', () => {
-                console.log('🔴 [SPECTATOR] Conectado al socket. Esperando a MenuScene...');
+                console.log('🔴 [SPECTATOR] Conectado. Uniéndose a sala...');
+                window.globalSocket.emit('JOIN_ROOM', { roomId: spectateBusId, isSpectator: true });
             });
 
-            // Iniciar juego directamente
-            setTimeout(() => {
-                const game = window.game;
-                if (game) {
-                    console.log('🔴 [SPECTATOR] Iniciando GameScene...');
-                    // Saltamos MenuScene y vamos directo a GameScene o dejamos que MenuScene maneje la redirección
-                    // Mejor dejar que MenuScene detecte el flag window.SPECTATOR_MODE
-                    game.scene.start('MenuScene');
-                }
-            }, 1000);
+            // Escuchar confirmación para iniciar escena
+            window.globalSocket.on('ROOM_JOINED', (data) => {
+                 console.log('🔴 [SPECTATOR] Sala unida. Iniciando GameScene...');
+                 const launchGame = () => {
+                     if (window.game) {
+                         // Ir directo a GameScene
+                         window.game.scene.start('GameScene');
+                         window.game.scene.stop('MenuScene');
+                         window.game.scene.stop('BootScene');
+                     } else {
+                         console.log('⏳ [SPECTATOR] Esperando a Phaser...');
+                         setTimeout(launchGame, 100);
+                     }
+                 };
+                 launchGame();
+            });
         }
 
         // 🛡️ NO CONECTAR SOCKET AUTOMÁTICAMENTE - Esperar login (SOLO SI NO ES ESPECTADOR)
@@ -1678,7 +1687,7 @@
             return wallet;
         }
 
-        if (!isSpectator) {
+        if (!spectateBusId) {
             connectBtn.addEventListener('click', async () => {
                 try {
                     connectBtn.disabled = true;
@@ -2295,6 +2304,40 @@
                     }
 
                     inventoryGrid.appendChild(card);
+                });
+            }
+
+            // Actualizar inventario de skins
+            function updateInventoryGrid(inventory) {
+                inventoryGrid.innerHTML = ''; // Limpiar el grid
+
+                inventory.forEach(skin => {
+                    const skinCard = document.createElement('div');
+                    skinCard.className = 'skin-card';
+                    skinCard.innerHTML = `
+                        <div class="skin-image" style="background-image: url('${skin.image}')"></div>
+                        <div class="skin-name">${skin.name}</div>
+                        <button class="equip-skin-btn" data-skin-id="${skin.id}">Equipar</button>
+                    `;
+
+                    // Añadir evento para equipar skin
+                    const equipBtn = skinCard.querySelector('.equip-skin-btn');
+                    equipBtn.addEventListener('click', () => {
+                        if (window.globalSocket) {
+                            window.globalSocket.emit('EQUIP_SKIN', { skinId: skin.id });
+                            showToast(`Equipando skin: ${skin.name}`, 'success');
+                        }
+                    });
+
+                    inventoryGrid.appendChild(skinCard);
+                });
+            }
+
+            // Escuchar evento USER_PROFILE para actualizar el inventario
+            if (window.globalSocket) {
+                window.globalSocket.on('USER_PROFILE', (profile) => {
+                    currentUserProfile = profile;
+                    updateInventoryGrid(profile.inventory);
                 });
             }
         });

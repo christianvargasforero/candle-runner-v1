@@ -43,6 +43,7 @@ export class CandleSystem {
         this.liveStartPrice = null;
         this.liveCandleHigh = null;
         this.liveCandleLow = null;
+        this.currentPhase = 'BETTING'; // Default phase
 
         // Capas de renderizado
         this.candleLayer = this.scene.add.container(0, 0).setDepth(10);
@@ -212,6 +213,20 @@ export class CandleSystem {
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // 🔄 SET PHASE
+    // ═══════════════════════════════════════════════════════════════
+
+    setPhase(phase) {
+        this.currentPhase = phase;
+        // Forzar actualización visual si es necesario
+        if (this.liveStartPrice !== null && this.candleHistory.length > 0) {
+            const lastIndex = this.candleHistory.length - 1;
+            const last = this.candleHistory[lastIndex];
+            this.renderLiveCandleTicker(lastIndex, this.liveStartPrice, last.close, this.liveCandleHigh, this.liveCandleLow);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // 🔴 ACTUALIZAR VELA EN VIVO (CRÍTICO PARA FÍSICA DINÁMICA)
     // ═══════════════════════════════════════════════════════════════
 
@@ -318,16 +333,25 @@ export class CandleSystem {
         const isGreen = current >= open;
         const isFlat = Math.abs(priceChange) < 0.01;
 
-        let color, glowColor;
+        let color, glowColor, borderColor;
+        
+        // TAREA 3: Visualización por Fase
+        if (this.currentPhase === 'BETTING') {
+            // Fase de Apuestas: Borde Blanco/Amarillo
+            borderColor = 0xffff00; // Amarillo eléctrico
+            color = isGreen ? this.COLORS.LONG : this.COLORS.SHORT; // Cuerpo normal
+            glowColor = 0xffffff;
+        } else {
+            // Fase Locked/Resolving: Borde del color de la tendencia
+            borderColor = isGreen ? this.COLORS.LONG_INTENSE : this.COLORS.SHORT_INTENSE;
+            color = isGreen ? this.COLORS.LONG_INTENSE : this.COLORS.SHORT_INTENSE;
+            glowColor = isGreen ? this.COLORS.LONG : this.COLORS.SHORT;
+        }
+
         if (isFlat) {
             color = this.COLORS.NEUTRAL;
             glowColor = 0xffffff;
-        } else if (isGreen) {
-            color = this.COLORS.LONG_INTENSE;
-            glowColor = this.COLORS.LONG;
-        } else {
-            color = this.COLORS.SHORT_INTENSE;
-            glowColor = this.COLORS.SHORT;
+            borderColor = 0xcccccc;
         }
 
         // ============================================
@@ -400,7 +424,7 @@ export class CandleSystem {
         );
 
         // Borde sólido BRILLANTE
-        this.liveCandleGraphics.lineStyle(3, color, 1);
+        this.liveCandleGraphics.lineStyle(3, borderColor, 1);
         this.liveCandleGraphics.strokeRoundedRect(
             x - this.CANDLE_WIDTH / 2,
             bodyTop,

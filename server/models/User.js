@@ -1,5 +1,6 @@
 import Skin from './Skin.js';
 import prisma from '../config/prisma.js';
+import { FREE_SKINS } from '../../shared/constants.js';
 
 /**
  * User Model
@@ -17,10 +18,31 @@ export default class User {
         // 🎒 INVENTARIO DE SKINS
         this.inventory = [];
 
-        // Crear Protocol Droid (siempre disponible)
-        // isDefault se calcula automáticamente en Skin.js basado en el tipo 'PROTOCOL_DROID'
-        const protocolDroid = new Skin('default_droid', 'PROTOCOL_DROID');
-        protocolDroid.userId = id;
+        // Crear todas las skins gratuitas disponibles
+        FREE_SKINS.forEach(skinData => {
+            const skin = new Skin(skinData.id, 'PROTOCOL_DROID');
+            skin.name = skinData.name;
+            skin.color = skinData.color;
+            skin.userId = id;
+            this.inventory.push(skin);
+        });
+
+        // Equipar una aleatoria por defecto
+        this.activeSkin = this.inventory[Math.floor(Math.random() * this.inventory.length)];
+    }
+
+    /**
+     * Equip a skin from inventory
+     * @param {string} skinId 
+     * @returns {boolean}
+     */
+    equipSkin(skinId) {
+        const skin = this.inventory.find(s => s.id === skinId);
+        if (skin) {
+            this.activeSkin = skin;
+            return true;
+        }
+        return false;
     }
 
     /**
