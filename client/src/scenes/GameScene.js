@@ -55,6 +55,12 @@ export default class GameScene extends Phaser.Scene {
         console.log('[🎮 NEON TRADER] Escena iniciada');
 
         // ============================================
+        // 🎥 CAMERA CONTROL STATE
+        // ============================================
+        this.isCameraLocked = true;
+        this.dragStartX = 0;
+
+        // ============================================
         // ⚙️ CONFIGURACIÓN DE FÍSICA ARCADE
         // ============================================
         this.physics.world.setBounds(0, 0, 20000, 2000);
@@ -71,6 +77,46 @@ export default class GameScene extends Phaser.Scene {
         
         // CRÍTICO: Detener cualquier paneo automático previo
         this.cameras.main.stopFollow();
+
+        // ============================================
+        // 🖱️ INPUT & CAMERA DRAG
+        // ============================================
+        this.input.on('pointerdown', (pointer) => {
+            // Desbloquear cámara al iniciar arrastre (si no es UI)
+            if (this.isCameraLocked) {
+                this.isCameraLocked = false;
+                this.cameras.main.stopFollow();
+                
+                // Notificar a UI
+                const uiScene = this.scene.get('UIScene');
+                if (uiScene) {
+                    uiScene.events.emit('CAMERA_UNLOCKED');
+                }
+            }
+            this.dragStartX = pointer.x;
+        });
+
+        this.input.on('pointermove', (pointer) => {
+            if (pointer.isDown && !this.isCameraLocked) {
+                const diff = (pointer.x - this.dragStartX) * 0.5; // Sensibilidad 0.5
+                this.cameras.main.scrollX -= diff;
+                this.dragStartX = pointer.x;
+
+                // Límites (Clamping)
+                const minX = 0; 
+                let maxX = 20000; 
+                
+                if (this.candleSystem && this.candleSystem.candleHistory) {
+                    const lastIndex = this.candleSystem.candleHistory.length;
+                    const spacing = this.candleSystem.CANDLE_SPACING || 140;
+                    const baseX = this.candleSystem.BASE_X || 300;
+                    maxX = baseX + (lastIndex + 5) * spacing + 500; 
+                }
+
+                if (this.cameras.main.scrollX < minX) this.cameras.main.scrollX = minX;
+                if (this.cameras.main.scrollX > maxX) this.cameras.main.scrollX = maxX;
+            }
+        });
 
         // Capas de profundidad
         this.bgLayer = this.add.container(0, 0).setDepth(0);
@@ -120,6 +166,31 @@ export default class GameScene extends Phaser.Scene {
         this.events.once('destroy', () => {
             this.cleanup();
         });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🎥 CÁMARA: RE-CENTER
+    // ═══════════════════════════════════════════════════════════════
+
+    recenterCamera() {
+        const player = this.playerSystem.getMyPlayer();
+        if (player) {
+            console.log('[🎥 CAMERA] Re-centrando en jugador...');
+            
+            // Pan suave hacia el jugador
+            this.cameras.main.pan(player.x, player.y, 500, 'Power2', false, (camera, progress) => {
+                if (progress === 1) {
+                    this.cameras.main.startFollow(player, true, 0.1, 0.1);
+                    this.isCameraLocked = true;
+                    
+                    // Notificar a UI
+                    const uiScene = this.scene.get('UIScene');
+                    if (uiScene) {
+                        uiScene.events.emit('CAMERA_LOCKED');
+                    }
+                }
+            });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -304,6 +375,9 @@ export default class GameScene extends Phaser.Scene {
         // ============================================
         this.socket.on('ROUND_RESULT', (data) => {
             console.log('[ROUND_RESULT]', data);
+
+            // 🎥 AUTO-RECENTER: Forzar cámara al jugador
+            this.recenterCamera();
 
             // 🎯 RESETEAR ESTADO DE VELA EN VIVO
             this.candleSystem.resetLiveCandle();

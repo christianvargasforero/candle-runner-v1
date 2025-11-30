@@ -52,6 +52,11 @@ export default class UIScene extends Phaser.Scene {
         // Botón de Settings (Placeholder)
         this.createSettingsButton();
 
+        // 🎥 CONTROLES DE CÁMARA
+        this.createRecenterButton();
+        this.createFreeLookIndicator();
+        this.setupCameraListeners();
+
         // Actualizar temporizador cada frame
         this.events.on('update', this.updateLocalTimer, this);
     }
@@ -880,5 +885,91 @@ P/L: ${profitSign}$${profit.toFixed(2)}
         if (this.btnShort.label) this.btnShort.label.setText('WAITING...');
         
         console.log('[UI] 🔴 Botones DESHABILITADOS explícitamente');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🎥 CONTROLES DE CÁMARA
+    // ═══════════════════════════════════════════════════════════════
+
+    setupCameraListeners() {
+        // Escuchar eventos de GameScene
+        const gameScene = this.scene.get('GameScene');
+        if (gameScene) {
+            gameScene.events.on('CAMERA_UNLOCKED', () => {
+                if (this.recenterBtn) {
+                    this.recenterBtn.setVisible(true);
+                    this.recenterBtn.setAlpha(0);
+                    this.tweens.add({
+                        targets: this.recenterBtn,
+                        alpha: 1,
+                        duration: 300
+                    });
+                }
+                
+                if (this.freeLookText) {
+                    this.freeLookText.setVisible(true);
+                    this.freeLookText.setAlpha(1);
+                }
+            });
+
+            gameScene.events.on('CAMERA_LOCKED', () => {
+                if (this.recenterBtn) this.recenterBtn.setVisible(false);
+                if (this.freeLookText) this.freeLookText.setVisible(false);
+            });
+        }
+    }
+
+    createRecenterButton() {
+        const x = this.cameras.main.width - 50;
+        const y = this.cameras.main.height - 180; // Encima de apuestas
+
+        this.recenterBtn = this.add.container(x, y);
+        this.recenterBtn.setVisible(false); // Oculto por defecto
+        this.recenterBtn.setScrollFactor(0);
+
+        const bg = this.add.circle(0, 0, 25, 0x000000, 0.8);
+        bg.setStrokeStyle(2, 0x00ff88);
+        
+        const icon = this.add.text(0, 0, '🎯', { fontSize: '24px' }).setOrigin(0.5);
+        
+        this.recenterBtn.add([bg, icon]);
+        
+        // Interacción
+        bg.setInteractive({ useHandCursor: true });
+        bg.on('pointerdown', () => {
+            const gameScene = this.scene.get('GameScene');
+            if (gameScene) {
+                gameScene.recenterCamera();
+            }
+        });
+        
+        bg.on('pointerover', () => this.recenterBtn.setScale(1.1));
+        bg.on('pointerout', () => this.recenterBtn.setScale(1));
+    }
+
+    createFreeLookIndicator() {
+        this.freeLookText = this.add.text(
+            this.cameras.main.width / 2, 
+            100, 
+            '[ FREE LOOK MODE ]', 
+            {
+                font: 'bold 16px Courier New',
+                fill: '#00ff88',
+                backgroundColor: '#000000',
+                padding: { x: 10, y: 5 }
+            }
+        ).setOrigin(0.5);
+        
+        this.freeLookText.setVisible(false);
+        this.freeLookText.setScrollFactor(0);
+
+        // Parpadeo discreto
+        this.tweens.add({
+            targets: this.freeLookText,
+            alpha: 0.5,
+            duration: 1000,
+            yoyo: true,
+            repeat: -1
+        });
     }
 }
