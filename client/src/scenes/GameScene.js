@@ -57,16 +57,37 @@ export default class GameScene extends Phaser.Scene {
     create() {
         console.log('[🎮 NEON TRADER] Escena iniciada');
         
-        // Configurar mundo
+        // ============================================
+        // ⚙️ CONFIGURACIÓN DE FÍSICA ARCADE
+        // ============================================
+        
+        // Configurar límites del mundo (mucho más ancho para infinitas velas)
+        this.physics.world.setBounds(0, 0, 20000, 2000);
+        this.physics.world.setFPS(60);
+        
+        // 🏗️ GRUPO FÍSICO DE VELAS (Plataformas Estáticas)
+        this.candlesGroup = this.physics.add.staticGroup();
+        
+        // Mapeo: índice de vela -> objeto físico
+        this.candlePhysicsBodies = new Map();
+        
+        console.log('[⚙️ PHYSICS] Sistema Arcade activado');
+        
+        // ============================================
+        // 🎨 CONFIGURACIÓN VISUAL
+        // ============================================
+        
+        // Configurar cámara
         this.cameras.main.setBackgroundColor(this.COLORS.BG);
         this.cameras.main.setZoom(this.zoomLevel);
+        this.cameras.main.setBounds(0, 0, 20000, 2000);
         
         // Capas de profundidad
         this.bgLayer = this.add.container(0, 0).setDepth(0);
         this.gridLayer = this.add.container(0, 0).setDepth(1);
         this.candleLayer = this.add.container(0, 0).setDepth(10);
         this.lineLayer = this.add.container(0, 0).setDepth(15);
-        this.playerLayer = this.add.container(0, 0).setDepth(50);
+        // NO usar container para playerLayer - los sprites físicos no funcionan bien en containers
         this.uiLayer = this.add.container(0, 0).setDepth(100);
         
         // Crear fondo con parallax animado
@@ -301,8 +322,14 @@ export default class GameScene extends Phaser.Scene {
     // ═══════════════════════════════════════════════════════════════
     
     renderHolographicCandles() {
-        // Limpiar velas anteriores
+        // ============================================
+        // 🧹 LIMPIEZA: Velas anteriores
+        // ============================================
         this.candleLayer.removeAll(true);
+        
+        // Limpiar grupo físico anterior
+        this.candlesGroup.clear(true, true);
+        this.candlePhysicsBodies.clear();
         
         if (!this.candleHistory.length) return;
         
@@ -316,22 +343,48 @@ export default class GameScene extends Phaser.Scene {
         });
         const priceRange = maxPrice - minPrice || 1;
         
-        // Dibujar cada vela usando el helper getCandleSpot
+        // ============================================
+        // 🏗️ SISTEMA DUAL: FÍSICA + VISUAL
+        // ============================================
         this.candleHistory.forEach((candle, i) => {
             const { x, y } = this.getCandleSpot(i);
-            // Determinar color basado en resultado (SERVIDOR = VERDAD)
+            
+            // Determinar color basado en resultado
             const isLong = candle.result === 'LONG';
             const color = isLong ? this.COLORS.LONG : 
                          (candle.result === 'SHORT' ? this.COLORS.SHORT : this.COLORS.NEUTRAL);
 
-            // Crear vela holográfica
+            const bodyHeight = 80;
+            
+            // ============================================
+            // A. CUERPO FÍSICO (Invisible) - LA PLATAFORMA REAL
+            // ============================================
+            const physicsBody = this.add.rectangle(x, y, this.CANDLE_WIDTH, bodyHeight, 0xffffff);
+            physicsBody.setAlpha(0); // Invisible
+            physicsBody.setOrigin(0.5, 0.5);
+            
+            // Añadir al grupo físico estático
+            this.candlesGroup.add(physicsBody);
+            
+            // Guardar referencia
+            this.candlePhysicsBodies.set(i, physicsBody);
+            
+            // ============================================
+            // B. GRÁFICO VISUAL (Cyberpunk) - LO QUE SE VE
+            // ============================================
             const candleContainer = this.createHolographicCandle(x, y, color, i === this.candleHistory.length - 1);
             this.candleLayer.add(candleContainer);
+            
+            // DEBUG: Mostrar hitbox (descomentar para debugging)
+            // physicsBody.setAlpha(0.2);
+            // physicsBody.setFillStyle(0xff0000);
         });
         
         // Centrar cámara en última vela
         const lastX = this.BASE_X + (this.candleHistory.length - 1) * this.CANDLE_SPACING;
         this.cameras.main.pan(lastX, baseY - 50, 800, 'Quad.easeOut');
+        
+        console.log(`[🏗️ PHYSICS] ${this.candleHistory.length} plataformas creadas`);
     }
     
     createHolographicCandle(x, y, color, isLive = false) {
@@ -408,12 +461,29 @@ export default class GameScene extends Phaser.Scene {
         if (!this.candleHistory.length) return;
         
         // Actualizar última vela
-        const last = this.candleHistory[this.candleHistory.length - 1];
+        const lastIndex = this.candleHistory.length - 1;
+        const last = this.candleHistory[lastIndex];
         last.close = price;
         if (price > (last.high || price)) last.high = price;
         if (price < (last.low || price)) last.low = price;
         
-        // Re-renderizar
+        // ============================================
+        // 🔄 SINCRONIZACIÓN: Actualizar cuerpo físico
+        // ============================================
+        const physicsBody = this.candlePhysicsBodies.get(lastIndex);
+        if (physicsBody) {
+            const { x, y } = this.getCandleSpot(lastIndex);
+            const bodyHeight = 80; // Mantener consistente con renderHolographicCandles
+            
+            // Actualizar posición y tamaño del cuerpo físico
+            physicsBody.setPosition(x, y);
+            physicsBody.setSize(this.CANDLE_WIDTH, bodyHeight);
+            
+            // CRÍTICO: Refrescar física estática
+            physicsBody.body.updateFromGameObject();
+        }
+        
+        // Re-renderizar visual
         this.renderHolographicCandles();
         this.renderPriceLine();
     }
@@ -506,17 +576,16 @@ export default class GameScene extends Phaser.Scene {
     spawnDifferentiatedPlayers(passengers) {
         // Limpiar sprites previos
         this.playerSprites.forEach(data => {
-            if (data.container) data.container.destroy();
+            if (data.sprite) data.sprite.destroy();
         });
         this.playerSprites.clear();
-        this.playerLayer.removeAll(true);
 
         if (!this.candleHistory.length) return;
 
         const lastIndex = this.candleHistory.length - 1;
         const spot = this.getCandleSpot(lastIndex);
 
-        // Spawn separado para local y remotos (evita superposición)
+        // Spawn separado para local y remotos
         passengers.forEach((p, index) => {
             const id = p.odId || p.userId || p.id;
             if (!id) return;
@@ -524,130 +593,173 @@ export default class GameScene extends Phaser.Scene {
             const isLocal = id === this.localUserId;
 
             if (isLocal) {
-                // Jugador local: posicion precisa sobre la vela y cámara inmediata
+                // Jugador local: sprite con física completa
                 const my = this.spawnMyPlayer(id, p, spot);
                 this.playerSprites.set(id, my);
             } else {
-                // Otros jugadores: evitar overlap con offset aleatorio
+                // Otros jugadores: sprites visuales (sin colisión)
                 const other = this.spawnOtherPlayer(id, p, spot, index);
                 this.playerSprites.set(id, other);
             }
         });
 
-        // Asegurar que la cámara siga al local si existe
+        // Asegurar que la cámara siga al jugador local
         const localData = this.playerSprites.get(this.localUserId);
-        if (localData && localData.container) {
-            this.cameras.main.startFollow(localData.container, true, 0.12, 0.12);
+        if (localData && localData.sprite) {
+            this.cameras.main.startFollow(localData.sprite, true, 0.1, 0.1);
+            console.log('[📷 CAMERA] Siguiendo jugador local');
         }
     }
 
-    // Posicionar y crear jugador local exactamente sobre la vela
+    // ============================================
+    // 🎮 SPAWN JUGADOR LOCAL (CON FÍSICA)
+    // ============================================
     spawnMyPlayer(id, p, spot) {
         const x = spot.x;
-        const y = spot.y - 20; // encima de la vela
+        const y = spot.y - 60; // Spawn más alto para que caiga con gravedad
         const color = p.skinColor || 0x00fff9;
-        const data = this.createPlayerSprite(x, y, color, { odId: id, skinName: p.skinName || p.skin || 'You', integrity: p.integrity, maxIntegrity: p.maxIntegrity }, true);
-        // Force follow immediately
-        if (data && data.container) {
-            this.cameras.main.startFollow(data.container, true, 0.12, 0.12);
-        }
-        return data;
-    }
-
-    // Posicionar y crear jugador remoto con pequeño offset para evitar superposición
-    spawnOtherPlayer(id, p, spot, index) {
-        // Offset en X determinista por índice para estabilidad en todos los clientes
-        const column = index % 5;
-        const row = Math.floor(index / 5);
-        const jitter = (column - 2) * 18 + (Math.random() * 10 - 5); // -41 .. +41 approx
-        const x = spot.x + jitter;
-        const y = spot.y - 20 - row * 6; // pequeño apilado si muchos
-        const color = p.skinColor || this.SKIN_COLORS[index % this.SKIN_COLORS.length];
-        const data = this.createPlayerSprite(x, y, color, { odId: id, skinName: p.skinName || p.skin || 'Anon', integrity: p.integrity, maxIntegrity: p.maxIntegrity }, false);
-        // Fantasma
-        if (data && data.container) {
-            data.container.setAlpha(0.55);
-        }
-        return data;
-    }
-    
-    createPlayerSprite(x, y, color, data, isLocal) {
-        const container = this.add.container(x, y);
-        container.setDepth(isLocal ? 100 : 50);
         
-        // === CUERPO (Círculo neón con glow) ===
-        // Glow
-        const glow = this.add.circle(0, 0, 22, color, 0.3);
-        container.add(glow);
+        // Crear sprite físico
+        const sprite = this.physics.add.sprite(x, y, null);
+        sprite.setDisplaySize(30, 30); // Tamaño del sprite
+        sprite.setOrigin(0.5, 0.5);
+        sprite.setDepth(100);
+        
+        // ============================================
+        // ⚙️ CONFIGURACIÓN DE FÍSICA
+        // ============================================
+        sprite.setGravityY(800); // Gravedad fuerte
+        sprite.setCollideWorldBounds(true);
+        sprite.setBounce(0.2); // Pequeño rebote al aterrizar
+        sprite.setFriction(0.8); // Fricción para no resbalar
+        
+        // ============================================
+        // 🎨 VISUAL: Sprite procedural del jugador
+        // ============================================
+        // Crear textura procedural usando graphics temporal
+        const tempGraphics = this.add.graphics();
+        
+        // Glow exterior
+        tempGraphics.fillStyle(color, 0.3);
+        tempGraphics.fillCircle(22, 22, 22);
         
         // Cuerpo principal
-        const body = this.add.circle(0, 0, 15, color, isLocal ? 1 : 0.6);
-        container.add(body);
+        tempGraphics.fillStyle(color, 1);
+        tempGraphics.fillCircle(22, 22, 15);
         
         // Borde
-        const border = this.add.circle(0, 0, 15, color, 0);
-        border.setStrokeStyle(2, isLocal ? 0xffffff : color, 1);
-        container.add(border);
+        tempGraphics.lineStyle(2, 0xffffff, 1);
+        tempGraphics.strokeCircle(22, 22, 15);
         
         // Core brillante
-        const core = this.add.circle(0, -3, 5, 0xffffff, 0.5);
-        container.add(core);
+        tempGraphics.fillStyle(0xffffff, 0.5);
+        tempGraphics.fillCircle(22, 19, 5);
         
-        // === NOMBRE FLOTANTE ===
-        const shortName = (data.skinName || 'Anon').slice(0, 8);
+        // Generar textura desde el graphics
+        tempGraphics.generateTexture('playerLocal', 44, 44);
+        tempGraphics.destroy();
+        
+        // Aplicar textura al sprite
+        sprite.setTexture('playerLocal');
+        
+        // ============================================
+        // 📛 NOMBRE Y UI
+        // ============================================
+        const shortName = (p.skinName || p.skin || 'You').slice(0, 8);
         const nameTag = this.add.text(0, -35, shortName, {
             font: 'bold 12px "Courier New"',
-            fill: isLocal ? '#00fff9' : '#ffffff',
+            fill: '#00fff9',
             stroke: '#000',
             strokeThickness: 3
-        }).setOrigin(0.5);
-        container.add(nameTag);
+        }).setOrigin(0.5).setDepth(101);
         
-        // === INDICADOR DE INTEGRIDAD ===
-        const integrityBar = this.add.rectangle(0, 25, 30, 4, 0x333333);
-        container.add(integrityBar);
+        sprite.setData('nameTag', nameTag);
         
-        const integrityPercent = (data.integrity || 100) / (data.maxIntegrity || 100);
+        // Barra de integridad
+        const integrityBar = this.add.rectangle(0, 25, 30, 4, 0x333333).setDepth(101);
+        const integrityPercent = (p.integrity || 100) / (p.maxIntegrity || 100);
         const integrityFill = this.add.rectangle(
-            -15 + (30 * integrityPercent) / 2, 25,
-            30 * integrityPercent, 4,
+            -15, 25, 30 * integrityPercent, 4,
             integrityPercent > 0.5 ? 0x00ff88 : (integrityPercent > 0.2 ? 0xffff00 : 0xff0055)
-        );
-        integrityFill.setOrigin(0, 0.5);
-        integrityFill.x = -15;
-        container.add(integrityFill);
+        ).setOrigin(0, 0.5).setDepth(101);
         
-        // Animación de flotar para el jugador local
-        if (isLocal) {
-            this.tweens.add({
-                targets: container,
-                y: y - 5,
-                duration: 1500,
-                yoyo: true,
-                repeat: -1,
-                ease: 'Sine.easeInOut'
-            });
-            
-            // Partículas de estela
-            this.time.addEvent({
-                delay: 200,
-                callback: () => this.createTrailParticle(container.x, container.y + 15, color),
-                loop: true
-            });
-        }
+        sprite.setData('integrityBar', integrityBar);
+        sprite.setData('integrityFill', integrityFill);
         
-        this.playerLayer.add(container);
+        // ============================================
+        // 🔗 COLISIONADOR CON VELAS
+        // ============================================
+        this.physics.add.collider(sprite, this.candlesGroup);
+        
+        console.log('[🎮 PLAYER] Jugador local spawneado con física en', x, y);
         
         return {
-            container,
-            body,
-            glow,
+            sprite,
             nameTag,
+            integrityBar,
+            integrityFill,
             color,
-            isLocal,
-            odId: data.odId
+            isLocal: true,
+            odId: id
         };
     }
+
+    // ============================================
+    // 👥 SPAWN JUGADOR REMOTO (SIN FÍSICA - Solo Visual)
+    // ============================================
+    spawnOtherPlayer(id, p, spot, index) {
+        const column = index % 5;
+        const row = Math.floor(index / 5);
+        const jitter = (column - 2) * 18;
+        const x = spot.x + jitter;
+        const y = spot.y - 20 - row * 6;
+        const color = p.skinColor || this.SKIN_COLORS[index % this.SKIN_COLORS.length];
+        
+        // Sprite visual simple (sin física)
+        const sprite = this.add.sprite(x, y, null);
+        sprite.setDisplaySize(30, 30);
+        sprite.setOrigin(0.5, 0.5);
+        sprite.setDepth(50);
+        sprite.setAlpha(0.6); // Fantasma
+        
+        // Crear textura procedural única para este jugador
+        const textureKey = `playerRemote_${id}`;
+        const tempGraphics = this.add.graphics();
+        tempGraphics.fillStyle(color, 0.3);
+        tempGraphics.fillCircle(22, 22, 22);
+        tempGraphics.fillStyle(color, 0.8);
+        tempGraphics.fillCircle(22, 22, 15);
+        tempGraphics.lineStyle(2, color, 1);
+        tempGraphics.strokeCircle(22, 22, 15);
+        tempGraphics.generateTexture(textureKey, 44, 44);
+        tempGraphics.destroy();
+        
+        // Aplicar textura
+        sprite.setTexture(textureKey);
+        
+        // Nombre
+        const shortName = (p.skinName || p.skin || 'Anon').slice(0, 8);
+        const nameTag = this.add.text(0, -35, shortName, {
+            font: 'bold 12px "Courier New"',
+            fill: '#ffffff',
+            stroke: '#000',
+            strokeThickness: 3
+        }).setOrigin(0.5).setDepth(51);
+        
+        sprite.setData('nameTag', nameTag);
+        
+        console.log('[👥 PLAYER] Jugador remoto spawneado:', shortName);
+        
+        return {
+            sprite,
+            nameTag,
+            color,
+            isLocal: false,
+            odId: id
+        };
+    }
+    
+
     
     createTrailParticle(x, y, color) {
         const particle = this.add.circle(x, y, 4, color, 0.5);
@@ -666,28 +778,31 @@ export default class GameScene extends Phaser.Scene {
     addPlayerSprite(data) {
         if (!this.candleHistory.length) return;
         
-        const lastCandleX = this.BASE_X + (this.candleHistory.length - 1) * this.CANDLE_SPACING;
-        const y = this.scale.height / 2 - 80;
+        const lastIndex = this.candleHistory.length - 1;
+        const spot = this.getCandleSpot(lastIndex);
         const id = data.id || data.odId || data.userId;
         if (!id) return;
 
-        const color = data.skinColor || this.SKIN_COLORS[this.playerSprites.size % this.SKIN_COLORS.length];
         const isLocal = id === this.localUserId;
-
-        const playerData = this.createPlayerSprite(lastCandleX, y, color, {
-            odId: id,
-            skinName: data.skin || data.skinName,
-            integrity: data.integrity || 100,
-            maxIntegrity: data.maxIntegrity || 100
-        }, isLocal);
-
-        this.playerSprites.set(id, playerData);
+        
+        if (isLocal) {
+            // Jugador local con física
+            const playerData = this.spawnMyPlayer(id, data, spot);
+            this.playerSprites.set(id, playerData);
+        } else {
+            // Jugador remoto visual
+            const playerData = this.spawnOtherPlayer(id, data, spot, this.playerSprites.size);
+            this.playerSprites.set(id, playerData);
+        }
     }
     
     removePlayerSprite(odId) {
         const data = this.playerSprites.get(odId);
         if (data) {
-            if (data.container) data.container.destroy();
+            if (data.sprite) data.sprite.destroy();
+            if (data.nameTag) data.nameTag.destroy();
+            if (data.integrityBar) data.integrityBar.destroy();
+            if (data.integrityFill) data.integrityFill.destroy();
             this.playerSprites.delete(odId);
         }
     }
@@ -700,62 +815,84 @@ export default class GameScene extends Phaser.Scene {
         statuses.forEach(s => {
             const id = s.odId || s.userId || s.id;
             const data = this.playerSprites.get(id);
-            if (!data || !data.container) return;
+            if (!data || !data.sprite) return;
             
-            const container = data.container;
+            const sprite = data.sprite;
             
             if (s.status === 'WIN') {
-                // === VICTORIA: Salto triunfante ===
-                this.tweens.add({
-                    targets: container,
-                    x: container.x + this.CANDLE_SPACING,
-                    y: container.y - 100,
-                    duration: 500,
-                    ease: 'Quad.easeOut',
-                    onComplete: () => {
-                        this.tweens.add({
-                            targets: container,
-                            y: container.y + 100,
-                            duration: 400,
-                            ease: 'Bounce.easeOut'
-                        });
-                        this.createVictoryParticles(container.x, container.y, data.color);
-                        this.showFloatingText('+WIN', container.x, container.y - 50, '#00ff88');
-                    }
-                });
+                // === VICTORIA: Salto a siguiente vela ===
+                if (data.isLocal) {
+                    // Jugador local: usar física para saltar
+                    sprite.setVelocityY(-600); // Salto fuerte
+                    sprite.setVelocityX(200);  // Impulso hacia adelante
+                    
+                    this.time.delayedCall(300, () => {
+                        this.createVictoryParticles(sprite.x, sprite.y, data.color);
+                        this.showFloatingText('+WIN', sprite.x, sprite.y - 50, '#00ff88');
+                    });
+                } else {
+                    // Jugador remoto: tween visual
+                    this.tweens.add({
+                        targets: sprite,
+                        x: sprite.x + this.CANDLE_SPACING,
+                        y: sprite.y - 100,
+                        duration: 500,
+                        ease: 'Quad.easeOut',
+                        onComplete: () => {
+                            this.tweens.add({
+                                targets: sprite,
+                                y: sprite.y + 100,
+                                duration: 400,
+                                ease: 'Bounce.easeOut'
+                            });
+                        }
+                    });
+                }
                 
             } else if (s.status === 'DAMAGE') {
-                // === DAÑO: Glitch y deslizamiento ===
-                this.createGlitchEffect(container);
+                // === DAÑO: Glitch y avance ===
+                this.createGlitchEffect(sprite);
                 
-                this.tweens.add({
-                    targets: container,
-                    x: container.x + this.CANDLE_SPACING,
-                    duration: 800,
-                    ease: 'Cubic.easeInOut',
-                    onStart: () => {
-                        // Cambiar color temporalmente a rojo
-                        if (data.body) data.body.setFillStyle(0xff0055);
-                        this.showFloatingText('-1 HP', container.x, container.y - 50, '#ff0055');
-                    },
-                    onComplete: () => {
-                        // Restaurar color
-                        if (data.body) data.body.setFillStyle(data.color, data.isLocal ? 1 : 0.6);
-                    }
-                });
+                if (data.isLocal) {
+                    // Jugador local: impulso horizontal
+                    sprite.setVelocityX(150);
+                    
+                    // Flash rojo en el sprite
+                    this.tweens.add({
+                        targets: sprite,
+                        alpha: 0.3,
+                        duration: 100,
+                        yoyo: true,
+                        repeat: 2
+                    });
+                } else {
+                    // Jugador remoto: tween
+                    this.tweens.add({
+                        targets: sprite,
+                        x: sprite.x + this.CANDLE_SPACING,
+                        duration: 800,
+                        ease: 'Cubic.easeInOut'
+                    });
+                }
+                
+                this.showFloatingText('-1 HP', sprite.x, sprite.y - 50, '#ff0055');
                 
             } else if (s.status === 'BURNED') {
                 // === QUEMADO: Explosión épica ===
-                this.createExplosion(container.x, container.y);
-                this.showFloatingText('💀 BURNED', container.x, container.y - 60, '#ff0055');
+                this.createExplosion(sprite.x, sprite.y);
+                this.showFloatingText('💀 BURNED', sprite.x, sprite.y - 60, '#ff0055');
                 
                 // Destruir sprite
                 this.time.delayedCall(500, () => {
-                    container.destroy();
-                    this.playerSprites.delete(s.odId);
+                    if (data.nameTag) data.nameTag.destroy();
+                    if (data.integrityBar) data.integrityBar.destroy();
+                    if (data.integrityFill) data.integrityFill.destroy();
+                    sprite.destroy();
+                    
+                    this.playerSprites.delete(id);
                     
                     // Si era el jugador local, mostrar Game Over
-                    if (s.odId === this.localUserId) {
+                    if (id === this.localUserId) {
                         this.cameras.main.stopFollow();
                         this.showGameOver();
                     }
@@ -784,12 +921,12 @@ export default class GameScene extends Phaser.Scene {
         }
     }
     
-    createGlitchEffect(container) {
+    createGlitchEffect(sprite) {
         // Efecto de glitch rápido
-        const originalX = container.x;
+        const originalX = sprite.x;
         
         this.tweens.add({
-            targets: container,
+            targets: sprite,
             x: originalX + Phaser.Math.Between(-10, 10),
             duration: 50,
             yoyo: true,
@@ -906,7 +1043,28 @@ export default class GameScene extends Phaser.Scene {
         // Parallax del grid
         if (this.gridGraphics) {
             this.gridScrollX += delta * 0.01;
-            // El scrollFactor ya maneja el parallax
         }
+        
+        // ============================================
+        // 🎨 SINCRONIZACIÓN: UI sigue sprites
+        // ============================================
+        this.playerSprites.forEach((data, id) => {
+            if (!data.sprite || !data.sprite.active) return;
+            
+            const sprite = data.sprite;
+            
+            // Sincronizar nombre
+            if (data.nameTag) {
+                data.nameTag.setPosition(sprite.x, sprite.y - 35);
+            }
+            
+            // Sincronizar barra de integridad
+            if (data.integrityBar) {
+                data.integrityBar.setPosition(sprite.x, sprite.y + 25);
+            }
+            if (data.integrityFill) {
+                data.integrityFill.setPosition(sprite.x - 15, sprite.y + 25);
+            }
+        });
     }
 }

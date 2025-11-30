@@ -1433,6 +1433,9 @@
             <div class="bus-lobby-header">
                 <h2><i class="fa-solid fa-bus"></i> BUS TERMINAL</h2>
                 <div style="display: flex; gap: 10px;">
+                    <button class="close-btn refresh-btn" id="refresh-lobby-buses-btn" title="Refresh Buses">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
                     <button class="close-btn" id="open-profile-from-lobby" title="Open Profile">
                         <i class="fa-solid fa-user"></i>
                     </button>
@@ -1960,6 +1963,7 @@
             // 🚌 BUS LOBBY EVENT LISTENERS
             const closeLobbyBtn = document.getElementById('close-lobby-btn');
             const openProfileFromLobby = document.getElementById('open-profile-from-lobby');
+            const refreshLobbyBusesBtn = document.getElementById('refresh-lobby-buses-btn');
 
             if (closeLobbyBtn) {
                 closeLobbyBtn.addEventListener('click', () => {
@@ -1971,6 +1975,16 @@
                 openProfileFromLobby.addEventListener('click', () => {
                     window.hideBusLobby();
                     overlay.classList.add('active'); // Abrir profile
+                });
+            }
+
+            if (refreshLobbyBusesBtn) {
+                refreshLobbyBusesBtn.addEventListener('click', () => {
+                    console.log('[LOBBY] 🔄 Recargando buses...');
+                    if (window.globalSocket) {
+                        window.globalSocket.emit('GET_AVAILABLE_BUSES');
+                        showToast('🔄 Actualizando buses...', 'info');
+                    }
                 });
             }
 
