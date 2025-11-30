@@ -58,6 +58,33 @@ export default class GameScene extends Phaser.Scene {
     preload() {
         // Sin assets externos - todo se genera proceduralmente
     }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // 🧹 LIMPIEZA DE RECURSOS (Fix Listeners Duplicados)
+    // ═══════════════════════════════════════════════════════════════
+    
+    cleanup() {
+        console.log('[🧹 CLEANUP] Removiendo listeners de socket...');
+        
+        if (this.socket && this.listenersAttached) {
+            // Remover todos los listeners de juego
+            this.socket.off('BUS_START');
+            this.socket.off('PRICE_UPDATE');
+            this.socket.off('ROUND_RESULT');
+            this.socket.off('PLAYER_JOINED');
+            this.socket.off('PLAYER_LEFT');
+            this.socket.off('CURRENT_GAME_STATE');
+            
+            this.listenersAttached = false;
+            console.log('[✅ CLEANUP] Listeners removidos correctamente');
+        }
+        
+        // Limpiar intervals de precio
+        if (this.priceStreamInterval) {
+            clearInterval(this.priceStreamInterval);
+            this.priceStreamInterval = null;
+        }
+    }
 
     create() {
         console.log('[🎮 NEON TRADER] Escena iniciada');
@@ -134,6 +161,15 @@ export default class GameScene extends Phaser.Scene {
                 this.localUserId = profile.id;
                 console.log('[LOCAL USER]', this.localUserId);
             }
+        });
+        
+        // 🛡️ REGISTRAR CLEANUP EN SHUTDOWN
+        this.events.once('shutdown', () => {
+            this.cleanup();
+        });
+        
+        this.events.once('destroy', () => {
+            this.cleanup();
         });
     }
 
@@ -247,6 +283,12 @@ export default class GameScene extends Phaser.Scene {
     // ═══════════════════════════════════════════════════════════════
     
     setupSocketListeners() {
+        // 🛡️ PREVENIR LISTENERS DUPLICADOS
+        if (this.listenersAttached) {
+            console.log('[⚠️ LISTENERS] Ya existen listeners, saltando setup...');
+            return;
+        }
+        
         // ============================================
         // 🛡️ SISTEMA DE RECUPERACIÓN DE ESTADO
         // ============================================
@@ -254,6 +296,8 @@ export default class GameScene extends Phaser.Scene {
         // Solicitar estado del juego inmediatamente (proactivo)
         console.log('[🔍 RECOVERY] Solicitando estado del juego...');
         this.socket.emit('REQUEST_GAME_STATE');
+        
+        this.listenersAttached = true;
         
         // CURRENT_GAME_STATE: Respuesta del servidor con estado actual
         this.socket.on('CURRENT_GAME_STATE', (data) => {
@@ -329,10 +373,19 @@ export default class GameScene extends Phaser.Scene {
             if (this.liveCandleGraphics) this.liveCandleGraphics.clear();
             if (this.liveLineGraphics) this.liveLineGraphics.clear();
             
+            // 🎯 SOLIDIFICAR VELA EN VIVO → HISTÓRICA
             if (data.candleHistory) {
                 this.candleHistory = data.candleHistory;
+                
+                // Actualizar índices (la vela en vivo ahora es histórica)
+                this.lastHistoricalIndex = this.candleHistory.length - 1;
+                this.liveTickerIndex = this.lastHistoricalIndex + 1;
+                
+                // Re-renderizar escena completa
                 this.renderHolographicCandles();
                 this.renderPriceLine();
+                
+                console.log(`[🎯 TRANSITION] Vela solidificada. Nueva histórica: ${this.lastHistoricalIndex}, Próximo ticker: ${this.liveTickerIndex}`);
             }
             
             if (data.passengerStatuses) {
@@ -369,6 +422,10 @@ export default class GameScene extends Phaser.Scene {
         this.candlePhysicsBodies.clear();
         
         if (!this.candleHistory.length) return;
+        
+        // 🎯 ACTUALIZAR ÍNDICE DE ÚLTIMA VELA HISTÓRICA
+        this.lastHistoricalIndex = this.candleHistory.length - 1;
+        this.liveTickerIndex = this.lastHistoricalIndex + 1;
         
         const baseY = this.scale.height / 2 + 100;
         
@@ -564,8 +621,10 @@ export default class GameScene extends Phaser.Scene {
         // Limpiar gráfico anterior
         this.liveCandleGraphics.clear();
         
-        // Calcular posición X de la vela
-        const x = this.BASE_X + index * this.CANDLE_SPACING;
+        // 🎯 CRÍTICO: Dibujar en PRÓXIMA posición (no en la actual)
+        // index = lastHistoricalIndex (donde están los jugadores)
+        // liveTickerIndex = lastHistoricalIndex + 1 (zona de riesgo)
+        const x = this.BASE_X + this.liveTickerIndex * this.CANDLE_SPACING;
         
         // ============================================
         // 📊 CONVERTIR PRECIOS A COORDENADAS Y
@@ -683,17 +742,17 @@ export default class GameScene extends Phaser.Scene {
         // Limpiar gráfico anterior
         this.liveLineGraphics.clear();
         
-        if (this.candleHistory.length < 2) return;
+        if (this.candleHistory.length < 1) return;
         
         // ============================================
         // 📊 CALCULAR COORDENADAS
         // ============================================
-        const prevIndex = liveIndex - 1;
-        if (prevIndex < 0) return;
+        // Conectar ÚLTIMA vela histórica (donde están jugadores) con vela en vivo (próxima)
+        const historicalX = this.BASE_X + this.lastHistoricalIndex * this.CANDLE_SPACING;
+        const liveX = this.BASE_X + this.liveTickerIndex * this.CANDLE_SPACING;
         
-        const prevCandle = this.candleHistory[prevIndex];
-        const prevX = this.BASE_X + prevIndex * this.CANDLE_SPACING;
-        const liveX = this.BASE_X + liveIndex * this.CANDLE_SPACING;
+        const lastCandle = this.candleHistory[this.lastHistoricalIndex];
+        if (!lastCandle) return;
         
         // Normalización de precios
         let minPrice = Infinity, maxPrice = -Infinity;
@@ -708,18 +767,18 @@ export default class GameScene extends Phaser.Scene {
             return this.baseY - priceNorm * this.priceScale;
         };
         
-        const prevY = priceToY(prevCandle.close);
+        const historicalY = priceToY(lastCandle.close);
         const currentY = priceToY(currentPrice);
         
         // ============================================
         // 🎨 SEGMENTO ELÁSTICO (Última histórica → Live)
         // ============================================
-        const isGreen = currentPrice >= prevCandle.close;
+        const isGreen = currentPrice >= lastCandle.close;
         const color = isGreen ? this.COLORS.LONG : this.COLORS.SHORT;
         
         // Línea animada (grosor mayor para visibilidad)
         this.liveLineGraphics.lineStyle(3, color, 0.8);
-        this.liveLineGraphics.lineBetween(prevX, prevY, liveX, currentY);
+        this.liveLineGraphics.lineBetween(historicalX, historicalY, liveX, currentY);
         
         // Punto pulsante en la conexión
         this.liveLineGraphics.fillStyle(color, 0.6);

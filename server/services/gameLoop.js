@@ -200,6 +200,9 @@ class BusGameLoop {
 
             // FASE 3: RESOLVING (25s - 30s)
             await this.phaseResolving();
+            
+            // 🛡️ FASE 4: COOLDOWN (30s - 33s) - Tiempo para animaciones
+            await this.phaseCooldown();
 
         } catch (error) {
             console.error(`❌ [BUS ${this.room.id}] Error en Game Loop:`, error);
@@ -365,6 +368,28 @@ class BusGameLoop {
 
         await this.wait(PHASE_RESOLVE_TIME);
         console.log(`✅ [BUS ${this.room.id}] RESOLVING completada\n`);
+    }
+    
+    /**
+     * FASE 4: Cooldown (30s - 33s)
+     * Espera para que las animaciones de salto/muerte se completen
+     */
+    async phaseCooldown() {
+        console.log(`⏸️ [BUS ${this.room.id}] FASE 4 - COOLDOWN (3s de espera)`);
+        
+        // Emitir estado de cooldown
+        for (const socketId of this.room.users.keys()) {
+            this.io.to(socketId).emit('GAME_STATE', {
+                state: 'COOLDOWN',
+                roundNumber: this.roundNumber,
+                timeLeft: 3000,
+                serverTime: Date.now(),
+                roomId: this.room.id
+            });
+        }
+        
+        await this.wait(3000); // 3 segundos de cooldown
+        console.log(`✅ [BUS ${this.room.id}] COOLDOWN completada\n`);
     }
 
     /**
@@ -582,6 +607,10 @@ class BusGameLoop {
             }
         }
 
+        // 🔗 CONTINUIDAD GRÁFICA: Próxima ronda inicia donde terminó esta
+        // Esto asegura que la vela en vivo se dibuje conectada a la histórica
+        const nextStartPrice = this.currentRound.endPrice || this.currentRound.startPrice;
+        
         // Emitir resultado a todos los clientes, incluyendo status de cada pasajero
         const passengerStatuses = [];
         for (const bet of this.currentRound.bets) {
@@ -591,6 +620,7 @@ class BusGameLoop {
                 if (bet.direction === result) status = 'WIN';
                 if (user.activeSkin.isBurned) status = 'BURNED';
                 passengerStatuses.push({
+                    odId: bet.socketId,
                     userId: user.id,
                     status,
                     integrity: user.activeSkin.currentIntegrity,
