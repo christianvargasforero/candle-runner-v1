@@ -119,7 +119,7 @@ export default class UIScene extends Phaser.Scene {
                 this.disableBettingUI();
                 console.log('[UI] ⛔ Botones de apuesta DESHABILITADOS');
             }
-            
+
             this.updateBettingButtons();
         });
 
@@ -387,6 +387,7 @@ export default class UIScene extends Phaser.Scene {
         // Guardar referencias directas para acceso seguro
         container.bg = bg;
         container.label = label;
+        container.originalColor = color; // Guardar color original para restaurar
 
         // Interacción
         bg.setInteractive({ useHandCursor: true });
@@ -851,41 +852,45 @@ P/L: ${profitSign}$${profit.toFixed(2)}
 
     enableBettingUI() {
         if (!this.btnLong || !this.btnShort) return;
-        
+
         // Remover tinte gris y reactivar interactividad
         this.btnLong.setAlpha(1);
         this.btnShort.setAlpha(1);
-        this.btnLong.clearTint();
-        this.btnShort.clearTint();
-        
+
+        // Restaurar colores originales
+        if (this.btnLong.bg && this.btnLong.originalColor) this.btnLong.bg.setFillStyle(this.btnLong.originalColor);
+        if (this.btnShort.bg && this.btnShort.originalColor) this.btnShort.bg.setFillStyle(this.btnShort.originalColor);
+
         // Restaurar interactividad
         if (this.btnLong.bg) this.btnLong.bg.setInteractive({ useHandCursor: true });
         if (this.btnShort.bg) this.btnShort.bg.setInteractive({ useHandCursor: true });
-        
+
         // Restaurar texto original
         if (this.btnLong.label) this.btnLong.label.setText('BUY TICKET [UP]');
         if (this.btnShort.label) this.btnShort.label.setText('BUY TICKET [DN]');
-        
+
         console.log('[UI] 🟢 Botones HABILITADOS explícitamente');
     }
 
     disableBettingUI() {
         if (!this.btnLong || !this.btnShort) return;
-        
+
         // Aplicar tinte gris
         this.btnLong.setAlpha(0.5);
         this.btnShort.setAlpha(0.5);
-        this.btnLong.setTint(0x666666);
-        this.btnShort.setTint(0x666666);
-        
+
+        // Usar setFillStyle en el background (Rectángulo) en lugar de setTint en el Container
+        if (this.btnLong.bg) this.btnLong.bg.setFillStyle(0x666666);
+        if (this.btnShort.bg) this.btnShort.bg.setFillStyle(0x666666);
+
         // Deshabilitar interactividad
         if (this.btnLong.bg) this.btnLong.bg.disableInteractive();
         if (this.btnShort.bg) this.btnShort.bg.disableInteractive();
-        
+
         // Cambiar texto
         if (this.btnLong.label) this.btnLong.label.setText('WAITING...');
         if (this.btnShort.label) this.btnShort.label.setText('WAITING...');
-        
+
         console.log('[UI] 🔴 Botones DESHABILITADOS explícitamente');
     }
 
@@ -907,7 +912,7 @@ P/L: ${profitSign}$${profit.toFixed(2)}
                         duration: 300
                     });
                 }
-                
+
                 if (this.freeLookText) {
                     this.freeLookText.setVisible(true);
                     this.freeLookText.setAlpha(1);
@@ -931,11 +936,11 @@ P/L: ${profitSign}$${profit.toFixed(2)}
 
         const bg = this.add.circle(0, 0, 25, 0x000000, 0.8);
         bg.setStrokeStyle(2, 0x00ff88);
-        
+
         const icon = this.add.text(0, 0, '🎯', { fontSize: '24px' }).setOrigin(0.5);
-        
+
         this.recenterBtn.add([bg, icon]);
-        
+
         // Interacción
         bg.setInteractive({ useHandCursor: true });
         bg.on('pointerdown', () => {
@@ -944,16 +949,16 @@ P/L: ${profitSign}$${profit.toFixed(2)}
                 gameScene.recenterCamera();
             }
         });
-        
+
         bg.on('pointerover', () => this.recenterBtn.setScale(1.1));
         bg.on('pointerout', () => this.recenterBtn.setScale(1));
     }
 
     createFreeLookIndicator() {
         this.freeLookText = this.add.text(
-            this.cameras.main.width / 2, 
-            100, 
-            '[ FREE LOOK MODE ]', 
+            this.cameras.main.width / 2,
+            100,
+            '[ FREE LOOK MODE ]',
             {
                 font: 'bold 16px Courier New',
                 fill: '#00ff88',
@@ -961,7 +966,7 @@ P/L: ${profitSign}$${profit.toFixed(2)}
                 padding: { x: 10, y: 5 }
             }
         ).setOrigin(0.5);
-        
+
         this.freeLookText.setVisible(false);
         this.freeLookText.setScrollFactor(0);
 

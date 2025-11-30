@@ -9,18 +9,28 @@ export default class MenuScene extends Phaser.Scene {
 
     create() {
         console.log('[MENU] 🎬 MenuScene iniciada - Activando lobby HTML...');
+        console.log('[MENU] 🔍 Debug - window.SOCKET_READY:', window.SOCKET_READY);
+        console.log('[MENU] 🔍 Debug - window.globalSocket:', window.globalSocket);
+        console.log('[MENU] 🔍 Debug - socket.connected:', window.globalSocket?.connected);
 
         // 🛡️ VALIDACIÓN: Socket disponible
-        if (!window.globalSocket) {
-            console.warn('[MENU] ⚠️ Socket no disponible aún. Reintentando en 200ms...');
-            this.time.delayedCall(200, () => {
-                this.scene.restart();
-            });
+        if (!window.globalSocket || !window.globalSocket.connected) {
+            console.error('[MENU] ❌ Socket no disponible. Esto es un error crítico - el login debió conectar el socket primero.');
+            console.error('[MENU] ❌ Estado: globalSocket existe:', !!window.globalSocket, 'conectado:', window.globalSocket?.connected);
+            return;
+        }
+
+        // 🛡️ VALIDACIÓN: Lobby inicializado
+        if (!window.isLobbyReady || !window.isLobbyReady()) {
+            console.error('[MENU] ❌ Lobby no inicializado. Esperando inicialización...');
+            console.error('[MENU] ❌ isLobbyReady existe:', !!window.isLobbyReady);
             return;
         }
 
         this.socket = window.globalSocket;
-        console.log('[MENU] ✅ Socket conectado');
+        console.log('[MENU] ✅ Socket conectado y lobby inicializado');
+
+
 
         // 🔴 MODO ESPECTADOR: Bypass completo
         if (window.SPECTATOR_MODE) {
@@ -49,15 +59,28 @@ export default class MenuScene extends Phaser.Scene {
 
         // 🔌 Setup listeners para transiciones
         this.setupSocketListeners();
+
+        // 🎨 Agregar texto temporal en canvas mientras se carga el lobby
+        this.add.text(this.scale.width / 2, this.scale.height / 2, '🚌 Buscando buses disponibles...', {
+            fontSize: '32px',
+            color: '#00fff9',
+            fontFamily: 'Arial',
+            stroke: '#000000',
+            strokeThickness: 4
+        }).setOrigin(0.5).setDepth(1000);
+
+        console.log('[MENU] 📺 Texto temporal agregado al canvas');
     }
 
     showLobbyOverlay() {
         // Llamar función global que muestra el overlay de buses
         if (window.showBusLobby) {
+            console.log('[MENU] 🎬 Llamando a showBusLobby()...');
             window.showBusLobby();
-            console.log('[MENU] 📋 Lobby de buses mostrado');
+            console.log('[MENU] 📋 Lobby de buses activado');
         } else {
             console.error('[MENU] ❌ window.showBusLobby no está disponible');
+            console.error('[MENU] ❌ window keys:', Object.keys(window).filter(k => k.includes('Lobby') || k.includes('Bus')));
         }
     }
 

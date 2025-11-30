@@ -4,125 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🕯️ Candle Runner - Survival Trading</title>
+    <title>🕯️ CANDLE RUNNER - Neon Trading Game</title>
+
+    <!-- External CSS -->
+    <link rel="stylesheet" href="assets/css/game-styles.css">
+
     <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Courier New', monospace;
-            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
-            color: #00ff88;
-            overflow: hidden;
-            width: 100vw;
-            height: 100vh;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Contenedor del Juego con estilo Cyberpunk */
-        #game-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            box-shadow: none;
-            border: none;
-            border-radius: 0;
-            overflow: hidden;
-            background: #000;
-            z-index: 1;
-        }
-
-        /* Esquinas decorativas */
-        #game-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 20px;
-            height: 20px;
-            border-top: 2px solid #00ff88;
-            border-left: 2px solid #00ff88;
-            z-index: 10;
-        }
-
-        #game-container::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 20px;
-            height: 20px;
-            border-bottom: 2px solid #00ff88;
-            border-right: 2px solid #00ff88;
-            z-index: 10;
-        }
-
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            z-index: 1000;
-            background: rgba(0, 0, 0, 0.95);
-            padding: 40px;
-            border: 1px solid #00ff88;
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
-            min-width: 300px;
-        }
-
-        #loading h1 {
-            font-size: 1.8rem;
-            margin-bottom: 20px;
-            color: #fff;
-            text-shadow: 0 0 10px #00ff88;
-            letter-spacing: 2px;
-        }
-
-        #loading i {
-            font-size: 3rem;
-            color: #00ff88;
-            margin-bottom: 20px;
-            animation: pulse 1.5s infinite;
-        }
-
-        #loading p {
-            font-size: 0.9rem;
-            color: #00ff88;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-                opacity: 1;
-            }
-
-            50% {
-                transform: scale(1.1);
-                opacity: 0.7;
-            }
-
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
         /* ===================================
            🎨 CENTRO DE COMANDO DEL JUGADOR
            =================================== */
@@ -851,7 +741,7 @@
         }
 
         /* ===================================
-           � BUSES DISPONIBLES
+           🚌 BUSES DISPONIBLES
            =================================== */
 
         .bus-card {
@@ -1009,205 +899,6 @@
         }
 
         /* ===================================
-           🦊 PANTALLA DE LOGIN (WALLET)
-           =================================== */
-
-        #login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
-            z-index: 99999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            opacity: 1;
-            transition: opacity 0.5s ease;
-        }
-
-        #login-overlay.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .login-container {
-            text-align: center;
-            max-width: 500px;
-            padding: 40px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #00fff9;
-            box-shadow: 0 0 50px rgba(0, 255, 249, 0.3), inset 0 0 30px rgba(0, 255, 249, 0.05);
-            position: relative;
-        }
-
-        .login-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 4px;
-            background: linear-gradient(90deg, #00fff9, #ff00c1, #00fff9);
-            box-shadow: 0 0 10px rgba(0, 255, 249, 0.5);
-            animation: pulse-line 2s infinite;
-        }
-
-        @keyframes pulse-line {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.5;
-            }
-        }
-
-        .login-logo {
-            font-size: 4rem;
-            margin-bottom: 20px;
-            animation: float 3s ease-in-out infinite;
-        }
-
-        @keyframes float {
-
-            0%,
-            100% {
-                transform: translateY(0);
-            }
-
-            50% {
-                transform: translateY(-10px);
-            }
-        }
-
-        .login-title {
-            font-size: 2rem;
-            color: #fff;
-            text-shadow: 0 0 15px #00fff9;
-            margin-bottom: 10px;
-            letter-spacing: 3px;
-        }
-
-        .login-subtitle {
-            font-size: 0.9rem;
-            color: #888;
-            margin-bottom: 40px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .connect-wallet-btn {
-            width: 100%;
-            padding: 20px 30px;
-            background: linear-gradient(135deg, #00fff9 0%, #00bfff 100%);
-            border: none;
-            color: #000;
-            font-family: inherit;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .connect-wallet-btn::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
-        }
-
-        .connect-wallet-btn:hover::before {
-            width: 300px;
-            height: 300px;
-        }
-
-        .connect-wallet-btn:hover {
-            background: linear-gradient(135deg, #00bfff 0%, #00fff9 100%);
-            box-shadow: 0 0 30px rgba(0, 255, 249, 0.6);
-            transform: scale(1.05);
-        }
-
-        .connect-wallet-btn i {
-            margin-right: 10px;
-            font-size: 1.3rem;
-        }
-
-        .login-info {
-            margin-top: 30px;
-            padding: 15px;
-            background: rgba(0, 255, 249, 0.05);
-            border: 1px solid rgba(0, 255, 249, 0.2);
-            font-size: 0.75rem;
-            color: #aaa;
-            line-height: 1.6;
-        }
-
-        .login-info strong {
-            color: #00ff88;
-        }
-
-        /* Loading state */
-        .connect-wallet-btn.loading {
-            pointer-events: none;
-            opacity: 0.7;
-        }
-
-        .connect-wallet-btn.loading i {
-            animation: spin 1s linear infinite;
-        }
-
-        /* Reset Wallet Button (Debug) */
-        .reset-wallet-btn {
-            width: 100%;
-            padding: 10px 20px;
-            background: transparent;
-            border: 1px solid rgba(255, 0, 85, 0.5);
-            color: rgba(255, 0, 85, 0.8);
-            font-family: inherit;
-            font-size: 0.8rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .reset-wallet-btn:hover {
-            background: rgba(255, 0, 85, 0.1);
-            border-color: #ff0055;
-            color: #ff0055;
-        }
-
-        .reset-wallet-btn i {
-            margin-right: 8px;
-        }
-
-        @keyframes spin {
-            from {
-                transform: rotate(0deg);
-            }
-
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* ===================================
            🚌 BUS LOBBY OVERLAY
            =================================== */
 
@@ -1315,127 +1006,181 @@
         }
 
         /* ===================================
-           📱 RESPONSIVE DESIGN (MOBILE)
+           🦊 PANTALLA DE LOGIN (WALLET)
            =================================== */
 
-        @media (max-width: 768px) {
-            #profile-toggle-btn {
-                bottom: 20px;
-                right: 20px;
-                width: 56px;
-                height: 56px;
-                font-size: 20px;
+        #login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+
+        #login-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .login-container {
+            text-align: center;
+            max-width: 500px;
+            padding: 40px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00fff9;
+            box-shadow: 0 0 50px rgba(0, 255, 249, 0.3);
+            position: relative;
+        }
+
+        .login-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #00fff9, #ff00c1, #00fff9);
+            animation: pulse-line 2s infinite;
+        }
+
+        @keyframes pulse-line {
+
+            0%,
+            100% {
+                opacity: 1;
             }
 
-            #profile-panel {
-                max-width: 100%;
-                max-height: 95vh;
-                margin: 0 10px;
-            }
-
-            .profile-header h2 {
-                font-size: 1rem;
-            }
-
-            .user-info-section {
-                grid-template-columns: 1fr;
-                gap: 10px;
-                padding: 10px 15px;
-            }
-
-            .user-info-value {
-                font-size: 0.7rem;
-            }
-
-            .balance-section {
-                gap: 10px;
-            }
-
-            .balance-amount {
-                font-size: 1.2rem;
-            }
-
-            .inventory-grid {
-                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-                gap: 10px;
-            }
-
-            .skin-icon {
-                font-size: 1.5rem;
-                height: 40px;
-            }
-
-            .skin-name {
-                font-size: 0.7rem;
-            }
-
-            .panel-content {
-                padding: 15px;
-            }
-
-            .active-skin-name {
-                font-size: 1rem;
-            }
-
-            .integrity-hearts {
-                font-size: 1.5rem;
-                gap: 5px;
+            50% {
+                opacity: 0.5;
             }
         }
 
-        @media (max-width: 480px) {
-            #profile-toggle-btn {
-                bottom: 15px;
-                right: 15px;
-                width: 48px;
-                height: 48px;
-                font-size: 18px;
+        .login-logo {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
             }
 
-            .balance-section {
-                grid-template-columns: 1fr;
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .login-title {
+            font-size: 2rem;
+            color: #fff;
+            text-shadow: 0 0 15px #00fff9;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+        }
+
+        .login-subtitle {
+            font-size: 0.9rem;
+            color: #888;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .connect-btn {
+            width: 100%;
+            padding: 20px 30px;
+            background: linear-gradient(135deg, #00fff9 0%, #00bfff 100%);
+            border: none;
+            color: #000;
+            font-family: inherit;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .connect-btn:hover {
+            background: linear-gradient(135deg, #00bfff 0%, #00fff9 100%);
+            box-shadow: 0 0 30px rgba(0, 255, 249, 0.6);
+            transform: scale(1.05);
+        }
+
+        .connect-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .connect-btn i {
+            margin-right: 10px;
+        }
+
+        .login-info {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(0, 255, 249, 0.05);
+            border: 1px solid rgba(0, 255, 249, 0.2);
+            font-size: 0.75rem;
+            color: #aaa;
+            line-height: 1.6;
+            text-align: left;
+        }
+
+        .login-info strong {
+            color: #00ff88;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
             }
 
-            .inventory-grid {
-                grid-template-columns: repeat(2, 1fr);
+            to {
+                transform: rotate(360deg);
             }
+        }
+
+        .connect-btn.loading i {
+            animation: spin 1s linear infinite;
         }
     </style>
 </head>
 
 <body>
-    <!-- 🦊 PANTALLA DE LOGIN (WALLET) -->
+    <!-- Login Overlay -->
     <div id="login-overlay">
         <div class="login-container">
             <div class="login-logo">🕯️</div>
             <h1 class="login-title">CANDLE RUNNER</h1>
             <p class="login-subtitle">Survival Trading Platform</p>
 
-            <button class="connect-wallet-btn" id="connect-wallet-btn">
-                <i class="fa-solid fa-wallet"></i> CONNECT METAMASK (SIMULATOR)
-            </button>
-
-            <!-- 🔄 BOTÓN DE DEBUG: RESET WALLET -->
-            <button class="reset-wallet-btn" id="reset-wallet-btn" style="margin-top: 10px;">
-                <i class="fa-solid fa-rotate-right"></i> RESET WALLET (DEBUG)
+            <button class="connect-btn" id="connect-btn">
+                <i class="fa-solid fa-plug"></i> CONNECT TO SERVER
             </button>
 
             <div class="login-info">
-                <strong>🎁 Welcome Bonus:</strong> New players receive 1,000 USDT<br>
-                <strong>🔒 Security:</strong> Simulated wallet - No real funds required<br>
-                <strong>💾 Persistence:</strong> Your progress is saved automatically
+                <strong>🎮 Game Features:</strong><br>
+                • Real-time trading simulation<br>
+                • Multiplayer bus system<br>
+                • Skin integrity mechanics<br>
+                <strong>🔒 Note:</strong> This is a simulation - No real funds required
             </div>
         </div>
     </div>
 
-    <div id="game-container">
-        <div id="loading" class="hidden">
-            <i class="fa-solid fa-microchip"></i>
-            <h1>CANDLE RUNNER</h1>
-            <p>Inicializando Sistemas...</p>
-        </div>
-        <!-- El canvas de Phaser se generará dinámicamente y ocupará todo el contenedor -->
-    </div>
+
 
     <!-- 🚌 BUS LOBBY OVERLAY (Vista Principal después del Login) -->
     <div id="bus-lobby-overlay" class="hidden">
@@ -1466,7 +1211,6 @@
             </div>
         </div>
     </div>
-
 
     <!-- ===================================
          🎒 HTML DEL CENTRO DE COMANDO
@@ -1606,507 +1350,179 @@
 
     <div id="toast-notification"><i class="fa-solid fa-circle-info"></i> <span>Notificación</span></div>
 
-    <!-- Phaser 3 desde CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <!-- Game Container -->
+    <div id="game-container"></div>
+
+    <!-- Visual Effects -->
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
 
     <!-- Socket.io Client -->
     <script src="/socket.io/socket.io.js"></script>
 
-    <!-- Nuestro código del juego (ES Modules) -->
-    <script type="module" src="/src/main.js"></script>
+    <!-- Phaser 3 -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
 
-    <!-- 🔴 LÓGICA DE WALLET LOGIN -->
+    <!-- Login & Socket Initialization -->
     <script>
-        // ============================================
-        // 👁️ MODO ESPECTADOR - Detección
-        // ============================================
-        const urlParams = new URLSearchParams(window.location.search);
-        const spectateBusId = urlParams.get('spectate');
+        // NO inicializar socket ni Phaser hasta que el usuario haga login
+        console.log('[INIT] Waiting for user to connect...');
 
-        if (spectateBusId) {
-            console.log(`🔴 [SPECTATOR] Modo espectador activado para bus: ${spectateBusId}`);
-            window.SPECTATOR_MODE = true;
-            window.SPECTATOR_BUS_ID = spectateBusId;
-
-            // Ocultar overlay de login inmediatamente
-            const loginOverlay = document.getElementById('login-overlay');
-            if (loginOverlay) loginOverlay.classList.add('hidden');
-
-            // Ocultar botón de perfil (Command Center)
-            const profileBtn = document.getElementById('profile-toggle-btn');
-            if (profileBtn) profileBtn.style.display = 'none';
-
-            // Mostrar Banner
-            const banner = document.createElement('div');
-            banner.innerHTML = `👁️ SPECTATOR MODE: ${spectateBusId}`;
-            banner.style.cssText = 'position:fixed; top:0; left:0; width:100%; background:rgba(255,0,0,0.8); color:white; text-align:center; z-index:99999; font-weight:bold; padding:5px; font-family: "Courier New"; pointer-events:none;';
-            document.body.appendChild(banner);
-
-            // Conectar socket como espectador
-            window.globalSocket = io({
-                auth: { type: 'spectator' },
-                query: { busId: spectateBusId }
-            });
-            window.socket = window.globalSocket;
-
-            window.globalSocket.on('connect', () => {
-                console.log('🔴 [SPECTATOR] Conectado. Uniéndose a sala...');
-                window.globalSocket.emit('JOIN_ROOM', { roomId: spectateBusId, isSpectator: true });
-            });
-
-            // Escuchar confirmación para iniciar escena
-            window.globalSocket.on('ROOM_JOINED', (data) => {
-                 console.log('🔴 [SPECTATOR] Sala unida. Iniciando GameScene...');
-                 const launchGame = () => {
-                     if (window.game) {
-                         // Ir directo a GameScene
-                         window.game.scene.start('GameScene');
-                         window.game.scene.stop('MenuScene');
-                         window.game.scene.stop('BootScene');
-                     } else {
-                         console.log('⏳ [SPECTATOR] Esperando a Phaser...');
-                         setTimeout(launchGame, 100);
-                     }
-                 };
-                 launchGame();
-            });
-        }
-
-        // 🛡️ NO CONECTAR SOCKET AUTOMÁTICAMENTE - Esperar login (SOLO SI NO ES ESPECTADOR)
-        const STORAGE_KEY = 'candle_runner_wallet';
+        const connectBtn = document.getElementById('connect-btn');
         const loginOverlay = document.getElementById('login-overlay');
-        const connectBtn = document.getElementById('connect-wallet-btn');
 
-        // Función para generar wallet ficticia
-        function generateWallet() {
-            const randomHex = () => Math.floor(Math.random() * 16).toString(16);
-            let wallet = '0x';
-            for (let i = 0; i < 40; i++) {
-                wallet += randomHex();
-            }
-            return wallet;
-        }
+        // Variables globales para el estado
+        window.isLobbyReady = () => true; // Siempre listo en esta versión monolítica
 
-        if (!spectateBusId) {
-            connectBtn.addEventListener('click', async () => {
-                try {
-                    connectBtn.disabled = true;
-                    connectBtn.innerHTML = '<i class="fa-solid fa-spinner"></i> CONNECTING...';
+        connectBtn.addEventListener('click', async () => {
+            try {
+                connectBtn.disabled = true;
+                connectBtn.classList.add('loading');
+                connectBtn.innerHTML = '<i class="fa-solid fa-spinner"></i> CONNECTING...';
 
-                    // Esperar un poco para simular conexión
-                    await new Promise(resolve => setTimeout(resolve, 800));
+                console.log('[INIT] Connecting to server...');
 
-                    // Verificar si ya hay una wallet guardada
-                    let wallet = localStorage.getItem(STORAGE_KEY);
+                // Crear socket con wallet simulada (para desarrollo)
+                const mockWallet = `0x${Math.random().toString(16).substr(2, 40)}`;
+                console.log('[INIT] 🎭 Using mock wallet:', mockWallet);
 
-                    if (!wallet) {
-                        // Generar nueva wallet
-                        wallet = generateWallet();
-                        localStorage.setItem(STORAGE_KEY, wallet);
-                        console.log('🎁 [WALLET] Nueva wallet generada:', wallet);
-                    } else {
-                        console.log('🔄 [WALLET] Wallet recuperada:', wallet);
+                window.globalSocket = io({
+                    auth: {
+                        wallet: mockWallet
+                    }
+                });
+                window.socket = window.globalSocket;
+
+                // Configurar listeners de diagnóstico
+                window.globalSocket.on('disconnect', (reason) => {
+                    console.error('[SOCKET] ❌ Desconectado:', reason);
+                });
+
+                window.globalSocket.on('connect_error', (error) => {
+                    console.error('[SOCKET] ❌ Error de conexión:', error);
+                });
+
+                // Esperar a que el socket conecte
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Connection timeout'));
+                    }, 5000);
+
+                    if (window.globalSocket.connected) {
+                        clearTimeout(timeout);
+                        resolve();
+                        return;
                     }
 
-                    // Conectar socket con autenticación
-                    window.globalSocket = io({
-                        auth: {
-                            wallet: wallet
-                        }
-                    });
-
-                    // También exponer como window.socket para compatibilidad
-                    window.socket = window.globalSocket;
-
-                    // Escuchar eventos de autenticación
-                    window.globalSocket.on('AUTH_SUCCESS', (data) => {
-                        console.log('✅ [AUTH] Autenticación exitosa:', data);
-
-                        // 🦊 ACTUALIZAR DATOS DEL USUARIO EN EL DASHBOARD
-                        const userWalletEl = document.getElementById('user-wallet');
-                        const userIdEl = document.getElementById('user-id');
-
-                        if (userWalletEl && wallet) {
-                            // Mostrar wallet abreviada: 0x1234...5678
-                            const walletShort = `${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}`;
-                            userWalletEl.textContent = walletShort;
-                            userWalletEl.title = wallet; // Tooltip con wallet completa
-                        }
-
-                        if (userIdEl && data.userId) {
-                            // Mostrar user ID abreviado
-                            const userIdShort = data.userId.length > 12
-                                ? `${data.userId.substring(0, 8)}...${data.userId.substring(data.userId.length - 4)}`
-                                : data.userId;
-                            userIdEl.textContent = userIdShort;
-                            userIdEl.title = data.userId; // Tooltip con ID completo
-                        }
-
-                        // Ocultar login overlay
-                        loginOverlay.classList.add('hidden');
-
-                        // 🎮 NOTIFICAR A PHASER QUE EL SOCKET ESTÁ LISTO
-                        console.log('[AUTH] 🎮 Inicializando Phaser con socket autenticado...');
-
-                        // Dar un pequeño delay para asegurar que el socket esté completamente listo
-                        setTimeout(() => {
-                            const game = window.game;
-
-                            if (game) {
-                                // Verificar si MenuScene está activa
-                                if (game.scene.isActive('MenuScene')) {
-                                    console.log('[AUTH] 🔄 Reiniciando MenuScene con socket autenticado');
-                                    game.scene.getScene('MenuScene').scene.restart();
-                                } else {
-                                    // Si no está activa, iniciarla
-                                    console.log('[AUTH] 🚀 Iniciando MenuScene por primera vez');
-                                    game.scene.start('MenuScene');
-                                }
-                            } else {
-                                console.warn('[AUTH] ⚠️ Instancia de Phaser no encontrada aún');
-                            }
-                        }, 300);
-
-                        // Mostrar mensaje de bienvenida
-                        const isNewUser = !localStorage.getItem(`${STORAGE_KEY}_seen`);
-                        if (isNewUser) {
-                            setTimeout(() => {
-                                showToast('🎁 Welcome! You received 1,000 USDT bonus!', 'success');
-                                localStorage.setItem(`${STORAGE_KEY}_seen`, 'true');
-                            }, 500);
-                        } else {
-                            setTimeout(() => {
-                                showToast('✅ Welcome back, trader!', 'success');
-                            }, 500);
-                        }
-                    });
-
-                    window.globalSocket.on('AUTH_ERROR', (data) => {
-                        console.error('❌ [AUTH] Error de autenticación:', data);
-                        connectBtn.classList.remove('loading');
-                        connectBtn.innerHTML = '<i class="fa-solid fa-wallet"></i> CONNECT METAMASK (SIMULATOR)';
-                        alert('Authentication failed: ' + data.message);
+                    window.globalSocket.on('connect', () => {
+                        clearTimeout(timeout);
+                        console.log('[SOCKET] ✅ Connected to server');
+                        resolve();
                     });
 
                     window.globalSocket.on('connect_error', (error) => {
-                        console.error('❌ [SOCKET] Error de conexión:', error);
-                        connectBtn.classList.remove('loading');
-                        connectBtn.innerHTML = '<i class="fa-solid fa-wallet"></i> CONNECT METAMASK (SIMULATOR)';
-                        alert('Connection error. Please try again.');
+                        clearTimeout(timeout);
+                        reject(error);
                     });
+                });
 
-                } catch (error) {
-                    console.error('❌ [WALLET] Error:', error);
-                    connectBtn.classList.remove('loading');
-                    connectBtn.innerHTML = '<i class="fa-solid fa-wallet"></i> CONNECT METAMASK (SIMULATOR)';
-                    alert('An error occurred. Please try again.');
-                }
-            });
-        }
+                // Socket conectado - ocultar login
+                loginOverlay.classList.add('hidden');
 
-        // 🔄 Event listener del botón RESET WALLET (Debug)
-        const resetBtn = document.getElementById('reset-wallet-btn');
-        resetBtn.addEventListener('click', () => {
-            if (confirm('⚠️ WARNING: This will delete your saved wallet and progress.\n\nAre you sure you want to reset?')) {
-                console.log('🔄 [DEBUG] Resetting wallet...');
+                // Marcar que el socket está listo
+                window.SOCKET_READY = true;
 
-                // Limpiar localStorage completamente
-                localStorage.removeItem(STORAGE_KEY);
-                localStorage.removeItem(`${STORAGE_KEY}_seen`);
+                // Inicializar listeners de UI
+                initUIListeners(window.globalSocket);
 
-                console.log('✅ [DEBUG] Wallet reset complete. Reloading...');
+                // Cargar Phaser
+                await new Promise((resolve) => {
+                    const gameScript = document.createElement('script');
+                    gameScript.type = 'module';
+                    gameScript.src = 'src/main.js';
+                    gameScript.onload = () => {
+                        console.log('[INIT] ✅ Phaser module loaded');
+                        resolve();
+                    };
+                    document.body.appendChild(gameScript);
+                });
 
-                // Recargar la página para empezar como usuario nuevo
-                window.location.reload();
+                console.log('[INIT] ✅ Game initialization completed');
+
+            } catch (error) {
+                console.error('[INIT] ❌ Connection failed:', error);
+                connectBtn.disabled = false;
+                connectBtn.classList.remove('loading');
+                connectBtn.innerHTML = '<i class="fa-solid fa-plug"></i> CONNECT TO SERVER';
+                alert('Connection failed. Please check the server and try again.');
             }
         });
 
-        // Para debugging - mostrar wallet en consola al cargar
-        console.log('💾 [WALLET] Wallet guardada:', localStorage.getItem(STORAGE_KEY) || 'Ninguna');
-    </script>
+        // ==========================================
+        // 🧠 LÓGICA DE UI (RESTAURADA)
+        // ==========================================
 
-    <!-- 🧠 LÓGICA DEL CENTRO DE COMANDO -->
-    <script>
-        // 🎮 FUNCIONES GLOBALES DEL BUS LOBBY
-        window.showBusLobby = function () {
-            const lobbyOverlay = document.getElementById('bus-lobby-overlay');
-            if (lobbyOverlay) {
-                lobbyOverlay.classList.remove('hidden');
-                console.log('[LOBBY] 📋 Bus lobby mostrado');
+        function initUIListeners(socket) {
+            console.log('[UI] Inicializando listeners de UI...');
 
-                // NOTA: Los buses se solicitan desde USER_PROFILE para evitar race condition
-                // No se solicitan aquí automáticamente
-            }
-        };
-
-        window.hideBusLobby = function () {
-            const lobbyOverlay = document.getElementById('bus-lobby-overlay');
-            if (lobbyOverlay) {
-                lobbyOverlay.classList.add('hidden');
-                console.log('[LOBBY] 🚪 Bus lobby ocultado');
-            }
-        };
-
-        // 🚌 RENDERIZAR LISTA DE BUSES EN EL LOBBY
-        function renderBusList(buses) {
-            // Renderizar en AMBOS sitios: lobby y profile panel
-            const busesLobbyGrid = document.getElementById('buses-lobby-grid');
-            const busesGrid = document.getElementById('buses-grid');
-
-            // 🐛 DEBUG: Log completo de buses recibidos
-            console.log('[BUSES] 🚌 Renderizando lista:', buses);
-            buses.forEach((bus, index) => {
-                console.log(`[BUS ${index}] ${bus.name}:`, {
-                    id: bus.id,
-                    status: bus.status,
-                    occupancy: bus.occupancy,
-                    capacity: bus.capacity,
-                    tier: bus.tier
-                });
-            });
-
-            if (!buses || buses.length === 0) {
-                busesGrid.innerHTML = '<p style="color:#888; text-align:center;">[ NO BUSES AVAILABLE ]</p>';
-                return;
-            }
-
-            busesGrid.innerHTML = '';
-
-            buses.forEach(bus => {
-                const card = document.createElement('div');
-                card.className = 'bus-card';
-
-                // 🛡️ VALIDACIÓN ROBUSTA: Valores seguros con fallbacks
-                const occupancy = bus.occupancy || 0;
-                const capacity = bus.capacity || 5;
-                const status = bus.status || 'BOARDING';
-                const isBoarding = status === 'BOARDING';
-                const isFull = occupancy >= capacity;
-                const canJoin = isBoarding && !isFull;
-
-                // Determinar estado visual
-                const statusClass = status.toLowerCase();
-                let statusText = 'LOCKED';
-                let statusIcon = '🔒';
-
-                if (isBoarding) {
-                    statusText = 'BOARDING';
-                    statusIcon = '✓';
-                } else if (status === 'IN_PROGRESS' || status === 'LOCKED') {
-                    statusText = 'IN GAME';
-                    statusIcon = '✈';
-                }
-
-                // Determinar color del estado
-                const statusColor = isBoarding ? '#00ff88' :
-                    (status === 'IN_PROGRESS' || status === 'LOCKED') ? '#ff9800' : '#888';
-
-                // 🏆 JACKPOT BADGE (solo si hay pot acumulado)
-                const jackpotHTML = (bus.pot && bus.pot > 0) ?
-                    `<div class="bus-jackpot">
-                        🏆 JACKPOT: $${bus.pot.toFixed(2)} USDT
-                    </div>` : '';
-
-                card.innerHTML = `
-                    <div class="bus-card-header">
-                        <div class="bus-name">${bus.name || 'UNKNOWN'}</div>
-                        <div class="bus-status ${statusClass}" style="color: ${statusColor}">
-                            ${statusIcon} ${statusText}
-                        </div>
-                    </div>
-                    ${jackpotHTML}
-                    <div class="bus-ticket-price">
-                        <i class="fa-solid fa-ticket"></i> $${(bus.ticketPrice || 0).toFixed(2)} USDT
-                    </div>
-                    <div class="bus-info">
-                        <div class="bus-info-item">
-                            <i class="fa-solid fa-users"></i>
-                            <span>${occupancy}/${capacity} Pasajeros</span>
-                        </div>
-                        <div class="bus-info-item">
-                            <i class="fa-solid fa-layer-group"></i>
-                            <span>Tier: ${bus.tier || 'Unknown'}</span>
-                        </div>
-                    </div>
-                    <button class="bus-join-btn" data-bus-id="${bus.id}" ${!canJoin ? 'disabled' : ''}>
-                        ${canJoin ?
-                        '<i class="fa-solid fa-right-to-bracket"></i> JOIN BUS' :
-                        '<i class="fa-solid fa-lock"></i> NOT AVAILABLE'}
-                    </button>
-                `;
-
-                // Evento de unirse al bus
-                const joinBtn = card.querySelector('.bus-join-btn');
-                if (canJoin) {
-                    joinBtn.addEventListener('click', () => {
-                        window.globalSocket.emit('JOIN_ROOM', { roomId: bus.id });
-                        showToast(`🚌 Joining ${bus.name}...`, 'info');
-                        overlay.classList.remove('active'); // Cerrar dashboard al unirse
-                    });
-                }
-
-                busesGrid.appendChild(card);
-
-                // 🚌 RENDERIZAR TAMBIÉN EN EL LOBBY
-                if (busesLobbyGrid) {
-                    const cardClone = card.cloneNode(true);
-
-                    // Re-añadir event listener al clon
-                    const clonedBtn = cardClone.querySelector('.bus-join-btn');
-                    if (clonedBtn && !clonedBtn.disabled) {
-                        clonedBtn.addEventListener('click', () => {
-                            const busId = clonedBtn.getAttribute('data-bus-id');
-                            if (window.globalSocket) {
-                                window.globalSocket.emit('JOIN_ROOM', { roomId: busId });
-                                showToast(`Joining bus...`, 'info');
-                            }
-                        });
-                    }
-
-                    busesLobbyGrid.appendChild(cardClone);
-                }
-            });
-
-            console.log(`[BUSES] Renderizados ${buses.length} buses en ambos grids`);
-        }
-
-        // Mock para evitar error si busModalOverlay no existe
-        const busModalOverlay = { classList: { remove: () => { } } };
-        document.addEventListener('DOMContentLoaded', () => {
             // Referencias DOM
             const toggleBtn = document.getElementById('profile-toggle-btn');
             const overlay = document.getElementById('profile-overlay');
             const closeBtn = document.getElementById('close-profile-btn');
             const logoutBtn = document.getElementById('logout-btn');
-            const panel = document.getElementById('profile-panel');
             const toast = document.getElementById('toast-notification');
 
-            // ⚠️ DEFINIR showToast AL PRINCIPIO (antes de ser usado)
-            function showToast(message, type = 'info') {
-                // Tipos: 'info', 'success', 'error', 'warning'
-                let icon, borderColor, textColor;
-
-                switch (type) {
-                    case 'success':
-                        icon = '<i class="fa-solid fa-circle-check"></i>';
-                        borderColor = '#00ff88';
-                        textColor = '#00ff88';
-                        break;
-                    case 'error':
-                        icon = '<i class="fa-solid fa-triangle-exclamation"></i>';
-                        borderColor = '#ff0000';
-                        textColor = '#ff0000';
-                        break;
-                    case 'warning':
-                        icon = '<i class="fa-solid fa-exclamation-circle"></i>';
-                        borderColor = '#ff9800';
-                        textColor = '#ff9800';
-                        break;
-                    default: // 'info'
-                        icon = '<i class="fa-solid fa-circle-info"></i>';
-                        borderColor = '#00fff9';
-                        textColor = '#00fff9';
-                }
-
-                toast.innerHTML = `${icon} <span>${message}</span>`;
-                toast.style.borderColor = borderColor;
-                toast.style.color = textColor;
-                toast.style.background = '#000';
-
-                toast.classList.add('show');
-                setTimeout(() => {
-                    toast.classList.remove('show');
-                }, 3000);
-            }
-
-            // Hacer showToast accesible globalmente
-            window.showToast = showToast;
-
-            // 🚌 BUS LOBBY EVENT LISTENERS
+            // Bus Lobby Elements
+            const busLobbyOverlay = document.getElementById('bus-lobby-overlay');
             const closeLobbyBtn = document.getElementById('close-lobby-btn');
             const openProfileFromLobby = document.getElementById('open-profile-from-lobby');
             const refreshLobbyBusesBtn = document.getElementById('refresh-lobby-buses-btn');
 
-            if (closeLobbyBtn) {
-                closeLobbyBtn.addEventListener('click', () => {
-                    window.hideBusLobby();
-                });
-            }
+            // Funciones globales para el lobby
+            window.showBusLobby = function () {
+                if (busLobbyOverlay) {
+                    busLobbyOverlay.classList.remove('hidden');
+                    console.log('[LOBBY] Mostrando lobby');
+                    socket.emit('GET_AVAILABLE_BUSES');
+                }
+            };
 
-            if (openProfileFromLobby) {
-                openProfileFromLobby.addEventListener('click', () => {
-                    window.hideBusLobby();
-                    overlay.classList.add('active'); // Abrir profile
-                });
-            }
+            window.hideBusLobby = function () {
+                if (busLobbyOverlay) {
+                    busLobbyOverlay.classList.add('hidden');
+                }
+            };
 
-            if (refreshLobbyBusesBtn) {
-                refreshLobbyBusesBtn.addEventListener('click', () => {
-                    console.log('[LOBBY] 🔄 Recargando buses...');
-                    if (window.globalSocket) {
-                        window.globalSocket.emit('GET_AVAILABLE_BUSES');
-                        showToast('🔄 Actualizando buses...', 'info');
-                    }
-                });
-            }
+            // Event Listeners
+            if (toggleBtn) toggleBtn.addEventListener('click', () => overlay.classList.add('active'));
+            if (closeBtn) closeBtn.addEventListener('click', () => overlay.classList.remove('active'));
+            if (overlay) overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.classList.remove('active');
+            });
 
-            // Manual Elements
+            if (closeLobbyBtn) closeLobbyBtn.addEventListener('click', () => window.hideBusLobby());
+
+            if (openProfileFromLobby) openProfileFromLobby.addEventListener('click', () => {
+                window.hideBusLobby();
+                overlay.classList.add('active');
+            });
+
+            if (refreshLobbyBusesBtn) refreshLobbyBusesBtn.addEventListener('click', () => {
+                socket.emit('GET_AVAILABLE_BUSES');
+                showToast('Refreshing buses...', 'info');
+            });
+
+            // Logout
+            if (logoutBtn) logoutBtn.addEventListener('click', () => {
+                if (confirm('Disconnect?')) window.location.reload();
+            });
+
+            // Manual Toggle
             const manualToggle = document.getElementById('manual-toggle');
             const manualContent = document.getElementById('manual-content');
             const manualArrow = document.getElementById('manual-arrow');
 
-            // Elementos de Datos
-            const balanceUsdt = document.getElementById('balance-usdt');
-            const balanceWick = document.getElementById('balance-wick');
-            const activeSkinName = document.getElementById('active-skin-name');
-            const activeSkinLevel = document.getElementById('active-skin-level');
-            const integrityText = document.getElementById('integrity-text');
-            const integrityBar = document.getElementById('integrity-bar-visual');
-            const repairBtn = document.getElementById('repair-btn');
-            const inventoryGrid = document.getElementById('inventory-grid');
-            const refreshBusesBtn = document.getElementById('refresh-buses-btn');
-
-            // Estado Local
-            let currentUserProfile = null;
-            let availableBuses = [];
-
-            // 🔄 REFRESH BUSES BUTTON
-            if (refreshBusesBtn) {
-                refreshBusesBtn.addEventListener('click', () => {
-                    console.log('[REFRESH] Solicitando lista de buses actualizada...');
-                    if (window.globalSocket) {
-                        window.globalSocket.emit('GET_AVAILABLE_BUSES');
-                        showToast('Refreshing bus list...', 'info');
-                    }
-                });
-            }
-
-            // --- BUS MODAL LOGIC ---
-
-            // --- INTERACCIÓN UI ---
-            toggleBtn.addEventListener('click', () => {
-                overlay.classList.add('active');
-            });
-
-            closeBtn.addEventListener('click', () => {
-                overlay.classList.remove('active');
-            });
-
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    overlay.classList.remove('active');
-                }
-            });
-
-            // Logout Logic
-            logoutBtn.addEventListener('click', () => {
-                if (confirm('⚠️ DISCONNECT FROM SYSTEM?\nYou will leave the current bus.')) {
-                    window.location.reload();
-                }
-            });
-
-            // Manual Toggle Logic
-            manualToggle.addEventListener('click', () => {
+            if (manualToggle) manualToggle.addEventListener('click', () => {
                 manualContent.classList.toggle('show');
                 if (manualContent.classList.contains('show')) {
                     manualArrow.classList.replace('fa-chevron-down', 'fa-chevron-up');
@@ -2115,232 +1531,149 @@
                 }
             });
 
-            // --- SOCKET LISTENERS ---
-            // Esperar a que window.globalSocket esté disponible (creado en main.js)
-            const checkSocket = setInterval(() => {
-                if (window.globalSocket) {
-                    clearInterval(checkSocket);
-                    initSocketListeners(window.globalSocket);
-                }
-            }, 100);
-
-            function initSocketListeners(socket) {
-                console.log('[PROFILE] CONNECTING TO GLOBAL SOCKET...');
-
-                // Request initial bus list
-                socket.emit('ADMIN_GET_BUSES'); // Reusing admin event for now as it returns full info
-
-                // Listen for bus list updates (using ADMIN_BUSES for now)
-                socket.on('ADMIN_BUSES', (buses) => {
-                    console.log('[UI] Received Bus List:', buses);
-                    availableBuses = buses;
-                    renderBusList(buses);
-                });
-
-                // Listen for successful join to close modal
-                socket.on('ROOM_JOINED', (data) => {
-                    console.log('[UI] Joined Room:', data);
-                    busModalOverlay.classList.remove('active');
-                    showToast(`[OK] TICKET CONFIRMED: ${data.roomName}`, 'success');
-                });
-
-                // Escuchar actualizaciones de perfil
-                socket.on('USER_PROFILE', (profile) => {
-                    console.log('[PROFILE] DATA RECEIVED:', profile);
-                    currentUserProfile = profile;
-                    updateUI(profile);
-
-                    // ✅ SOLICITAR BUSES SOLO DESPUÉS DE QUE EL PERFIL ESTÉ LISTO
-                    // Esto evita condición de carrera con la BD
-                    console.log('[PROFILE] Usuario listo. Solicitando buses disponibles...');
-                    socket.emit('GET_AVAILABLE_BUSES');
-                });
-
-                // Escuchar eventos de reparación
-                socket.on('SKIN_REPAIRED', (data) => {
-                    showToast(`✅ REPAIR SUCCESSFUL (-${data.cost} WICK)`, 'success');
-                    // USER_PROFILE se actualiza automáticamente
-                });
-
-                // Escuchar eventos de equipamiento
-                socket.on('SKIN_EQUIPPED', (data) => {
-                    showToast(`⚡ ${data.message}`, 'success');
-                });
-
-                // Escuchar errores
-                socket.on('GAME_ERROR', (data) => {
-                    showToast(`❌ ${data.message}`, 'error');
-                });
-            }
-
-            // --- ACTUALIZACIÓN DE UI ---
-            function updateUI(profile) {
-                // 1. Saldos
-                balanceUsdt.textContent = `$${profile.balanceUSDT.toFixed(2)}`;
-                balanceWick.textContent = `${profile.balanceWICK} WICK`;
-
-                // 2. Skin Activa
-                const skin = profile.activeSkin;
-                activeSkinName.textContent = skin.name;
-                activeSkinLevel.textContent = `Lvl ${skin.level}`;
-                integrityText.textContent = `${skin.integrity}/${skin.maxIntegrity}`;
-
-                // Renderizar barra de integridad
-                renderIntegrityBar(skin.integrity, skin.maxIntegrity);
-
-                // Botón de Reparar
-                const damage = skin.maxIntegrity - skin.integrity;
-                const repairCost = Math.floor(50 * Math.pow(1.618, skin.level || 1));
-
-                if (damage > 0 && !skin.isBurned) {
-                    repairBtn.disabled = false;
-                    repairBtn.innerHTML = `<i class="fa-solid fa-screwdriver-wrench"></i> REPAIR SKIN (${repairCost} $WICK)`;
-                    repairBtn.onclick = () => {
-                        window.globalSocket.emit('REPAIR_SKIN');
-                    };
-                } else if (skin.isBurned) {
-                    repairBtn.disabled = true;
-                    repairBtn.innerHTML = '<i class="fa-solid fa-skull"></i> SKIN BURNED [FATAL]';
-                } else {
-                    repairBtn.disabled = true;
-                    repairBtn.innerHTML = '<i class="fa-solid fa-check"></i> SYSTEM OPTIMAL';
+            // Toast Function
+            window.showToast = function (message, type = 'info') {
+                let icon, color;
+                switch (type) {
+                    case 'success': icon = 'fa-circle-check'; color = '#00ff88'; break;
+                    case 'error': icon = 'fa-triangle-exclamation'; color = '#ff0000'; break;
+                    case 'warning': icon = 'fa-exclamation-circle'; color = '#ff9800'; break;
+                    default: icon = 'fa-circle-info'; color = '#00fff9';
                 }
 
-                // 3. Inventario
-                renderInventory(profile.inventory);
-            }
+                toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+                toast.style.borderColor = color;
+                toast.style.color = color;
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 3000);
+            };
 
-            function renderIntegrityBar(current, max) {
-                // 1. Renderizar corazones (hasta 5 corazones)
-                const heartsContainer = document.getElementById('integrity-hearts');
-                const maxHearts = Math.min(max, 5); // Máximo 5 corazones visuales
-                const healthPerHeart = max / maxHearts;
-                const filledHearts = Math.ceil(current / healthPerHeart);
+            // Socket Events
+            socket.on('USER_PROFILE', (profile) => {
+                console.log('[UI] Perfil recibido:', profile);
+                updateUserProfile(profile);
+                // Solicitar buses después de recibir perfil
+                socket.emit('GET_AVAILABLE_BUSES');
+            });
 
-                heartsContainer.innerHTML = '';
-                for (let i = 0; i < maxHearts; i++) {
-                    const heart = document.createElement('i');
-                    heart.className = 'fa-solid fa-heart heart-icon';
+            socket.on('BUS_LIST_UPDATE', (buses) => {
+                console.log('[UI] Buses recibidos (BUS_LIST_UPDATE):', buses);
+                renderBusList(buses);
+            });
 
-                    if (i >= filledHearts) {
-                        heart.classList.add('empty');
-                        heart.classList.remove('fa-solid');
-                        heart.classList.add('fa-regular');
-                    }
+            socket.on('ROOM_JOINED', (data) => {
+                console.log('[UI] Unido a sala:', data);
+                window.hideBusLobby();
+                showToast(`Joined ${data.roomName}`, 'success');
+            });
 
-                    heartsContainer.appendChild(heart);
-                }
+            socket.on('SKIN_EQUIPPED', (data) => showToast(data.message, 'success'));
+            socket.on('SKIN_REPAIRED', (data) => showToast(`Repaired (-${data.cost} WICK)`, 'success'));
+            socket.on('GAME_ERROR', (data) => showToast(data.message, 'error'));
+        }
 
-                // 2. Renderizar barra de segmentos (más detallada)
-                integrityBar.innerHTML = '';
-                const segments = 20; // Más segmentos para look más técnico
-                const healthPerSegment = max / segments;
-                const activeSegments = Math.ceil(current / healthPerSegment);
+        function updateUserProfile(profile) {
+            document.getElementById('balance-usdt').textContent = `$${profile.balanceUSDT.toFixed(2)}`;
+            document.getElementById('balance-wick').textContent = `${profile.balanceWICK} WICK`;
+            document.getElementById('active-skin-name').textContent = profile.activeSkin.name;
+            document.getElementById('active-skin-level').textContent = `Lvl ${profile.activeSkin.level}`;
+            document.getElementById('integrity-text').textContent = `${profile.activeSkin.integrity}/${profile.activeSkin.maxIntegrity}`;
 
-                for (let i = 0; i < segments; i++) {
-                    const segment = document.createElement('div');
-                    segment.className = 'integrity-segment';
-
-                    if (i >= activeSegments) {
-                        segment.classList.add('empty');
-                    } else if (current < max * 0.3) {
-                        segment.classList.add('damaged');
-                    }
-
-                    integrityBar.appendChild(segment);
-                }
-            }
-
-            function renderInventory(inventory) {
-                inventoryGrid.innerHTML = '';
-
-                if (!inventory || inventory.length === 0) {
-                    inventoryGrid.innerHTML = '<p style="color:#888; text-align:center; grid-column:1/-1;">[ EMPTY INVENTORY ]</p>';
-                    return;
-                }
-
-                inventory.forEach(skin => {
+            // Render inventory
+            const grid = document.getElementById('inventory-grid');
+            if (grid) {
+                grid.innerHTML = '';
+                profile.inventory.forEach(skin => {
                     const card = document.createElement('div');
                     card.className = `skin-card ${skin.isActive ? 'active' : ''} ${skin.isBurned ? 'burned' : ''}`;
 
-                    // Icono basado en tipo
-                    let iconClass = 'fa-robot';
-                    if (skin.name.includes('Punk')) iconClass = 'fa-guitar';
-                    if (skin.name.includes('Samurai')) iconClass = 'fa-khanda';
-                    if (skin.isBurned) iconClass = 'fa-skull-crossbones';
-
-                    // Estado texto
-                    let statusClass = 'intact';
-                    let statusText = '[OK] INTACT';
-                    if (skin.isBurned) { statusClass = 'burned'; statusText = '[!] BURNED'; }
-                    else if (skin.integrity < skin.maxIntegrity) { statusClass = 'damaged'; statusText = '[!] DAMAGED'; }
+                    let icon = 'fa-robot';
+                    if (skin.isBurned) icon = 'fa-skull';
 
                     card.innerHTML = `
                         <div class="skin-level-badge">${skin.level}</div>
-                        <div class="skin-icon"><i class="fa-solid ${iconClass}"></i></div>
+                        <div class="skin-icon"><i class="fa-solid ${icon}"></i></div>
                         <div class="skin-name">${skin.name}</div>
-                        <div class="skin-status ${statusClass}">${statusText}</div>
                     `;
 
-                    // Botón Equipar (solo si no está activa y no está quemada)
                     if (!skin.isActive && !skin.isBurned) {
-                        const equipBtn = document.createElement('button');
-                        equipBtn.className = 'equip-btn';
-                        equipBtn.textContent = '[ EQUIP ]';
-                        equipBtn.onclick = (e) => {
-                            e.stopPropagation();
-                            window.globalSocket.emit('EQUIP_SKIN', { skinId: skin.id });
-                        };
-                        card.appendChild(equipBtn);
+                        const btn = document.createElement('button');
+                        btn.className = 'equip-btn';
+                        btn.textContent = 'EQUIP';
+                        btn.onclick = () => window.globalSocket.emit('EQUIP_SKIN', { skinId: skin.id });
+                        card.appendChild(btn);
                     }
 
-                    if (skin.isActive) {
-                        const activeLabel = document.createElement('div');
-                        activeLabel.style.color = '#ff00c1';
-                        activeLabel.style.fontSize = '0.6rem';
-                        activeLabel.style.marginTop = '10px';
-                        activeLabel.innerHTML = '<i class="fa-solid fa-circle-check"></i> [ EQUIPPED ]';
-                        card.appendChild(activeLabel);
-                    }
-
-                    inventoryGrid.appendChild(card);
+                    grid.appendChild(card);
                 });
             }
 
-            // Actualizar inventario de skins
-            function updateInventoryGrid(inventory) {
-                inventoryGrid.innerHTML = ''; // Limpiar el grid
+            // Repair button logic
+            const repairBtn = document.getElementById('repair-btn');
+            if (repairBtn) {
+                const skin = profile.activeSkin;
+                if (skin.isBurned) {
+                    repairBtn.disabled = true;
+                    repairBtn.innerHTML = 'BURNED';
+                } else if (skin.integrity < skin.maxIntegrity) {
+                    repairBtn.disabled = false;
+                    repairBtn.innerHTML = 'REPAIR';
+                    repairBtn.onclick = () => window.globalSocket.emit('REPAIR_SKIN');
+                } else {
+                    repairBtn.disabled = true;
+                    repairBtn.innerHTML = 'OPTIMAL';
+                }
+            }
+        }
 
-                inventory.forEach(skin => {
-                    const skinCard = document.createElement('div');
-                    skinCard.className = 'skin-card';
-                    skinCard.innerHTML = `
-                        <div class="skin-image" style="background-image: url('${skin.image}')"></div>
-                        <div class="skin-name">${skin.name}</div>
-                        <button class="equip-skin-btn" data-skin-id="${skin.id}">Equipar</button>
+        function renderBusList(buses) {
+            const grids = [
+                document.getElementById('buses-lobby-grid'),
+                document.getElementById('buses-grid')
+            ];
+
+            grids.forEach(grid => {
+                if (!grid) return;
+                grid.innerHTML = '';
+
+                if (!buses || !buses.length) {
+                    grid.innerHTML = '<p style="color:#888; text-align:center;">NO BUSES AVAILABLE</p>';
+                    return;
+                }
+
+                buses.forEach(bus => {
+                    const card = document.createElement('div');
+                    card.className = 'bus-card';
+
+                    const isFull = bus.occupancy >= bus.capacity;
+                    const isBoarding = bus.status === 'BOARDING';
+                    const canJoin = isBoarding && !isFull;
+
+                    card.innerHTML = `
+                        <div class="bus-card-header">
+                            <div class="bus-name">${bus.name}</div>
+                            <div class="bus-status ${bus.status.toLowerCase()}">${bus.status}</div>
+                        </div>
+                        <div class="bus-ticket-price">$${bus.ticketPrice}</div>
+                        <div class="bus-info">
+                            <span>${bus.occupancy}/${bus.capacity} Players</span>
+                        </div>
+                        <button class="bus-join-btn" ${!canJoin ? 'disabled' : ''}>
+                            ${canJoin ? 'JOIN BUS' : 'LOCKED'}
+                        </button>
                     `;
 
-                    // Añadir evento para equipar skin
-                    const equipBtn = skinCard.querySelector('.equip-skin-btn');
-                    equipBtn.addEventListener('click', () => {
-                        if (window.globalSocket) {
-                            window.globalSocket.emit('EQUIP_SKIN', { skinId: skin.id });
-                            showToast(`Equipando skin: ${skin.name}`, 'success');
-                        }
-                    });
+                    if (canJoin) {
+                        card.querySelector('button').addEventListener('click', () => {
+                            window.globalSocket.emit('JOIN_ROOM', { roomId: bus.id });
+                        });
+                    }
 
-                    inventoryGrid.appendChild(skinCard);
+                    grid.appendChild(card);
                 });
-            }
-
-            // Escuchar evento USER_PROFILE para actualizar el inventario
-            if (window.globalSocket) {
-                window.globalSocket.on('USER_PROFILE', (profile) => {
-                    currentUserProfile = profile;
-                    updateInventoryGrid(profile.inventory);
-                });
-            }
-        });
+            });
+        }
     </script>
+</body>
 
 </html>

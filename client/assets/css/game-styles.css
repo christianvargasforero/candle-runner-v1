@@ -1,0 +1,125 @@
+/* 🎮 CANDLE RUNNER - Game Styles */
+/* Cyberpunk Neon Theme */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Courier New', monospace;
+    background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+    color: #00ff88;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+}
+
+/* Game Container */
+#game-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #000;
+    z-index: 1;
+}
+
+#game-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 20px;
+    height: 20px;
+    border-top: 2px solid #00ff88;
+    border-left: 2px solid #00ff88;
+    z-index: 10;
+}
+
+#game-container::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    border-bottom: 2px solid #00ff88;
+    border-right: 2px solid #00ff88;
+    z-index: 10;
+}
+
+/* Loading Screen */
+#loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.95);
+    padding: 40px;
+    border: 1px solid #00ff88;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+    min-width: 300px;
+}
+
+#loading h1 {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: #fff;
+    text-shadow: 0 0 10px #00ff88;
+    letter-spacing: 2px;
+}
+
+#loading i {
+    font-size: 3rem;
+    color: #00ff88;
+    margin-bottom: 20px;
+    animation: pulse 1.5s infinite;
+}
+
+#loading p {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.1); }
+}
+
+/* Scanlines Effect */
+.scanlines {
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    z-index: 9999;
+}
+
+/* Vignette Effect */
+.vignette {
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    box-shadow: inset 0 0 150px rgba(0, 0, 0, 0.8);
+    z-index: 9998;
+}

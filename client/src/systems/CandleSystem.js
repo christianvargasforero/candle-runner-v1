@@ -649,22 +649,22 @@ export class CandleSystem {
     // ═══════════════════════════════════════════════════════════════
 
     getCandleSpot(index) {
+        // Devuelve la posición EXACTA de la cima visual de la vela index
         const i = Math.max(0, Math.min(index, this.candleHistory.length - 1));
         const x = this.BASE_X + i * this.CANDLE_SPACING;
-
-        // Normalizar precio
         let minPrice = Infinity, maxPrice = -Infinity;
         this.candleHistory.forEach(c => {
             minPrice = Math.min(minPrice, c.low || c.close);
             maxPrice = Math.max(maxPrice, c.high || c.close);
         });
         const priceRange = Math.max(1, maxPrice - minPrice);
-
         const price = this.candleHistory[i].close || (minPrice + priceRange / 2);
         const priceNorm = (price - minPrice) / priceRange;
-        const y = this.baseY - priceNorm * this.priceScale;
-
-        return { x, y };
+        // Y de la cima visual: la parte superior del rectángulo de la vela
+        const yCandleBase = this.baseY - priceNorm * this.priceScale;
+        // La altura visual de la vela es 80px (ver createHolographicCandle)
+        const yTop = yCandleBase - 40; // 40 = 80/2
+        return { x, y: yTop };
     }
 
     // ═══════════════════════════════════════════════════════════════

@@ -478,11 +478,13 @@ export default class GameScene extends Phaser.Scene {
         }
 
         // Limpiar jugadores remotos fuera de cámara
-        this.playerSystem.playerSprites.forEach((data, id) => {
-            if (!data.isLocal && data.sprite && data.sprite.x < cameraLeft) {
-                console.log(`[🗑️ GC] Limpiando jugador remoto fuera de cámara: ${id}`);
-                this.playerSystem.removePlayer(id);
-            }
-        });
+        if (this.playerSystem.players) {
+            this.playerSystem.players.forEach((data, id) => {
+                if (!data.isLocal && data.sprite && data.sprite.x < cameraLeft) {
+                    console.log(`[🗑️ GC] Limpiando jugador remoto fuera de cámara: ${id}`);
+                    this.playerSystem.removePlayer(id);
+                }
+            });
+        }
     }
 }

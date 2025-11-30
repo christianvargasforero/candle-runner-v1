@@ -85,10 +85,9 @@ class BusGameLoop {
      */
     getBusPassengersState() {
         const passengers = [];
-        
         for (const [socketId, userId] of this.room.users.entries()) {
             const user = userManager.getUser(socketId);
-            if (user) {
+            if (user && (!user.activeSkin?.isBurned && user.status !== 'ELIMINATED')) {
                 passengers.push({
                     odId: socketId,
                     userId: user.id,
@@ -102,7 +101,6 @@ class BusGameLoop {
                 });
             }
         }
-        
         return passengers;
     }
 
@@ -157,13 +155,11 @@ class BusGameLoop {
         console.log(`   Pozo Total: $${this.room.ticketPrice * this.room.users.size}`);
         console.log(`${'='.repeat(60)}\n`);
 
-        // 👫 EMITIR EVENTO BUS_START con lista de pasajeros y estado de integridad + skinId
+        // 👫 EMITIR EVENTO BUS_START con lista de pasajeros activos (no eliminados)
         const passengerStates = [];
-        
-        // Iterar por socketId para obtener datos completos
         for (const [socketId, usId] of this.room.users.entries()) {
             const user = userManager.getUser(socketId);
-            if (user) {
+            if (user && (!user.activeSkin?.isBurned && user.status !== 'ELIMINATED')) {
                 passengerStates.push({
                     odId: socketId,
                     skinId: user.activeSkin?.id ?? 'default',
@@ -651,6 +647,11 @@ class BusGameLoop {
                 let status = 'DAMAGE';
                 if (bet.direction === result) status = 'WIN';
                 if (user.activeSkin.isBurned) status = 'BURNED';
+                // Si el usuario está eliminado, márcalo
+                if (user.activeSkin.isBurned || user.activeSkin.currentIntegrity <= 0) {
+                    user.status = 'ELIMINATED';
+                    status = 'ELIMINATED';
+                }
                 passengerStatuses.push({
                     odId: bet.socketId,
                     userId: user.id,

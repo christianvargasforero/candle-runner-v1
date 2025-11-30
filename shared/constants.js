@@ -27,9 +27,9 @@ export const ASH_INSURANCE_RATIO = 0.618; // 61.8% refund en Permadeath
 export const SKIN_LEVEL_REQ = [0, 2, 3, 5, 8, 13]; // Rondas sobrevividas para subir nivel (Fibonacci)
 
 export const FREE_SKINS = [
-    { id: 'droid_cyan', name: 'Droid Alpha', color: 0x00fff9 },
-    { id: 'droid_magenta', name: 'Droid Beta', color: 0xff00c1 },
-    { id: 'droid_yellow', name: 'Droid Gamma', color: 0xffea00 }
+  { id: 'droid_cyan', name: 'Droid Alpha', color: 0x00fff9 },
+  { id: 'droid_magenta', name: 'Droid Beta', color: 0xff00c1 },
+  { id: 'droid_yellow', name: 'Droid Gamma', color: 0xffea00 }
 ];
 
 // 🛡️ SISTEMA DE INTEGRIDAD (DURABILIDAD)
@@ -50,10 +50,8 @@ export const DEFAULT_SKIN = {
 
 // 🏛️ REGLAS DE ACCESO A SALAS (MODELO "BUS" - PRECIO FIJO + CAPACIDAD)
 export const ROOM_ACCESS_RULES = {
-  TRAINING: { allowDefault: true, minLevel: 0, ticketPrice: 0, defaultCapacity: 5 },        // Gratis (Practice Mode)
-  SATOSHI: { allowDefault: true, minLevel: 0, ticketPrice: 0.10, defaultCapacity: 5 },     // $0.10 Ticket
-  TRADER: { allowDefault: false, minLevel: 1, ticketPrice: 1.00, defaultCapacity: 8 },     // $1.00 Ticket
-  WHALE: { allowDefault: false, minLevel: 4, ticketPrice: 10.00, defaultCapacity: 13 }      // $10.00 Ticket
+  TRAINING: { allowDefault: true, minLevel: 0, ticketPrice: 0, defaultCapacity: 2 },        // Gratis (Practice Mode)
+  SATOSHI: { allowDefault: true, minLevel: 0, ticketPrice: 0.10, defaultCapacity: 2 }      // $0.10 Ticket
 };
 
 // 🎮 ESTADOS DEL BUS (Reemplazan GAME_STATES para cada sala)

@@ -8,11 +8,25 @@ import UIScene from './scenes/UIScene.js';
 
 // [ SOCKET GLOBAL COMPARTIDO ]
 // ⚠️ IMPORTANTE: El socket se crea en index.html DESPUÉS del login con wallet
-// NO creamos el socket aquí para evitar conexiones sin autenticación
-console.log('[MAIN] Socket será creado después del login con wallet...');
+console.log('[MAIN] 🔌 Verificando que el socket esté listo...');
 
-// El socket se expondrá como window.globalSocket desde index.html
-// después de que el usuario haga clic en "Connect Wallet"
+// Verificar que el socket esté listo antes de inicializar Phaser
+if (!window.SOCKET_READY) {
+    console.error('[MAIN] ❌ CRITICAL: Socket no está listo. No se puede iniciar Phaser.');
+    throw new Error('Socket must be ready before initializing Phaser');
+}
+
+if (!window.globalSocket || !window.globalSocket.connected) {
+    console.error('[MAIN] ❌ CRITICAL: globalSocket no existe o no está conectado');
+    throw new Error('globalSocket must be connected before initializing Phaser');
+}
+
+if (!window.isLobbyReady || !window.isLobbyReady()) {
+    console.error('[MAIN] ❌ CRITICAL: Lobby no está inicializado');
+    throw new Error('Lobby must be initialized before Phaser');
+}
+
+console.log('[MAIN] ✅ Socket y lobby listos. Iniciando Phaser...');
 
 // Configuración del juego
 const config = {
@@ -40,12 +54,14 @@ const game = new Phaser.Game(config);
 
 // Ocultar pantalla de carga cuando el juego esté listo
 game.events.once('ready', () => {
+    console.log('[MAIN] 🎮 Phaser game ready event fired');
     setTimeout(() => {
         const loading = document.getElementById('loading');
         if (loading) {
+            console.log('[MAIN] 🚫 Ocultando pantalla de loading');
             loading.classList.add('hidden');
         }
-    }, 1000);
+    }, 300);
 });
 
 // Exportar para debugging
