@@ -1094,6 +1094,32 @@
             animation: spin 1s linear infinite;
         }
 
+        /* Reset Wallet Button (Debug) */
+        .reset-wallet-btn {
+            width: 100%;
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid rgba(255, 0, 85, 0.5);
+            color: rgba(255, 0, 85, 0.8);
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .reset-wallet-btn:hover {
+            background: rgba(255, 0, 85, 0.1);
+            border-color: #ff0055;
+            color: #ff0055;
+        }
+
+        .reset-wallet-btn i {
+            margin-right: 8px;
+        }
+
         @keyframes spin {
             from {
                 transform: rotate(0deg);
@@ -1203,6 +1229,11 @@
 
             <button class="connect-wallet-btn" id="connect-wallet-btn">
                 <i class="fa-solid fa-wallet"></i> CONNECT METAMASK (SIMULATOR)
+            </button>
+
+            <!-- 🔄 BOTÓN DE DEBUG: RESET WALLET -->
+            <button class="reset-wallet-btn" id="reset-wallet-btn" style="margin-top: 10px;">
+                <i class="fa-solid fa-rotate-right"></i> RESET WALLET (DEBUG)
             </button>
 
             <div class="login-info">
@@ -1473,8 +1504,25 @@
             }
         }
 
-        // Event listener del botón
+        // Event listener del botón connect
         connectBtn.addEventListener('click', connectWallet);
+
+        // 🔄 Event listener del botón RESET WALLET (Debug)
+        const resetBtn = document.getElementById('reset-wallet-btn');
+        resetBtn.addEventListener('click', () => {
+            if (confirm('⚠️ WARNING: This will delete your saved wallet and progress.\n\nAre you sure you want to reset?')) {
+                console.log('🔄 [DEBUG] Resetting wallet...');
+
+                // Limpiar localStorage completamente
+                localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(`${STORAGE_KEY}_seen`);
+
+                console.log('✅ [DEBUG] Wallet reset complete. Reloading...');
+
+                // Recargar la página para empezar como usuario nuevo
+                window.location.reload();
+            }
+        });
 
         // Para debugging - mostrar wallet en consola al cargar
         console.log('💾 [WALLET] Wallet guardada:', localStorage.getItem(STORAGE_KEY) || 'Ninguna');
