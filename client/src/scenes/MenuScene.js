@@ -10,22 +10,35 @@ export default class MenuScene extends Phaser.Scene {
     }
 
     create() {
-        // 🔌 Usar socket GLOBAL (compartido con index.html)
-        this.socket = window.globalSocket;
-
-        if (!this.socket) {
-            console.error('[MENU] ❌ Socket global no disponible. Asegúrate de hacer login primero.');
+        // 🛡️ VALIDACIÓN ROBUSTA: Esperar a que el socket esté listo
+        if (!window.globalSocket) {
+            console.warn('[MENU] ⚠️ Socket no disponible aún. Reintentando en 200ms...');
+            this.time.delayedCall(200, () => {
+                this.scene.restart();
+            });
             return;
         }
+
+        // 🔌 Socket disponible - Continuar con la inicialización
+        this.socket = window.globalSocket;
+        console.log('[MENU] ✅ Socket conectado:', this.socket.connected);
 
         const { width, height } = this.cameras.main;
 
         // Setup listeners del socket
         this.setupSocketListeners();
 
-        // Solicitar lista de buses inmediatamente
-        this.socket.emit('GET_AVAILABLE_BUSES');
-        console.log('[MENU] 📋 Solicitando lista de buses...');
+        // 🚌 SOLICITAR LISTA DE BUSES INMEDIATAMENTE
+        if (this.socket.connected) {
+            this.socket.emit('GET_AVAILABLE_BUSES');
+            console.log('[MENU] 📋 Solicitando lista de buses...');
+        } else {
+            // Si el socket no está conectado aún, esperar el evento connect
+            this.socket.once('connect', () => {
+                console.log('[MENU] 🔌 Socket conectado. Solicitando buses...');
+                this.socket.emit('GET_AVAILABLE_BUSES');
+            });
+        }
 
         // Fondo cyberpunk
         this.createBackground(width, height);

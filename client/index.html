@@ -1471,6 +1471,28 @@
                     // Ocultar login overlay
                     loginOverlay.classList.add('hidden');
 
+                    // 🎮 NOTIFICAR A PHASER QUE EL SOCKET ESTÁ LISTO
+                    console.log('[AUTH] 🎮 Inicializando Phaser con socket autenticado...');
+
+                    // Dar un pequeño delay para asegurar que el socket esté completamente listo
+                    setTimeout(() => {
+                        const game = window.game;
+
+                        if (game) {
+                            // Verificar si MenuScene está activa
+                            if (game.scene.isActive('MenuScene')) {
+                                console.log('[AUTH] 🔄 Reiniciando MenuScene con socket autenticado');
+                                game.scene.getScene('MenuScene').scene.restart();
+                            } else {
+                                // Si no está activa, iniciarla
+                                console.log('[AUTH] 🚀 Iniciando MenuScene por primera vez');
+                                game.scene.start('MenuScene');
+                            }
+                        } else {
+                            console.warn('[AUTH] ⚠️ Instancia de Phaser no encontrada aún');
+                        }
+                    }, 300);
+
                     // Mostrar mensaje de bienvenida
                     const isNewUser = !localStorage.getItem(`${STORAGE_KEY}_seen`);
                     if (isNewUser) {
