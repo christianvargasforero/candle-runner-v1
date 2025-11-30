@@ -292,10 +292,12 @@ export class PlayerSystem {
 
             if (s.status === 'WIN') {
                 this.animateWin(sprite, data, candleSystem);
-            } else if (s.status === 'DAMAGE') {
+            } else if (s.status === 'DAMAGE' || s.status === 'LOSS') {
                 this.animateDamage(sprite, data, candleSystem);
             } else if (s.status === 'BURNED') {
                 this.animateBurned(sprite, data, id);
+            } else if (s.status === 'DRAW') {
+                this.animateDraw(sprite, data, candleSystem);
             }
         });
     }
@@ -426,6 +428,76 @@ export class PlayerSystem {
                 this.showGameOver();
             }
         });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🤷 ANIMACIÓN DE EMPATE (DRAW)
+    // ═══════════════════════════════════════════════════════════════
+
+    animateDraw(sprite, data, candleSystem) {
+        // El jugador se queda en la vela actual y hace animación de confusión
+
+        if (data.isLocal) {
+            // Desactivar física temporalmente
+            if (sprite.body) sprite.body.enable = false;
+        }
+
+        const originalX = sprite.x;
+
+        // Animación de sacudida lateral (confusión)
+        this.scene.tweens.add({
+            targets: sprite,
+            x: originalX - 10,
+            duration: 100,
+            yoyo: true,
+            repeat: 3,
+            ease: 'Sine.easeInOut',
+            onComplete: () => {
+                // Reactivar física
+                if (data.isLocal && sprite.body) {
+                    sprite.body.enable = true;
+                    sprite.setVelocity(0, 0);
+                }
+            }
+        });
+
+        // Pequeño salto de confusión
+        this.scene.tweens.add({
+            targets: sprite,
+            y: sprite.y - 20,
+            duration: 200,
+            yoyo: true,
+            ease: 'Quad.easeOut'
+        });
+
+        // Mostrar signo de interrogación
+        const questionMark = this.scene.add.text(
+            sprite.x,
+            sprite.y - 60,
+            '?',
+            {
+                font: 'bold 48px Arial',
+                fill: '#ffffff',
+                stroke: '#000',
+                strokeThickness: 4
+            }
+        ).setOrigin(0.5).setDepth(500);
+
+        // Animación del signo de interrogación
+        this.scene.tweens.add({
+            targets: questionMark,
+            y: questionMark.y - 30,
+            alpha: 0,
+            scale: 1.5,
+            duration: 1500,
+            ease: 'Quad.easeOut',
+            onComplete: () => questionMark.destroy()
+        });
+
+        // Texto flotante
+        this.showFloatingText('DRAW', sprite.x, sprite.y - 50, '#888888');
+
+        console.log(`[🤷 PlayerSystem] Animación de empate para jugador ${data.isLocal ? 'local' : 'remoto'}`);
     }
 
     // ═══════════════════════════════════════════════════════════════

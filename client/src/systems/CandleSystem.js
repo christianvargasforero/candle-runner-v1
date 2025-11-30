@@ -14,12 +14,22 @@ export class CandleSystem {
         this.baseY = window.innerHeight / 2 + 100;
         this.priceScale = 300; // px range for price normalization
 
+        // ============================================
+        // 🎬 AMPLIFICACIÓN VISUAL (DRAMA FACTOR)
+        // ============================================
+        this.VISUAL_MULTIPLIER = 25; // Exagerar movimientos de precio para emoción
+        this.SHAKE_THRESHOLD = 0.5; // % de cambio para activar shake
+        this.lastPriceForShake = null;
+
         // Paleta de colores
         this.COLORS = {
             LONG: 0x00ff88,      // Cyan/Verde neón
             SHORT: 0xff0055,     // Magenta/Rojo neón
             NEUTRAL: 0x888888,   // Gris
-            GRID: 0x00fff9       // Cyan brillante
+            GRID: 0x00fff9,      // Cyan brillante
+            // Colores INTENSOS para vela en vivo
+            LONG_INTENSE: 0x00ffaa,   // Verde más brillante
+            SHORT_INTENSE: 0xff0077   // Rojo más brillante
         };
 
         // Estado de velas
@@ -53,7 +63,7 @@ export class CandleSystem {
         this.physicsGroup = this.scene.physics.add.staticGroup();
         this.candlePhysicsBodies = new Map(); // índice -> cuerpo físico invisible
 
-        console.log('[🕯️ CandleSystem] Inicializado');
+        console.log('[🕯️ CandleSystem] Inicializado con VISUAL_MULTIPLIER:', this.VISUAL_MULTIPLIER);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -264,7 +274,19 @@ export class CandleSystem {
         // Dibujar en PRÓXIMA posición
         const x = this.BASE_X + this.liveTickerIndex * this.CANDLE_SPACING;
 
-        // Convertir precios a coordenadas Y
+        // ============================================
+        // 🎬 AMPLIFICACIÓN VISUAL DRAMÁTICA
+        // ============================================
+        // Calcular el cambio de precio como porcentaje
+        const priceChange = current - open;
+        const priceChangePercent = Math.abs(priceChange / open) * 100;
+
+        // Aplicar multiplicador visual para exagerar movimientos
+        const visualPriceChange = priceChange * this.VISUAL_MULTIPLIER;
+
+        // ============================================
+        // 📊 CONVERTIR PRECIOS A COORDENADAS Y (AMPLIFICADAS)
+        // ============================================
         let minPrice = Infinity, maxPrice = -Infinity;
         this.candleHistory.forEach(c => {
             minPrice = Math.min(minPrice, c.low || c.close);
@@ -272,9 +294,17 @@ export class CandleSystem {
         });
         const priceRange = Math.max(1, maxPrice - minPrice);
 
+        // Función auxiliar con amplificación
         const priceToY = (price) => {
-            const priceNorm = (price - minPrice) / priceRange;
-            return this.baseY - priceNorm * this.priceScale;
+            const basePrice = open; // Usar open como referencia
+            const delta = (price - basePrice) * this.VISUAL_MULTIPLIER;
+
+            // Calcular Y base del open
+            const openNorm = (open - minPrice) / priceRange;
+            const yBase = this.baseY - openNorm * this.priceScale;
+
+            // Aplicar delta amplificado
+            return yBase - delta;
         };
 
         const yOpen = priceToY(open);
@@ -282,31 +312,74 @@ export class CandleSystem {
         const yHigh = priceToY(high);
         const yLow = priceToY(low);
 
-        // Color dinámico
+        // ============================================
+        // 🎨 COLOR DINÁMICO INTENSO
+        // ============================================
         const isGreen = current >= open;
-        const color = isGreen ? this.COLORS.LONG : this.COLORS.SHORT;
+        const isFlat = Math.abs(priceChange) < 0.01;
 
-        // 1. Mechas (sombras high/low)
-        this.liveCandleGraphics.lineStyle(3, color, 0.6);
+        let color, glowColor;
+        if (isFlat) {
+            color = this.COLORS.NEUTRAL;
+            glowColor = 0xffffff;
+        } else if (isGreen) {
+            color = this.COLORS.LONG_INTENSE;
+            glowColor = this.COLORS.LONG;
+        } else {
+            color = this.COLORS.SHORT_INTENSE;
+            glowColor = this.COLORS.SHORT;
+        }
+
+        // ============================================
+        // 🎬 EFECTOS DRAMÁTICOS DE CÁMARA
+        // ============================================
+        if (this.lastPriceForShake !== null) {
+            const changeFromLast = Math.abs((current - this.lastPriceForShake) / this.lastPriceForShake) * 100;
+
+            // Shake si el cambio es significativo
+            if (changeFromLast > this.SHAKE_THRESHOLD) {
+                const intensity = Math.min(0.008, changeFromLast * 0.001);
+                this.scene.cameras.main.shake(200, intensity);
+                console.log(`[🎬 DRAMA] Shake activado! Cambio: ${changeFromLast.toFixed(2)}%`);
+            }
+
+            // Zoom out suave si la vela crece mucho
+            if (priceChangePercent > 1.0 && this.scene.cameras.main.zoom > 0.7) {
+                this.scene.tweens.add({
+                    targets: this.scene.cameras.main,
+                    zoom: this.scene.cameras.main.zoom - 0.05,
+                    duration: 300,
+                    ease: 'Sine.easeOut'
+                });
+            }
+        }
+        this.lastPriceForShake = current;
+
+        // ============================================
+        // 1️⃣ MECHAS (Sombras high/low) - MÁS GRUESAS
+        // ============================================
+        this.liveCandleGraphics.lineStyle(4, color, 0.8);
         this.liveCandleGraphics.lineBetween(x, yHigh, x, yLow);
 
-        // 2. Cuerpo (open → current)
+        // ============================================
+        // 2️⃣ CUERPO (open → current) - AMPLIFICADO
+        // ============================================
         const bodyTop = Math.min(yOpen, yCurrent);
         const bodyBottom = Math.max(yOpen, yCurrent);
-        const bodyHeight = Math.max(4, bodyBottom - bodyTop);
+        const bodyHeight = Math.max(8, bodyBottom - bodyTop); // Mínimo 8px para visibilidad
 
-        // Glow exterior
-        this.liveCandleGraphics.fillStyle(color, 0.15);
+        // Glow exterior INTENSO (resplandor pulsante)
+        this.liveCandleGraphics.fillStyle(glowColor, 0.25);
         this.liveCandleGraphics.fillRoundedRect(
-            x - this.CANDLE_WIDTH / 2 - 6,
-            bodyTop - 6,
-            this.CANDLE_WIDTH + 12,
-            bodyHeight + 12,
-            6
+            x - this.CANDLE_WIDTH / 2 - 10,
+            bodyTop - 10,
+            this.CANDLE_WIDTH + 20,
+            bodyHeight + 20,
+            8
         );
 
-        // Cuerpo principal
-        this.liveCandleGraphics.fillStyle(color, 0.4);
+        // Cuerpo principal (MÁS OPACO para visibilidad)
+        this.liveCandleGraphics.fillStyle(color, 0.6);
         this.liveCandleGraphics.fillRoundedRect(
             x - this.CANDLE_WIDTH / 2,
             bodyTop,
@@ -315,8 +388,8 @@ export class CandleSystem {
             4
         );
 
-        // Borde sólido
-        this.liveCandleGraphics.lineStyle(2, color, 1);
+        // Borde sólido BRILLANTE
+        this.liveCandleGraphics.lineStyle(3, color, 1);
         this.liveCandleGraphics.strokeRoundedRect(
             x - this.CANDLE_WIDTH / 2,
             bodyTop,
@@ -325,27 +398,42 @@ export class CandleSystem {
             4
         );
 
-        // 3. Glow dot (punto brillante en precio actual)
-        this.liveCandleGraphics.fillStyle(color, 0.3);
-        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 15, yCurrent, 12);
+        // ============================================
+        // 3️⃣ GLOW DOT PULSANTE (punto brillante en precio actual)
+        // ============================================
+        // Círculo exterior (glow grande)
+        this.liveCandleGraphics.fillStyle(color, 0.4);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 20, yCurrent, 16);
 
+        // Círculo medio
+        this.liveCandleGraphics.fillStyle(color, 0.8);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 20, yCurrent, 10);
+
+        // Círculo brillante
         this.liveCandleGraphics.fillStyle(color, 1);
-        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 15, yCurrent, 6);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 20, yCurrent, 7);
 
-        this.liveCandleGraphics.fillStyle(0xffffff, 0.8);
-        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 15, yCurrent, 3);
+        // Core blanco pulsante
+        this.liveCandleGraphics.fillStyle(0xffffff, 1);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 20, yCurrent, 4);
 
-        // 4. Precio numérico
+        // ============================================
+        // 4️⃣ PRECIO NUMÉRICO CON INDICADOR DE CAMBIO
+        // ============================================
         const priceText = current.toFixed(2);
+        const changeText = priceChange >= 0 ? `+${priceChange.toFixed(2)}` : priceChange.toFixed(2);
+        const displayText = `${priceText}\n${changeText}`;
+
         const priceLabel = this.scene.add.text(
-            x + this.CANDLE_WIDTH / 2 + 30,
+            x + this.CANDLE_WIDTH / 2 + 40,
             yCurrent,
-            priceText,
+            displayText,
             {
-                font: 'bold 14px "Courier New"',
-                fill: isGreen ? '#00ff88' : '#ff0055',
+                font: 'bold 16px "Courier New"',
+                fill: isFlat ? '#ffffff' : (isGreen ? '#00ffaa' : '#ff0077'),
                 stroke: '#000',
-                strokeThickness: 3
+                strokeThickness: 4,
+                align: 'left'
             }
         ).setOrigin(0, 0.5).setDepth(22);
 
@@ -353,6 +441,37 @@ export class CandleSystem {
         this.scene.time.delayedCall(50, () => {
             if (priceLabel) priceLabel.destroy();
         });
+
+        // ============================================
+        // 5️⃣ INDICADOR VISUAL DE DIRECCIÓN (Flecha)
+        // ============================================
+        if (!isFlat) {
+            const arrowY = isGreen ? bodyTop - 20 : bodyBottom + 20;
+            const arrowSymbol = isGreen ? '▲' : '▼';
+
+            const arrow = this.scene.add.text(
+                x,
+                arrowY,
+                arrowSymbol,
+                {
+                    font: 'bold 24px Arial',
+                    fill: isGreen ? '#00ffaa' : '#ff0077',
+                    stroke: '#000',
+                    strokeThickness: 3
+                }
+            ).setOrigin(0.5).setDepth(22);
+
+            // Animación de pulso
+            this.scene.tweens.add({
+                targets: arrow,
+                scale: 1.3,
+                alpha: 0.5,
+                duration: 300,
+                yoyo: true,
+                repeat: 0,
+                onComplete: () => arrow.destroy()
+            });
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
