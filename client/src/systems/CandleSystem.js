@@ -99,6 +99,27 @@ export class CandleSystem {
         // La cámara está configurada para seguir this.myPlayer en GameScene.spawnMyPlayer
 
         console.log(`[🏗️ CandleSystem] ${this.candleHistory.length} velas creadas`);
+
+        // 🛡️ FORZAR REDIBUJADO INMEDIATO
+        if (this.candleHistory.length > 0) {
+            const last = this.candleHistory[this.candleHistory.length - 1];
+            // Si no hay liveStartPrice, usar el último close
+            const startPrice = this.liveStartPrice !== null ? this.liveStartPrice : last.close;
+            const currentPrice = last.close;
+
+            // Inicializar high/low si es necesario
+            const high = this.liveCandleHigh !== null ? this.liveCandleHigh : currentPrice;
+            const low = this.liveCandleLow !== null ? this.liveCandleLow : currentPrice;
+
+            this.renderLiveCandleTicker(
+                this.liveTickerIndex,
+                startPrice,
+                currentPrice,
+                high,
+                low
+            );
+            console.log('[🏗️ CHART] Ticker forzado inicializado');
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -237,10 +258,12 @@ export class CandleSystem {
         const last = this.candleHistory[lastIndex];
 
         // Inicializar open si es la primera actualización
-        if (!this.liveStartPrice) {
+        // 🛡️ FALLBACK: Inicializar precio base si es null (Anti-Invisible Glitch)
+        if (this.liveStartPrice === null) {
             this.liveStartPrice = last.open || price;
             this.liveCandleHigh = price;
             this.liveCandleLow = price;
+            console.log('[🕯️ TICKER] Inicializando liveStartPrice:', this.liveStartPrice);
         }
 
         // Actualizar precio actual
@@ -307,7 +330,11 @@ export class CandleSystem {
             minPrice = Math.min(minPrice, c.low || c.close);
             maxPrice = Math.max(maxPrice, c.high || c.close);
         });
-        const priceRange = Math.max(1, maxPrice - minPrice);
+
+        // 🛡️ ANTI-FLATLINE: Padding de seguridad
+        minPrice -= 10;
+        maxPrice += 10;
+        const priceRange = Math.max(10, maxPrice - minPrice); // Mínimo 10
 
         // Función auxiliar con amplificación
         const priceToY = (price) => {
@@ -327,6 +354,8 @@ export class CandleSystem {
         const yHigh = priceToY(high);
         const yLow = priceToY(low);
 
+
+
         // ============================================
         // 🎨 COLOR DINÁMICO INTENSO
         // ============================================
@@ -334,7 +363,7 @@ export class CandleSystem {
         const isFlat = Math.abs(priceChange) < 0.01;
 
         let color, glowColor, borderColor;
-        
+
         // TAREA 3: Visualización por Fase
         if (this.currentPhase === 'BETTING') {
             // Fase de Apuestas: Borde Blanco/Amarillo
@@ -391,6 +420,8 @@ export class CandleSystem {
         const bodyTop = Math.min(yOpen, yCurrent);
         const bodyBottom = Math.max(yOpen, yCurrent);
         let bodyHeight = Math.max(8, bodyBottom - bodyTop); // Mínimo 8px para visibilidad
+
+        console.log('[TICKER] Price:', current, 'Y:', yCurrent, 'Height:', bodyHeight);
 
         // 🛡️ CLAMPING: Limitar altura para evitar velas infinitas
         const isExtremeForce = bodyHeight > this.MAX_CANDLE_HEIGHT;
