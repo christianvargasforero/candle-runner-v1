@@ -693,6 +693,27 @@
             color: #000;
         }
 
+        /* Refresh Button */
+        .refresh-btn {
+            background: transparent;
+            border: 1px solid rgba(0, 255, 249, 0.5);
+            color: #00fff9;
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(0, 255, 249, 0.1);
+            border-color: #00fff9;
+            transform: rotate(180deg);
+        }
+
+        .refresh-btn:active {
+            transform: rotate(360deg);
+        }
+
         /* Toast */
         #toast-notification {
             position: fixed;
@@ -1490,7 +1511,13 @@
 
                 <!-- 🚌 BUSES DISPONIBLES -->
                 <div class="buses-section" style="margin-top: 30px;">
-                    <div class="inventory-header"><i class="fa-solid fa-bus"></i> BUSES DISPONIBLES</div>
+                    <div class="inventory-header"
+                        style="display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-solid fa-bus"></i> BUSES DISPONIBLES</span>
+                        <button id="refresh-buses-btn" class="refresh-btn" title="Refresh bus list">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
                     <div id="buses-grid" style="display: grid; gap: 15px;">
                         <!-- Buses generados por JS -->
                     </div>
@@ -1710,10 +1737,8 @@
                 lobbyOverlay.classList.remove('hidden');
                 console.log('[LOBBY] 📋 Bus lobby mostrado');
 
-                // Solicitar lista de buses actualizada
-                if (window.globalSocket) {
-                    window.globalSocket.emit('GET_AVAILABLE_BUSES');
-                }
+                // NOTA: Los buses se solicitan desde USER_PROFILE para evitar race condition
+                // No se solicitan aquí automáticamente
             }
         };
 
@@ -1924,10 +1949,22 @@
             const integrityBar = document.getElementById('integrity-bar-visual');
             const repairBtn = document.getElementById('repair-btn');
             const inventoryGrid = document.getElementById('inventory-grid');
+            const refreshBusesBtn = document.getElementById('refresh-buses-btn');
 
             // Estado Local
             let currentUserProfile = null;
             let availableBuses = [];
+
+            // 🔄 REFRESH BUSES BUTTON
+            if (refreshBusesBtn) {
+                refreshBusesBtn.addEventListener('click', () => {
+                    console.log('[REFRESH] Solicitando lista de buses actualizada...');
+                    if (window.globalSocket) {
+                        window.globalSocket.emit('GET_AVAILABLE_BUSES');
+                        showToast('Refreshing bus list...', 'info');
+                    }
+                });
+            }
 
             // --- BUS MODAL LOGIC ---
 
@@ -1997,6 +2034,11 @@
                     console.log('[PROFILE] DATA RECEIVED:', profile);
                     currentUserProfile = profile;
                     updateUI(profile);
+
+                    // ✅ SOLICITAR BUSES SOLO DESPUÉS DE QUE EL PERFIL ESTÉ LISTO
+                    // Esto evita condición de carrera con la BD
+                    console.log('[PROFILE] Usuario listo. Solicitando buses disponibles...');
+                    socket.emit('GET_AVAILABLE_BUSES');
                 });
 
                 // Escuchar eventos de reparación
