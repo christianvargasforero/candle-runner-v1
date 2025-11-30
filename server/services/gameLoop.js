@@ -61,7 +61,26 @@ class BusGameLoop {
             burned: 0
         };
 
+        // Historial de velas (el mapa)
+        this.candleHistory = [];
+        this.initCandleHistory();
+
         console.log(`🚌 [BUS LOOP] Instancia creada para bus ${room.id}`);
+    }
+
+    /** Inicializa el historial de velas con 20 velas base (ficticias) */
+    initCandleHistory() {
+        let price = 90000;
+        for (let i = 0; i < 20; i++) {
+            const open = price;
+            const change = (Math.random() - 0.5) * 200; // +/- $100
+            const close = open + change;
+            const high = Math.max(open, close) + Math.random() * 50;
+            const low = Math.min(open, close) - Math.random() * 50;
+            const result = close > open ? 'LONG' : (close < open ? 'SHORT' : 'DRAW');
+            this.candleHistory.push({ open, close, high, low, result });
+            price = close;
+        }
     }
     /**
      * Recupera el estado persistente del bus desde Redis (acumulado, etc)
@@ -95,16 +114,26 @@ class BusGameLoop {
         console.log(`   Pozo Total: $${this.room.ticketPrice * this.room.users.size}`);
         console.log(`${'='.repeat(60)}\n`);
 
-        // 👥 EMITIR EVENTO BUS_START con lista de pasajeros confirmados
+        // 👫 EMITIR EVENTO BUS_START con lista de pasajeros y estado de integridad
         const passengerIds = Array.from(this.room.users.values());
+        const passengerStates = passengerIds.map(userId => {
+            const user = userManager.users.get(userId) || userManager.users.get(userId.socketId);
+            return {
+                userId,
+                integrity: user?.activeSkin?.currentIntegrity ?? 100,
+                maxIntegrity: user?.activeSkin?.maxIntegrity ?? 100,
+                isBurned: user?.activeSkin?.isBurned ?? false
+            };
+        });
         for (const socketId of this.room.users.keys()) {
             this.io.to(socketId).emit('BUS_START', {
                 busId: this.room.id,
-                passengers: passengerIds,
+                candleHistory: this.candleHistory,
+                passengers: passengerStates,
                 ticketPrice: this.room.ticketPrice
             });
         }
-        console.log(`👥 [BUS START] Notificados ${passengerIds.length} pasajeros`);
+        console.log(`👫 [BUS START] Notificados ${passengerIds.length} pasajeros`);
 
         // Iniciar sincronización
         this.startSyncTimer();
@@ -327,6 +356,14 @@ class BusGameLoop {
         this.currentRound.priceChange = priceChange;
         this.currentRound.priceChangePercent = priceChangePercent;
 
+        // Actualizar historial de velas
+        const open = this.currentRound.startPrice;
+        const close = this.currentRound.endPrice;
+        const high = Math.max(open, close) + Math.random() * 50;
+        const low = Math.min(open, close) - Math.random() * 50;
+        this.candleHistory.push({ open, close, high, low, result });
+        if (this.candleHistory.length > 20) this.candleHistory.shift();
+
         // --- LÓGICA DE DISTRIBUCIÓN DE PREMIOS ---
         let winners = [];
         let winAmountPerUser = 0;
@@ -491,7 +528,22 @@ class BusGameLoop {
             }
         }
 
-        // Emitir resultado a todos los clientes
+        // Emitir resultado a todos los clientes, incluyendo status de cada pasajero
+        const passengerStatuses = [];
+        for (const bet of this.currentRound.bets) {
+            const user = userManager.getUser(bet.socketId);
+            if (user) {
+                let status = 'DAMAGE';
+                if (bet.direction === result) status = 'WIN';
+                if (user.activeSkin.isBurned) status = 'BURNED';
+                passengerStatuses.push({
+                    userId: user.id,
+                    status,
+                    integrity: user.activeSkin.currentIntegrity,
+                    isBurned: user.activeSkin.isBurned
+                });
+            }
+        }
         this.io.emit('ROUND_RESULT', {
             roundNumber: this.roundNumber,
             startPrice: this.currentRound.startPrice,
@@ -502,7 +554,9 @@ class BusGameLoop {
             totalPool: this.currentRound.totalPool,
             accumulatedPot: this.accumulatedPot,
             winnersCount: winners.length,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            candleHistory: this.candleHistory,
+            passengerStatuses
         });
     }
 
