@@ -198,11 +198,16 @@
         #profile-panel {
             width: 100%;
             max-width: 500px;
-            max-height: 90vh;
+            max-height: 85dvh;
+            /* dvh para móviles (descuenta barra navegador) */
             background: rgba(10, 10, 20, 0.95);
             border: 1px solid #00fff9;
             box-shadow: 0 0 50px rgba(0, 255, 249, 0.15);
-            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            /* Header arriba, contenido scrolleable */
+            overflow: hidden;
+            /* Ocultar overflow del panel principal */
             transform: translateY(100vh);
             opacity: 0;
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -315,7 +320,13 @@
 
         /* Contenido */
         .panel-content {
+            flex: 1;
+            /* Ocupar espacio restante */
+            overflow-y: auto;
+            /* Scroll solo en el contenido */
             padding: 25px;
+            padding-bottom: 50px;
+            /* Espacio extra para que no se corte abajo */
         }
 
         /* Sección A: Resumen Financiero */
@@ -741,6 +752,9 @@
             font-size: 0.8rem;
             color: #ccc;
             line-height: 1.6;
+            word-wrap: break-word;
+            /* Evita desborde horizontal */
+            max-width: 100%;
         }
 
         .manual-content.show {
@@ -1575,7 +1589,7 @@
                     bus.status === 'IN_PROGRESS' ? 'IN GAME' : 'LOCKED';
 
                 // Determinar si puede unirse
-                const canJoin = bus.status === 'BOARDING' && bus.userCount < bus.capacity;
+                const canJoin = bus.status === 'BOARDING' && (bus.occupancy || 0) < bus.capacity;
 
                 card.innerHTML = `
                     <div class="bus-card-header">
@@ -1588,7 +1602,7 @@
                     <div class="bus-info">
                         <div class="bus-info-item">
                             <i class="fa-solid fa-users"></i>
-                            <span>${bus.userCount}/${bus.capacity} Pasajeros</span>
+                            <span>${bus.occupancy || 0}/${bus.capacity} Pasajeros</span>
                         </div>
                         <div class="bus-info-item">
                             <i class="fa-solid fa-layer-group"></i>
