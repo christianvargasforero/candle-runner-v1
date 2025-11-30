@@ -22,6 +22,7 @@ class Room {
         this.createdAt = Date.now();
         this.lastFillTime = null; // Para calcular velocidad de llenado
         this.gameLoopInstance = null; // Referencia al GameLoop de este bus
+        this.pot = 0; // 🏆 Jackpot acumulado inicial
     }
 
     determineTier(name) {
@@ -104,6 +105,15 @@ class RoomManager {
         this.rooms = new Map();
         this.nextRoomId = 1;
 
+        // 🏆 JACKPOTS GLOBALES POR TIER
+        // El dinero acumulado sobrevive entre buses del mismo tier
+        this.tierJackpots = {
+            TRAINING: 0,
+            SATOSHI: 0,
+            TRADER: 0,
+            WHALE: 0
+        };
+
         // 🚌 MODELO "BUS": Crear buses estáticos con capacidades Fibonacci
         console.log('🚌 [ROOM MANAGER] Inicializando buses con modelo SIT & GO...\n');
 
@@ -131,8 +141,15 @@ class RoomManager {
         const roomId = `bus_${name.toLowerCase()}_${this.nextRoomId++}`;
         const room = new Room(roomId, name, ticketPrice, capacity);
 
+        // 🏆 ASIGNAR JACKPOT INICIAL DEL TIER
+        const tier = room.tier;
+        room.pot = this.tierJackpots[tier] || 0;
+        
+        // Resetear el jackpot del tier (el dinero ahora está en este bus)
+        this.tierJackpots[tier] = 0;
+
         this.rooms.set(roomId, room);
-        console.log(`🚌 [BUS] ${roomId} creado | Ticket: $${ticketPrice.toFixed(2)} | Capacidad: ${capacity} sillas`);
+        console.log(`🚌 [BUS] ${roomId} creado | Ticket: $${ticketPrice.toFixed(2)} | Capacidad: ${capacity} sillas | Pot: $${room.pot.toFixed(2)}`);
 
         return room;
     }
@@ -334,7 +351,8 @@ class RoomManager {
                 capacity: room.capacity,
                 status: room.status,
                 ticketPrice: room.ticketPrice,
-                tier: room.tier
+                tier: room.tier,
+                pot: room.pot || 0 // 🏆 JACKPOT ACUMULADO
             });
         });
         return info;
@@ -345,6 +363,23 @@ class RoomManager {
      */
     getRoom(roomId) {
         return this.rooms.get(roomId);
+    }
+
+    /**
+     * 🏆 RECIBE ROLLOVER DE UN BUS FINALIZADO
+     * Suma el dinero acumulado al jackpot global del tier
+     * para que el próximo bus de ese tier nazca con ese bote
+     * @param {string} tier - TRAINING, SATOSHI, TRADER, WHALE
+     * @param {number} amount - Cantidad acumulada
+     */
+    addRollover(tier, amount) {
+        if (!this.tierJackpots.hasOwnProperty(tier)) {
+            console.error(`❌ [ROLLOVER] Tier inválido: ${tier}`);
+            return;
+        }
+
+        this.tierJackpots[tier] = (this.tierJackpots[tier] || 0) + amount;
+        console.log(`🏆 [ROLLOVER] ${tier} acumuló $${amount.toFixed(2)} | Total Tier: $${this.tierJackpots[tier].toFixed(2)}`);
     }
 
     /**

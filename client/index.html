@@ -869,6 +869,38 @@
             transform: translateY(-2px);
         }
 
+        /* 🏆 JACKPOT BADGE */
+        .bus-jackpot {
+            background: linear-gradient(90deg, #ffd700, #ffaa00, #ffd700);
+            background-size: 200% 100%;
+            color: #000;
+            font-weight: bold;
+            text-align: center;
+            padding: 8px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.3);
+            animation: glow-pulse 2s ease-in-out infinite, gradient-shift 3s ease infinite;
+            font-size: 0.95rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border: 2px solid #ffdd55;
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), inset 0 0 10px rgba(255, 255, 255, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 35px rgba(255, 215, 0, 0.9), inset 0 0 15px rgba(255, 255, 255, 0.5);
+            }
+        }
+
+        @keyframes gradient-shift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
         .bus-card-header {
             display: flex;
             justify-content: space-between;
@@ -1804,6 +1836,12 @@
                 const statusColor = isBoarding ? '#00ff88' :
                     (status === 'IN_PROGRESS' || status === 'LOCKED') ? '#ff9800' : '#888';
 
+                // 🏆 JACKPOT BADGE (solo si hay pot acumulado)
+                const jackpotHTML = (bus.pot && bus.pot > 0) ? 
+                    `<div class="bus-jackpot">
+                        🏆 JACKPOT: $${bus.pot.toFixed(2)} USDT
+                    </div>` : '';
+
                 card.innerHTML = `
                     <div class="bus-card-header">
                         <div class="bus-name">${bus.name || 'UNKNOWN'}</div>
@@ -1811,6 +1849,7 @@
                             ${statusIcon} ${statusText}
                         </div>
                     </div>
+                    ${jackpotHTML}
                     <div class="bus-ticket-price">
                         <i class="fa-solid fa-ticket"></i> $${(bus.ticketPrice || 0).toFixed(2)} USDT
                     </div>

@@ -15,7 +15,7 @@ import {
 
 import priceService from './priceService.js';
 import { userManager } from './userManager.js';
-import redisClient from '../config/redis.js';
+import redisClient, { safeRedisSet, safeRedisGet } from '../config/redis.js';
 
 /**
  * 🚌 BusGameLoop - Instancia de juego para un bus específico
@@ -86,19 +86,24 @@ class BusGameLoop {
      * Recupera el estado persistente del bus desde Redis (acumulado, etc)
      */
     async recoverState() {
-        try {
+        // 🏆 HEREDAR JACKPOT DEL ROOM (proviene del tier)
+        if (this.room.pot && this.room.pot > 0) {
+            this.accumulatedPot = this.room.pot;
+            console.log(`🏆 [JACKPOT] Bus hereda $${this.accumulatedPot.toFixed(2)} del tier ${this.room.tier}`);
+        } else {
+            // Fallback: Intentar recuperar de Redis
             const key = `bus:${this.room.id}:accumulatedPot`;
-            const value = await redisClient.get(key);
+            const value = await safeRedisGet(key);
             if (value !== null) {
                 this.accumulatedPot = parseFloat(value);
                 if (isNaN(this.accumulatedPot)) this.accumulatedPot = 0;
             } else {
                 this.accumulatedPot = 0;
             }
-        } catch (err) {
-            console.error(`[RECOVER] Error recuperando accumulatedPot de Redis:`, err);
-            this.accumulatedPot = 0;
         }
+        
+        // Asegurar que rolloverCount esté inicializado
+        this.rolloverCount = this.rolloverCount || 0;
     }
 
     /**
@@ -166,6 +171,13 @@ class BusGameLoop {
         } catch (error) {
             console.error(`❌ [BUS ${this.room.id}] Error en Game Loop:`, error);
         } finally {
+            // 🏆 TRANSFERIR ROLLOVER AL TIER (si hay dinero acumulado)
+            if (this.accumulatedPot > 0 && this.roomManager) {
+                const tier = this.room.tier;
+                console.log(`🏆 [BUS END] Transfiriendo $${this.accumulatedPot.toFixed(2)} al tier ${tier}`);
+                this.roomManager.addRollover(tier, this.accumulatedPot);
+            }
+            
             // Cleanup
             this.cleanup();
         }
@@ -458,14 +470,10 @@ class BusGameLoop {
 
             } else {
                 // No hay ganadores (todos perdieron): Rollover
-                this.accumulatedPot += roundPool;
-                // Persistir accumulatedPot en Redis
-                try {
-                    await redisClient.set(`bus:${this.room.id}:accumulatedPot`, this.accumulatedPot.toString());
-                } catch (err) {
-                    console.error('[REDIS] Error guardando accumulatedPot:', err);
-                }
-                this.rolloverCount++;
+                this.accumulatedPot = (this.accumulatedPot || 0) + roundPool;
+                // Persistir accumulatedPot en Redis (seguro)
+                await safeRedisSet(`bus:${this.room.id}:accumulatedPot`, this.accumulatedPot.toString());
+                this.rolloverCount = (this.rolloverCount || 0) + 1;
 
                 console.log(`🔄 [ROLLOVER] Sin ganadores. Pozo acumulado: $${this.accumulatedPot.toFixed(2)} (Racha: ${this.rolloverCount})`);
 

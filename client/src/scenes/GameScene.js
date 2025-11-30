@@ -16,6 +16,9 @@ export default class GameScene extends Phaser.Scene {
         this.CANDLE_SPACING = 140;
         this.CANDLE_WIDTH = 50;
         this.BASE_X = 300;
+        // Coordenadas absolutas y escala de precios (fuente de verdad)
+        this.baseY = window.innerHeight / 2 + 100;
+        this.priceScale = 300; // px range for price normalization (used in getCandleSpot)
         
         // Paleta Neon Cyberpunk
         this.COLORS = {
@@ -217,6 +220,7 @@ export default class GameScene extends Phaser.Scene {
             // Renderizar escena
             this.renderHolographicCandles();
             this.renderPriceLine();
+            // Usar sistema de coordenadas absolutas ancladas
             this.spawnDifferentiatedPlayers(this.passengers);
         });
         
@@ -273,17 +277,14 @@ export default class GameScene extends Phaser.Scene {
         });
         const priceRange = maxPrice - minPrice || 1;
         
-        // Dibujar cada vela
+        // Dibujar cada vela usando el helper getCandleSpot
         this.candleHistory.forEach((candle, i) => {
-            const x = this.BASE_X + i * this.CANDLE_SPACING;
-            const priceNorm = (candle.close - minPrice) / priceRange;
-            const y = baseY - priceNorm * 300;
-            
+            const { x, y } = this.getCandleSpot(i);
             // Determinar color basado en resultado (SERVIDOR = VERDAD)
             const isLong = candle.result === 'LONG';
             const color = isLong ? this.COLORS.LONG : 
                          (candle.result === 'SHORT' ? this.COLORS.SHORT : this.COLORS.NEUTRAL);
-            
+
             // Crear vela holográfica
             const candleContainer = this.createHolographicCandle(x, y, color, i === this.candleHistory.length - 1);
             this.candleLayer.add(candleContainer);
@@ -438,6 +439,27 @@ export default class GameScene extends Phaser.Scene {
         this.lineLayer.add(lineGraphics);
     }
 
+    // Fuente de verdad para la posición "encima" de una vela
+    getCandleSpot(index) {
+        // Índice seguro
+        const i = Math.max(0, Math.min(index, this.candleHistory.length - 1));
+        const x = this.BASE_X + i * this.CANDLE_SPACING;
+
+        // Normalizar precio para trasladarlo a Y
+        let minPrice = Infinity, maxPrice = -Infinity;
+        this.candleHistory.forEach(c => {
+            minPrice = Math.min(minPrice, c.low || c.close);
+            maxPrice = Math.max(maxPrice, c.high || c.close);
+        });
+        const priceRange = Math.max(1, maxPrice - minPrice);
+
+        const price = this.candleHistory[i].close || (minPrice + priceRange / 2);
+        const priceNorm = (price - minPrice) / priceRange;
+        const y = this.baseY - priceNorm * this.priceScale;
+
+        return { x, y };
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // 👥 JUGADORES DIFERENCIADOS
     // ═══════════════════════════════════════════════════════════════
@@ -445,42 +467,69 @@ export default class GameScene extends Phaser.Scene {
     spawnDifferentiatedPlayers(passengers) {
         // Limpiar sprites previos
         this.playerSprites.forEach(data => {
-            if (data.sprite) data.sprite.destroy();
-            if (data.nameTag) data.nameTag.destroy();
             if (data.container) data.container.destroy();
         });
         this.playerSprites.clear();
         this.playerLayer.removeAll(true);
-        
+
         if (!this.candleHistory.length) return;
-        
-        // Posición sobre la última vela
-        const lastCandleX = this.BASE_X + (this.candleHistory.length - 1) * this.CANDLE_SPACING;
-        const baseY = this.scale.height / 2; // Encima de las velas
-        
+
+        const lastIndex = this.candleHistory.length - 1;
+        const spot = this.getCandleSpot(lastIndex);
+
+        // Spawn separado para local y remotos (evita superposición)
         passengers.forEach((p, index) => {
-            const odId = p.odId || p.odId;
-            const isLocal = odId === this.localUserId || (odId && odId.endsWith && odId.endsWith(this.localUserId));
-            
-            // Calcular posición (distribuir jugadores)
-            const offsetX = (index - passengers.length / 2) * 40;
-            const x = lastCandleX + offsetX;
-            const y = baseY - 80;
-            
-            // Determinar color de skin
-            let skinColor = p.skinColor || this.SKIN_COLORS[index % this.SKIN_COLORS.length];
-            if (isLocal) skinColor = 0x00fff9; // Jugador local siempre cyan
-            
-            // Crear sprite del jugador
-            const playerData = this.createPlayerSprite(x, y, skinColor, p, isLocal);
-            this.playerSprites.set(odId, playerData);
+            const id = p.odId || p.userId || p.id;
+            if (!id) return;
+
+            const isLocal = id === this.localUserId;
+
+            if (isLocal) {
+                // Jugador local: posicion precisa sobre la vela y cámara inmediata
+                const my = this.spawnMyPlayer(id, p, spot);
+                this.playerSprites.set(id, my);
+            } else {
+                // Otros jugadores: evitar overlap con offset aleatorio
+                const other = this.spawnOtherPlayer(id, p, spot, index);
+                this.playerSprites.set(id, other);
+            }
         });
-        
-        // Seguir al jugador local
-        const localData = Array.from(this.playerSprites.values()).find(d => d.isLocal);
+
+        // Asegurar que la cámara siga al local si existe
+        const localData = this.playerSprites.get(this.localUserId);
         if (localData && localData.container) {
-            this.cameras.main.startFollow(localData.container, true, 0.08, 0.08);
+            this.cameras.main.startFollow(localData.container, true, 0.12, 0.12);
         }
+    }
+
+    // Posicionar y crear jugador local exactamente sobre la vela
+    spawnMyPlayer(id, p, spot) {
+        const x = spot.x;
+        const y = spot.y - 20; // encima de la vela
+        const color = p.skinColor || 0x00fff9;
+        const data = this.createPlayerSprite(x, y, color, { odId: id, skinName: p.skinName || p.skin || 'You', integrity: p.integrity, maxIntegrity: p.maxIntegrity }, true);
+        // Force follow immediately
+        if (data && data.container) {
+            this.cameras.main.startFollow(data.container, true, 0.12, 0.12);
+        }
+        return data;
+    }
+
+    // Posicionar y crear jugador remoto con pequeño offset para evitar superposición
+    spawnOtherPlayer(id, p, spot, index) {
+        // Offset en X determinista por índice para estabilidad en todos los clientes
+        const column = index % 5;
+        const row = Math.floor(index / 5);
+        const jitter = (column - 2) * 18 + (Math.random() * 10 - 5); // -41 .. +41 approx
+        const x = spot.x + jitter;
+        const y = spot.y - 20 - row * 6; // pequeño apilado si muchos
+        const color = p.skinColor || this.SKIN_COLORS[index % this.SKIN_COLORS.length];
+        const data = this.createPlayerSprite(x, y, color, { odId: id, skinName: p.skinName || p.skin || 'Anon', integrity: p.integrity, maxIntegrity: p.maxIntegrity }, false);
+        // Fantasma
+        if (data && data.container) {
+            data.container.setAlpha(0.55);
+        }
+        return data;
     }
     
     createPlayerSprite(x, y, color, data, isLocal) {
@@ -580,18 +629,20 @@ export default class GameScene extends Phaser.Scene {
         
         const lastCandleX = this.BASE_X + (this.candleHistory.length - 1) * this.CANDLE_SPACING;
         const y = this.scale.height / 2 - 80;
-        
+        const id = data.id || data.odId || data.userId;
+        if (!id) return;
+
         const color = data.skinColor || this.SKIN_COLORS[this.playerSprites.size % this.SKIN_COLORS.length];
-        const isLocal = data.id === this.localUserId;
-        
+        const isLocal = id === this.localUserId;
+
         const playerData = this.createPlayerSprite(lastCandleX, y, color, {
-            odId: data.id,
-            skinName: data.skin,
-            integrity: 100,
-            maxIntegrity: 100
+            odId: id,
+            skinName: data.skin || data.skinName,
+            integrity: data.integrity || 100,
+            maxIntegrity: data.maxIntegrity || 100
         }, isLocal);
-        
-        this.playerSprites.set(data.id, playerData);
+
+        this.playerSprites.set(id, playerData);
     }
     
     removePlayerSprite(odId) {
@@ -608,7 +659,8 @@ export default class GameScene extends Phaser.Scene {
     
     animatePlayerResults(statuses) {
         statuses.forEach(s => {
-            const data = this.playerSprites.get(s.odId);
+            const id = s.odId || s.userId || s.id;
+            const data = this.playerSprites.get(id);
             if (!data || !data.container) return;
             
             const container = data.container;
