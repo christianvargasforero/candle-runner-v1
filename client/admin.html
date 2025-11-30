@@ -57,46 +57,83 @@
             min-width: 0;
         }
         :root {
-            --bg-dark: #1a1a2e;
-            --card-bg: #16213e;
-            --accent-red: #e94560;
+            --bg-dark: #0a0a0a;
+            --card-bg: #1a1a2e;
+            --accent-cyan: #00b8c4;
+            --accent-magenta: #b8008a;
             --accent-blue: #0f3460;
             --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --neon-green: #00ff88;
-            --neon-red: #ff0055;
-            --gold: #ffd700;
+            --text-secondary: #00cc77;
+            --neon-green: #00cc77;
+            --neon-red: #cc0044;
+            --gold: #ccaa00;
+            --glow-cyan: rgba(0, 184, 196, 0.3);
+            --glow-magenta: rgba(184, 0, 138, 0.3);
         }
 
         body {
-            background-color: var(--bg-dark);
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
             color: var(--text-primary);
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Courier New', monospace;
         }
 
         .navbar {
-            background-color: var(--card-bg);
-            border-bottom: 2px solid var(--accent-red);
+            background: linear-gradient(90deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+            border-bottom: 2px solid var(--accent-cyan);
+            box-shadow: 0 4px 20px var(--glow-cyan);
         }
 
         .card {
-            background-color: var(--card-bg);
-            border: 1px solid var(--accent-blue);
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+            border: 1px solid var(--accent-cyan);
             border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 0 20px var(--glow-cyan);
             margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            animation: scan 3s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
         }
 
         .card-header {
-            background-color: rgba(15, 52, 96, 0.5);
-            border-bottom: 1px solid var(--accent-blue);
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta), var(--accent-cyan));
+            background-size: 200% 100%;
+            animation: gradientShift 3s ease infinite;
+            border-bottom: 1px solid var(--accent-cyan);
             font-weight: bold;
-            color: var(--text-secondary);
+            color: #000;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
         }
 
         .kpi-value {
             font-size: 2.5rem;
             font-weight: bold;
+            text-shadow: 0 0 10px currentColor;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
 
         .kpi-label {
@@ -108,15 +145,19 @@
         /* Progress Bar */
         .progress {
             height: 30px;
-            background-color: #0f3460;
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--accent-cyan);
             border-radius: 15px;
             overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0, 255, 249, 0.3);
         }
 
         .progress-bar {
             transition: width 0.5s linear;
             font-weight: bold;
             line-height: 30px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+            box-shadow: 0 0 20px currentColor;
         }
 
         /* Kill Feed */
@@ -125,6 +166,9 @@
             overflow-y: auto;
             font-family: 'Courier New', monospace;
             font-size: 0.9rem;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 5px;
         }
 
         .kill-feed table {
@@ -134,7 +178,19 @@
 
         .kill-feed td {
             padding: 8px;
-            border-bottom: 1px solid #2a2a4e;
+            border-bottom: 1px solid rgba(0, 255, 249, 0.2);
+        }
+        
+        .table-dark {
+            background-color: rgba(0, 0, 0, 0.8) !important;
+        }
+        
+        .table-dark thead {
+            border-bottom: 2px solid var(--accent-cyan);
+        }
+        
+        .table-dark tbody tr:hover {
+            background-color: rgba(0, 255, 249, 0.1) !important;
         }
 
         .log-win {
@@ -167,7 +223,129 @@
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: var(--accent-red);
+            background: var(--accent-cyan);
+        }
+        
+        /* Badges con efecto neón */
+        .badge {
+            text-shadow: 0 0 5px currentColor;
+            border: 1px solid currentColor;
+        }
+        
+        .badge.bg-success {
+            background: linear-gradient(135deg, #00cc77, #0099cc) !important;
+            box-shadow: 0 0 10px rgba(0, 204, 119, 0.4);
+        }
+        
+        .badge.bg-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta)) !important;
+            box-shadow: 0 0 10px var(--glow-cyan);
+        }
+        
+        .badge.bg-danger {
+            background: linear-gradient(135deg, #cc0044, #cc3500) !important;
+            box-shadow: 0 0 10px rgba(204, 0, 68, 0.4);
+        }
+        
+        .badge.bg-warning {
+            background: linear-gradient(135deg, #ccaa00, #cc8800) !important;
+            box-shadow: 0 0 10px rgba(204, 170, 0, 0.4);
+            color: #000 !important;
+        }
+        
+        /* Botones con efecto cyberpunk */
+        .btn {
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 2px solid currentColor;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px currentColor;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #00cc77, #0099cc);
+            border-color: #00cc77;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            border-color: var(--accent-cyan);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #cc0044, #cc3500);
+            border-color: #cc0044;
+        }
+        
+        .btn-info {
+            background: linear-gradient(135deg, #0099cc, #00b8c4);
+            border-color: #00b8c4;
+        }
+        
+        .btn-warning {
+            background: linear-gradient(135deg, #ccaa00, #cc8800);
+            border-color: #ccaa00;
+            color: #000;
+        }
+        
+        /* Nav tabs cyberpunk */
+        .nav-tabs {
+            border-bottom: 2px solid var(--accent-cyan);
+        }
+        
+        .nav-tabs .nav-link {
+            color: var(--text-secondary);
+            border: 1px solid transparent;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .nav-tabs .nav-link:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        
+        .nav-tabs .nav-link.active {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            border-color: var(--accent-cyan);
+            color: #000;
+            box-shadow: 0 0 20px var(--glow-cyan);
+        }
+        
+        /* Forms cyberpunk */
+        .form-control, .form-select {
+            background-color: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--accent-cyan);
+            color: var(--text-primary);
+            font-family: 'Courier New', monospace;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background-color: rgba(0, 0, 0, 0.9);
+            border-color: var(--accent-magenta);
+            box-shadow: 0 0 10px var(--glow-magenta);
+            color: var(--text-primary);
+        }
+        
+        /* Modal cyberpunk */
+        .modal-content {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+            border: 2px solid var(--accent-cyan);
+            box-shadow: 0 0 40px var(--glow-cyan);
+        }
+        
+        .modal-header {
+            border-bottom: 2px solid var(--accent-cyan);
+        }
+        
+        .modal-footer {
+            border-top: 2px solid var(--accent-cyan);
         }
     </style>
 </head>
@@ -197,6 +375,10 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="fleet-tab" data-bs-toggle="tab" data-bs-target="#fleet" type="button"
                     role="tab">🚌 Bus Fleet</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button"
+                    role="tab">👥 Users</button>
             </li>
         </ul>
 
@@ -385,6 +567,106 @@
                     </div>
                 </div>
             </div>
+
+            <!-- TAB 3: USERS MANAGEMENT -->
+            <div class="tab-pane fade" id="users" role="tabpanel">
+                <div class="row">
+                    <!-- User Stats Panel -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card p-3">
+                            <div class="card-header bg-dark text-white">
+                                <i class="fas fa-chart-bar me-2"></i>ESTADÍSTICAS DE USUARIOS
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Total Registrados</span>
+                                        <strong id="totalUsers">0</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Online Ahora</span>
+                                        <strong class="text-success" id="onlineUsers">0</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Saldo Total (USDT)</span>
+                                        <strong class="text-warning" id="totalBalance">$0.00</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Saldo Total (WICK)</span>
+                                        <strong class="text-info" id="totalWick">0</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- User Search -->
+                        <div class="card p-3 mt-3">
+                            <div class="card-header bg-dark text-white">
+                                <i class="fas fa-search me-2"></i>BUSCAR USUARIO
+                            </div>
+                            <div class="card-body">
+                                <input type="text" id="userSearchInput" class="form-control mb-2" 
+                                    placeholder="Buscar por wallet o ID...">
+                                <button id="searchUserBtn" class="btn btn-primary w-100">
+                                    <i class="fas fa-search"></i> Buscar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Users List -->
+                    <div class="col-md-8">
+                        <div class="card h-100">
+                            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                                <span><i class="fas fa-users me-2"></i>LISTA DE USUARIOS</span>
+                                <button id="refreshUsersBtn" class="btn btn-sm btn-outline-light">
+                                    <i class="fas fa-sync"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                                    <table class="table table-dark table-striped table-hover mb-0">
+                                        <thead style="position: sticky; top: 0; background-color: var(--card-bg); z-index: 10;">
+                                            <tr>
+                                                <th>Wallet</th>
+                                                <th>USDT</th>
+                                                <th>WICK</th>
+                                                <th>Skin Activa</th>
+                                                <th>Integridad</th>
+                                                <th>Estado</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="usersTableBody">
+                                            <tr>
+                                                <td colspan="7" class="text-center text-muted">Cargando usuarios...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Details Modal (Bootstrap) -->
+                <div class="modal fade" id="userDetailsModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content bg-dark text-white">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="fas fa-user me-2"></i>Detalles del Usuario</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body" id="userDetailsContent">
+                                <!-- Content injected by JavaScript -->
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -524,10 +806,231 @@
                 // Fetch buses on connect
                 socket.emit('ADMIN_GET_BUSES');
 
+                // Fetch users on connect
+                socket.emit('ADMIN_GET_USERS');
+
                 // Auto-refresh every 5s
                 setInterval(() => {
                     socket.emit('ADMIN_GET_BUSES');
+                    socket.emit('ADMIN_GET_USERS');
                 }, 5000);
+            });
+
+            // --- USERS MANAGEMENT LOGIC ---
+            const usersTableBody = document.getElementById('usersTableBody');
+            const refreshUsersBtn = document.getElementById('refreshUsersBtn');
+            const userSearchInput = document.getElementById('userSearchInput');
+            const searchUserBtn = document.getElementById('searchUserBtn');
+            
+            let allUsers = []; // Cache de usuarios
+
+            function updateUsersTable(users) {
+                console.log('👥 Received users list:', users);
+                allUsers = users || [];
+                usersTableBody.innerHTML = '';
+                
+                if (!users || users.length === 0) {
+                    usersTableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No hay usuarios registrados</td></tr>';
+                    return;
+                }
+
+                // Calcular estadísticas
+                let totalBalanceUSDT = 0;
+                let totalBalanceWICK = 0;
+                let onlineCount = 0;
+
+                users.forEach(user => {
+                    totalBalanceUSDT += user.balanceUSDT || 0;
+                    totalBalanceWICK += user.balanceWICK || 0;
+                    if (user.isOnline) onlineCount++;
+
+                    const row = document.createElement('tr');
+                    
+                    // Wallet truncada
+                    const walletShort = user.wallet ? 
+                        `${user.wallet.slice(0, 6)}...${user.wallet.slice(-4)}` : 
+                        'N/A';
+                    
+                    // Skin activa
+                    const skinName = user.activeSkin?.name || 'Default';
+                    const integrity = user.activeSkin?.currentIntegrity || 100;
+                    const maxIntegrity = user.activeSkin?.maxIntegrity || 100;
+                    const isBurned = user.activeSkin?.isBurned || false;
+                    
+                    // Color de integridad
+                    let integrityColor = 'success';
+                    if (integrity < 50) integrityColor = 'warning';
+                    if (integrity < 20 || isBurned) integrityColor = 'danger';
+                    
+                    // Estado online
+                    const statusBadge = user.isOnline ? 
+                        '<span class="badge bg-success">Online</span>' : 
+                        '<span class="badge bg-secondary">Offline</span>';
+
+                    row.innerHTML = `
+                        <td><small>${walletShort}</small></td>
+                        <td>$${(user.balanceUSDT || 0).toFixed(2)}</td>
+                        <td>${(user.balanceWICK || 0).toFixed(0)}</td>
+                        <td><span class="badge bg-primary">${skinName}</span></td>
+                        <td>
+                            <span class="badge bg-${integrityColor}">
+                                ${isBurned ? '💀 BURNED' : `${integrity}/${maxIntegrity}`}
+                            </span>
+                        </td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info btn-user-details" data-userid="${user.id}" title="Ver detalles">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-warning btn-user-edit" data-userid="${user.id}" title="Editar saldo">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </td>
+                    `;
+                    usersTableBody.appendChild(row);
+                });
+
+                // Actualizar estadísticas
+                document.getElementById('totalUsers').innerText = users.length;
+                document.getElementById('onlineUsers').innerText = onlineCount;
+                document.getElementById('totalBalance').innerText = `$${totalBalanceUSDT.toFixed(2)}`;
+                document.getElementById('totalWick').innerText = totalBalanceWICK.toFixed(0);
+
+                // Asignar listeners a botones
+                document.querySelectorAll('.btn-user-details').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const userId = btn.getAttribute('data-userid');
+                        showUserDetails(userId);
+                    });
+                });
+
+                document.querySelectorAll('.btn-user-edit').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const userId = btn.getAttribute('data-userid');
+                        editUserBalance(userId);
+                    });
+                });
+            }
+
+            function showUserDetails(userId) {
+                const user = allUsers.find(u => u.id === userId);
+                if (!user) return;
+
+                const modalContent = document.getElementById('userDetailsContent');
+                
+                const inventory = user.inventory || [];
+                const inventoryHTML = inventory.length > 0 ? 
+                    inventory.map(skin => `
+                        <div class="badge bg-secondary me-1">
+                            ${skin.name} (${skin.currentIntegrity}/${skin.maxIntegrity})
+                        </div>
+                    `).join('') : 
+                    '<span class="text-muted">Sin skins en inventario</span>';
+
+                modalContent.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Información General</h6>
+                            <p><strong>ID:</strong> ${user.id}</p>
+                            <p><strong>Wallet:</strong><br><code>${user.wallet || 'N/A'}</code></p>
+                            <p><strong>Estado:</strong> ${user.isOnline ? 
+                                '<span class="badge bg-success">Online</span>' : 
+                                '<span class="badge bg-secondary">Offline</span>'}
+                            </p>
+                            <p><strong>Sala Actual:</strong> ${user.currentRoom || 'Ninguna'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Balances</h6>
+                            <p><strong>USDT:</strong> $${(user.balanceUSDT || 0).toFixed(2)}</p>
+                            <p><strong>WICK:</strong> ${(user.balanceWICK || 0).toFixed(0)}</p>
+                            
+                            <h6 class="mt-3">Skin Activa</h6>
+                            <p><strong>Nombre:</strong> ${user.activeSkin?.name || 'Default'}</p>
+                            <p><strong>Level:</strong> ${user.activeSkin?.level || 0}</p>
+                            <p><strong>Integridad:</strong> ${user.activeSkin?.currentIntegrity || 100} / ${user.activeSkin?.maxIntegrity || 100}</p>
+                            <p><strong>Estado:</strong> ${user.activeSkin?.isBurned ? 
+                                '<span class="badge bg-danger">💀 BURNED</span>' : 
+                                '<span class="badge bg-success">✅ OK</span>'}
+                            </p>
+                        </div>
+                    </div>
+                    <hr>
+                    <h6>Inventario de Skins</h6>
+                    <div>${inventoryHTML}</div>
+                `;
+
+                // Mostrar modal usando Bootstrap 5 API
+                const modal = new bootstrap.Modal(document.getElementById('userDetailsModal'));
+                modal.show();
+            }
+
+            function editUserBalance(userId) {
+                const user = allUsers.find(u => u.id === userId);
+                if (!user) return;
+
+                const newBalanceUSDT = prompt(`Editar balance USDT de ${user.wallet}:`, user.balanceUSDT || 0);
+                if (newBalanceUSDT === null) return;
+
+                const newBalanceWICK = prompt(`Editar balance WICK de ${user.wallet}:`, user.balanceWICK || 0);
+                if (newBalanceWICK === null) return;
+
+                socket.emit('ADMIN_UPDATE_USER_BALANCE', {
+                    userId: user.id,
+                    balanceUSDT: parseFloat(newBalanceUSDT),
+                    balanceWICK: parseFloat(newBalanceWICK)
+                });
+            }
+
+            // Filtro de búsqueda
+            function filterUsers(searchTerm) {
+                if (!searchTerm) {
+                    updateUsersTable(allUsers);
+                    return;
+                }
+
+                const filtered = allUsers.filter(user => 
+                    (user.wallet && user.wallet.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                    (user.id && user.id.toLowerCase().includes(searchTerm.toLowerCase()))
+                );
+                updateUsersTable(filtered);
+            }
+
+            if (searchUserBtn) {
+                searchUserBtn.addEventListener('click', () => {
+                    const searchTerm = userSearchInput.value.trim();
+                    filterUsers(searchTerm);
+                });
+            }
+
+            if (userSearchInput) {
+                userSearchInput.addEventListener('keyup', (e) => {
+                    if (e.key === 'Enter') {
+                        const searchTerm = userSearchInput.value.trim();
+                        filterUsers(searchTerm);
+                    }
+                });
+            }
+
+            if (refreshUsersBtn) {
+                refreshUsersBtn.addEventListener('click', () => {
+                    socket.emit('ADMIN_GET_USERS');
+                    userSearchInput.value = '';
+                });
+            }
+
+            // Listener para recibir lista de usuarios
+            socket.on('ADMIN_USERS_LIST', (users) => {
+                updateUsersTable(users);
+            });
+
+            // Listener para confirmación de actualización
+            socket.on('ADMIN_USER_UPDATED', (result) => {
+                if (result.success) {
+                    alert('✅ Usuario actualizado correctamente');
+                    socket.emit('ADMIN_GET_USERS');
+                } else {
+                    alert('❌ Error al actualizar usuario: ' + (result.error || 'desconocido'));
+                }
             });
             const ctx = document.getElementById('sentimentChart').getContext('2d');
             const sentimentChart = new Chart(ctx, {

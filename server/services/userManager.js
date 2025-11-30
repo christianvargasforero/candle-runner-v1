@@ -49,6 +49,7 @@ class UserManager {
 
             // Instanciar User y persistir skins iniciales
             user = new User(dbUser.id, socketId);
+            user.wallet = dbUser.walletAddress; // 🦊 Guardar wallet address
             user.balanceUSDT = dbUser.balanceUSDT;
             user.balanceWICK = dbUser.balanceWICK;
 
@@ -76,6 +77,7 @@ class UserManager {
 
             // Instanciar User
             user = new User(dbUser.id, socketId);
+            user.wallet = dbUser.walletAddress; // 🦊 Guardar wallet address
             user.balanceUSDT = dbUser.balanceUSDT;
             user.balanceWICK = dbUser.balanceWICK;
 
@@ -127,6 +129,91 @@ class UserManager {
      */
     getUserCount() {
         return this.users.size;
+    }
+
+    /**
+     * Get all users with their profiles (for admin panel)
+     * @returns {Array<Object>}
+     */
+    getAllUsers() {
+        const users = [];
+        for (const [socketId, user] of this.users.entries()) {
+            users.push({
+                id: user.id,
+                wallet: user.wallet || 'N/A',
+                balanceUSDT: user.balanceUSDT || 0,
+                balanceWICK: user.balanceWICK || 0,
+                activeSkin: user.activeSkin ? {
+                    id: user.activeSkin.id,
+                    name: user.activeSkin.name,
+                    level: user.activeSkin.level,
+                    currentIntegrity: user.activeSkin.currentIntegrity,
+                    maxIntegrity: user.activeSkin.maxIntegrity,
+                    isBurned: user.activeSkin.isBurned
+                } : null,
+                inventory: user.inventory.map(skin => ({
+                    id: skin.id,
+                    name: skin.name,
+                    level: skin.level,
+                    currentIntegrity: skin.currentIntegrity,
+                    maxIntegrity: skin.maxIntegrity,
+                    isBurned: skin.isBurned
+                })),
+                currentRoom: user.currentRoom,
+                isOnline: true
+            });
+        }
+        return users;
+    }
+
+    /**
+     * Get socket ID by user ID (for admin notifications)
+     * @param {string} userId 
+     * @returns {string|null}
+     */
+    getUserSocketId(userId) {
+        for (const [socketId, user] of this.users.entries()) {
+            if (user.id === userId) {
+                return socketId;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Update user balance (admin function)
+     * @param {string} userId 
+     * @param {number} balanceUSDT 
+     * @param {number} balanceWICK 
+     * @returns {Promise<boolean>}
+     */
+    async updateUserBalance(userId, balanceUSDT, balanceWICK) {
+        try {
+            // Buscar usuario en sesión activa
+            const socketId = this.getUserSocketId(userId);
+            const user = socketId ? this.getUser(socketId) : null;
+
+            // Actualizar en base de datos
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    balanceUSDT: balanceUSDT,
+                    balanceWICK: balanceWICK
+                }
+            });
+
+            // Actualizar en sesión si está online
+            if (user) {
+                user.balanceUSDT = balanceUSDT;
+                user.balanceWICK = balanceWICK;
+            }
+
+            console.log(`💰 [ADMIN] Balance actualizado para usuario ${userId}: $${balanceUSDT} USDT, ${balanceWICK} WICK`);
+            return true;
+        } catch (error) {
+            console.error('[ADMIN] Error updating user balance:', error);
+            return false;
+        }
     }
 }
 

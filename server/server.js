@@ -149,6 +149,44 @@ io.on('connection', async (socket) => {
             io.to('admin_channel').emit('ADMIN_BUSES', roomManager.getRoomsInfo());
         });
 
+        // 👥 GESTIÓN DE USUARIOS
+        
+        // Evento: Admin solicita lista de usuarios
+        socket.on('ADMIN_GET_USERS', () => {
+            const users = userManager.getAllUsers();
+            socket.emit('ADMIN_USERS_LIST', users);
+        });
+
+        // Evento: Admin actualiza balance de un usuario
+        socket.on('ADMIN_UPDATE_USER_BALANCE', async (data) => {
+            const { userId, balanceUSDT, balanceWICK } = data;
+            
+            try {
+                const success = await userManager.updateUserBalance(userId, balanceUSDT, balanceWICK);
+                if (success) {
+                    socket.emit('ADMIN_USER_UPDATED', { success: true });
+                    
+                    // Notificar al usuario si está conectado
+                    const userSocket = userManager.getUserSocketId(userId);
+                    if (userSocket) {
+                        const user = userManager.getUser(userSocket);
+                        if (user) {
+                            io.to(userSocket).emit('USER_PROFILE', user.getProfile());
+                            io.to(userSocket).emit('BALANCE_UPDATE', {
+                                balanceUSDT: user.balanceUSDT,
+                                balanceWICK: user.balanceWICK
+                            });
+                        }
+                    }
+                } else {
+                    socket.emit('ADMIN_USER_UPDATED', { success: false, error: 'User not found' });
+                }
+            } catch (error) {
+                console.error('[ADMIN] Error updating user balance:', error);
+                socket.emit('ADMIN_USER_UPDATED', { success: false, error: error.message });
+            }
+        });
+
         return;
     }
     if (clientType === 'admin') {
