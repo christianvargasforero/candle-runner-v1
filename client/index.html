@@ -1567,11 +1567,24 @@
         console.log('💾 [WALLET] Wallet guardada:', localStorage.getItem(STORAGE_KEY) || 'Ninguna');
     </script>
 
-    <!-- �🧠 LÓGICA DEL CENTRO DE COMANDO -->
+    <!-- 🧠 LÓGICA DEL CENTRO DE COMANDO -->
     <script>
         // 🚌 RENDERIZAR LISTA DE BUSES DISPONIBLES
         function renderBusList(buses) {
             const busesGrid = document.getElementById('buses-grid');
+
+            // 🐛 DEBUG: Log completo de buses recibidos
+            console.log('[BUSES] 🚌 Renderizando lista:', buses);
+            buses.forEach((bus, index) => {
+                console.log(`[BUS ${index}] ${bus.name}:`, {
+                    id: bus.id,
+                    status: bus.status,
+                    occupancy: bus.occupancy,
+                    capacity: bus.capacity,
+                    tier: bus.tier
+                });
+            });
+
             if (!buses || buses.length === 0) {
                 busesGrid.innerHTML = '<p style="color:#888; text-align:center;">[ NO BUSES AVAILABLE ]</p>';
                 return;
@@ -1583,26 +1596,45 @@
                 const card = document.createElement('div');
                 card.className = 'bus-card';
 
-                // Determinar estado visual
-                const statusClass = bus.status.toLowerCase();
-                const statusText = bus.status === 'BOARDING' ? 'BOARDING' :
-                    bus.status === 'IN_PROGRESS' ? 'IN GAME' : 'LOCKED';
+                // 🛡️ VALIDACIÓN ROBUSTA: Valores seguros con fallbacks
+                const occupancy = bus.occupancy || 0;
+                const capacity = bus.capacity || 5;
+                const status = bus.status || 'BOARDING';
+                const isBoarding = status === 'BOARDING';
+                const isFull = occupancy >= capacity;
+                const canJoin = isBoarding && !isFull;
 
-                // Determinar si puede unirse
-                const canJoin = bus.status === 'BOARDING' && (bus.occupancy || 0) < bus.capacity;
+                // Determinar estado visual
+                const statusClass = status.toLowerCase();
+                let statusText = 'LOCKED';
+                let statusIcon = '🔒';
+
+                if (isBoarding) {
+                    statusText = 'BOARDING';
+                    statusIcon = '✓';
+                } else if (status === 'IN_PROGRESS' || status === 'LOCKED') {
+                    statusText = 'IN GAME';
+                    statusIcon = '✈';
+                }
+
+                // Determinar color del estado
+                const statusColor = isBoarding ? '#00ff88' :
+                    (status === 'IN_PROGRESS' || status === 'LOCKED') ? '#ff9800' : '#888';
 
                 card.innerHTML = `
                     <div class="bus-card-header">
-                        <div class="bus-name">${bus.name}</div>
-                        <div class="bus-status ${statusClass}">${statusText}</div>
+                        <div class="bus-name">${bus.name || 'UNKNOWN'}</div>
+                        <div class="bus-status ${statusClass}" style="color: ${statusColor}">
+                            ${statusIcon} ${statusText}
+                        </div>
                     </div>
                     <div class="bus-ticket-price">
-                        <i class="fa-solid fa-ticket"></i> $${bus.ticketPrice.toFixed(2)} USDT
+                        <i class="fa-solid fa-ticket"></i> $${(bus.ticketPrice || 0).toFixed(2)} USDT
                     </div>
                     <div class="bus-info">
                         <div class="bus-info-item">
                             <i class="fa-solid fa-users"></i>
-                            <span>${bus.occupancy || 0}/${bus.capacity} Pasajeros</span>
+                            <span>${occupancy}/${capacity} Pasajeros</span>
                         </div>
                         <div class="bus-info-item">
                             <i class="fa-solid fa-layer-group"></i>
@@ -1610,7 +1642,9 @@
                         </div>
                     </div>
                     <button class="bus-join-btn" data-bus-id="${bus.id}" ${!canJoin ? 'disabled' : ''}>
-                        ${canJoin ? '<i class="fa-solid fa-right-to-bracket"></i> JOIN BUS' : '<i class="fa-solid fa-lock"></i> NOT AVAILABLE'}
+                        ${canJoin ?
+                        '<i class="fa-solid fa-right-to-bracket"></i> JOIN BUS' :
+                        '<i class="fa-solid fa-lock"></i> NOT AVAILABLE'}
                     </button>
                 `;
 
