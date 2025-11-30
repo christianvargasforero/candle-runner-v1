@@ -254,7 +254,17 @@ io.on('connection', async (socket) => {
             roomManager.removeUserFromRoom(socket.id, user.currentRoom);
         }
 
-        // Intentar unirse a la nueva sala
+        // 🔐 ROOM JOINING ATÓMICO - Unirse al room ANTES de validaciones
+        // Esto garantiza que el socket esté en la sala de Socket.io cuando se emita BUS_START
+        socket.join(roomId);
+        console.log(`🔌 [SOCKET.JOIN] Socket ${socket.id} unido a sala ${roomId}`);
+        console.log(`📋 [ROOMS DEBUG] Socket rooms:`, Array.from(socket.rooms));
+        
+        // 🐛 DEBUG: Verificar estado de salas en el adaptador
+        const roomSockets = io.sockets.adapter.rooms.get(roomId);
+        console.log(`👥 [ADAPTER] Sockets en sala ${roomId}:`, roomSockets ? roomSockets.size : 0);
+
+        // Intentar unirse a la nueva sala (lógica de negocio)
         const { BusGameLoop } = await import('./services/gameLoop.js');
         const result = await roomManager.addUserToRoom(socket.id, roomId, (room) => {
             // Solo arrancar si no hay ya un gameLoopInstance
@@ -266,7 +276,7 @@ io.on('connection', async (socket) => {
 
         if (result.success) {
             user.currentRoom = roomId;
-            socket.join(roomId);
+            // socket.join ya se hizo arriba (atómico) hizo arriba (atómico)
 
             const room = roomManager.getRoom(roomId);
             socket.emit('ROOM_JOINED', {
@@ -305,6 +315,9 @@ io.on('connection', async (socket) => {
             console.log(`🚌 [JOIN] Usuario ${user.id} subió al bus ${roomId} (${room.name})`);
             console.log(`👥 [PRESENCE] ${currentPlayers.length} jugadores ya en el bus`);
         } else {
+            // 🔐 ROLLBACK: Si la lógica de negocio falla, sacar del room de Socket.io
+            socket.leave(roomId);
+            console.log(`⚠️ [ROLLBACK] Socket ${socket.id} removido de sala ${roomId} por error: ${result.error}`);
             socket.emit('GAME_ERROR', { message: `No puedes entrar a ${roomId}: ${result.error}` });
         }
     });

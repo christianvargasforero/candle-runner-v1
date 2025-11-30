@@ -114,26 +114,39 @@ class BusGameLoop {
         console.log(`   Pozo Total: $${this.room.ticketPrice * this.room.users.size}`);
         console.log(`${'='.repeat(60)}\n`);
 
-        // 👫 EMITIR EVENTO BUS_START con lista de pasajeros y estado de integridad
-        const passengerIds = Array.from(this.room.users.values());
-        const passengerStates = passengerIds.map(userId => {
-            const user = userManager.users.get(userId) || userManager.users.get(userId.socketId);
-            return {
-                userId,
-                integrity: user?.activeSkin?.currentIntegrity ?? 100,
-                maxIntegrity: user?.activeSkin?.maxIntegrity ?? 100,
-                isBurned: user?.activeSkin?.isBurned ?? false
-            };
-        });
-        for (const socketId of this.room.users.keys()) {
-            this.io.to(socketId).emit('BUS_START', {
-                busId: this.room.id,
-                candleHistory: this.candleHistory,
-                passengers: passengerStates,
-                ticketPrice: this.room.ticketPrice
-            });
+        // 👫 EMITIR EVENTO BUS_START con lista de pasajeros y estado de integridad + skinId
+        const passengerStates = [];
+        
+        // Iterar por socketId para obtener datos completos
+        for (const [socketId, usId] of this.room.users.entries()) {
+            const user = userManager.getUser(socketId);
+            if (user) {
+                passengerStates.push({
+                    odId: socketId,
+                    skinId: user.activeSkin?.id ?? 'default',
+                    skinName: user.activeSkin?.name ?? 'Protocol Droid',
+                    skinColor: user.activeSkin?.color ?? 0x00fff9, // Color neón por defecto
+                    skinLevel: user.activeSkin?.level ?? 0,
+                    integrity: user.activeSkin?.currentIntegrity ?? 100,
+                    maxIntegrity: user.activeSkin?.maxIntegrity ?? 100,
+                    isBurned: user.activeSkin?.isBurned ?? false
+                });
+            }
         }
-        console.log(`👫 [BUS START] Notificados ${passengerIds.length} pasajeros`);
+
+        // 🚨 CRÍTICO: Emitir a la SALA DE SOCKET.IO, no a sockets individuales
+        // Esto garantiza que todos los jugadores en la sala reciban el evento
+        console.log(`🚀 [BUS START] Emitiendo a sala ${this.room.id} con ${passengerStates.length} pasajeros`);
+        console.log(`📋 [DEBUG] Pasajeros:`, passengerStates.map(p => `${p.odId?.slice(-4)} (${p.skinName})`).join(', '));
+        
+        this.io.to(this.room.id).emit('BUS_START', {
+            busId: this.room.id,
+            candleHistory: this.candleHistory,
+            passengers: passengerStates,
+            ticketPrice: this.room.ticketPrice
+        });
+        
+        console.log(`✅ [BUS START] Evento emitido a sala ${this.room.id}`);
 
         // Iniciar sincronización
         this.startSyncTimer();

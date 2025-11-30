@@ -1,68 +1,88 @@
-// 🎮 CYBERPUNK CHART RACE - Motor visual para Candle Runner
-// Los jugadores corren sobre velas financieras en tiempo real
+// 🎮 NEON TRADER - Cyberpunk Chart Race Engine
+// Velas holográficas, skins diferenciadas, entorno vivo
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
         super({ key: 'GameScene' });
         
-        // Historial de velas y jugadores
+        // Estado del juego
+        this.busStarted = false;
         this.candleHistory = [];
-        this.playerSprites = new Map(); // userId -> sprite
+        this.playerSprites = new Map(); // odId -> { sprite, nameTag, skinColor }
         this.localUserId = null;
         this.passengers = [];
         
+        // Configuración visual
+        this.CANDLE_SPACING = 140;
+        this.CANDLE_WIDTH = 50;
+        this.BASE_X = 300;
+        
+        // Paleta Neon Cyberpunk
+        this.COLORS = {
+            LONG: 0x00ff88,      // Cyan/Verde neón
+            SHORT: 0xff0055,     // Magenta/Rojo neón
+            NEUTRAL: 0x888888,   // Gris
+            GRID: 0x00fff9,      // Cyan brillante
+            BG: 0x0a0a12,        // Fondo oscuro azulado
+            GLOW_LONG: 0x00ff88,
+            GLOW_SHORT: 0xff0055
+        };
+        
+        // Colores para skins (diferenciación de jugadores)
+        this.SKIN_COLORS = [
+            0x00fff9, // Neon Cyan
+            0xff00ff, // Neon Pink  
+            0xffff00, // Neon Yellow
+            0x00ff00, // Neon Green
+            0xff6600, // Neon Orange
+            0x9900ff, // Neon Purple
+            0xff0099, // Hot Pink
+            0x00ffcc  // Turquoise
+        ];
+        
         // Zoom responsivo
-        this.zoomMobile = window.innerWidth < 480 ? 0.6 : 1.0;
+        this.zoomLevel = window.innerWidth < 480 ? 0.55 : 0.85;
+        
+        // Parallax
+        this.gridScrollX = 0;
     }
 
     preload() {
-        // Placeholder: Assets básicos (fallback a color si no existen)
-        // Los assets faltantes se reemplazarán con círculos de colores
+        // Sin assets externos - todo se genera proceduralmente
     }
 
     create() {
-        console.log('[🎮 CYBERPUNK CHART RACE] Escena iniciada');
-
-        // Fondo cyberpunk con TileSprite y parallax
-        const bgWidth = this.scale.width * 3;
-        const bgHeight = this.scale.height * 2;
-        this.bg = this.add.rectangle(0, 0, bgWidth, bgHeight, 0x0a0a0a).setOrigin(0).setScrollFactor(0.1);
+        console.log('[🎮 NEON TRADER] Escena iniciada');
         
-        // Grid digital parallax (fallback a círculos si no hay asset)
-        this.createDigitalGrid();
-
-        // Scanlines y Vignette (simulados con rectangles)
+        // Configurar mundo
+        this.cameras.main.setBackgroundColor(this.COLORS.BG);
+        this.cameras.main.setZoom(this.zoomLevel);
+        
+        // Capas de profundidad
+        this.bgLayer = this.add.container(0, 0).setDepth(0);
+        this.gridLayer = this.add.container(0, 0).setDepth(1);
+        this.candleLayer = this.add.container(0, 0).setDepth(10);
+        this.lineLayer = this.add.container(0, 0).setDepth(15);
+        this.playerLayer = this.add.container(0, 0).setDepth(50);
+        this.uiLayer = this.add.container(0, 0).setDepth(100);
+        
+        // Crear fondo con parallax animado
+        this.createAnimatedBackground();
+        
+        // Crear grid cyberpunk
+        this.createNeonGrid();
+        
+        // Post-processing
         this.createPostProcessing();
-
-        // Audio placeholder (sin cargar assets)
-        this.sfx = {
-            jump: null,
-            damage: null,
-            burned: null
-        };
-
-        // Estado de espera con animación parpadeante
-        this.waitText = this.add.text(this.scale.width / 2, 80, 'WAITING FOR PASSENGERS...', {
-            font: 'bold 32px Courier New', fill: '#00fff9', stroke: '#000', strokeThickness: 6
-        }).setOrigin(0.5).setScrollFactor(0);
         
-        this.tweens.add({
-            targets: this.waitText,
-            alpha: 0.3,
-            duration: 800,
-            yoyo: true,
-            repeat: -1
-        });
-
-        // Configurar cámara
-        this.cameras.main.setZoom(this.zoomMobile);
-        this.cameras.main.setBackgroundColor('#0a0a0a');
-
+        // UI de espera
+        this.createWaitingUI();
+        
         // Socket
         this.socket = window.globalSocket;
         this.setupSocketListeners();
         
-        // Obtener el userId local
+        // Obtener userId local
         this.socket.on('USER_PROFILE', (profile) => {
             if (!this.localUserId) {
                 this.localUserId = profile.id;
@@ -71,290 +91,731 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
-    createDigitalGrid() {
-        // Simulación de grid cyberpunk con líneas
-        const gridGraphics = this.add.graphics();
-        gridGraphics.lineStyle(1, 0x00fff9, 0.1);
+    // ═══════════════════════════════════════════════════════════════
+    // 🎨 BACKGROUND & GRID
+    // ═══════════════════════════════════════════════════════════════
+    
+    createAnimatedBackground() {
+        // Fondo con gradiente radial simulado
+        const bgWidth = 5000;
+        const bgHeight = 1500;
         
-        for (let x = 0; x < this.scale.width * 3; x += 50) {
-            gridGraphics.lineBetween(x, 0, x, this.scale.height * 2);
-        }
-        for (let y = 0; y < this.scale.height * 2; y += 50) {
-            gridGraphics.lineBetween(0, y, this.scale.width * 3, y);
-        }
+        // Base oscura
+        const bg = this.add.rectangle(bgWidth/2, bgHeight/2, bgWidth, bgHeight, this.COLORS.BG);
+        this.bgLayer.add(bg);
         
-        gridGraphics.setScrollFactor(0.3);
-        gridGraphics.setAlpha(0.2);
+        // Gradiente central (glow)
+        const centerGlow = this.add.circle(bgWidth/2, bgHeight/2, 600, 0x001122, 0.5);
+        centerGlow.setBlendMode(Phaser.BlendModes.ADD);
+        this.bgLayer.add(centerGlow);
     }
-
+    
+    createNeonGrid() {
+        this.gridGraphics = this.add.graphics();
+        this.gridGraphics.setScrollFactor(0.3); // Parallax lento
+        
+        const gridWidth = 3000;
+        const gridHeight = 1500;
+        const cellSize = 60;
+        
+        // Líneas verticales
+        this.gridGraphics.lineStyle(1, this.COLORS.GRID, 0.08);
+        for (let x = 0; x < gridWidth; x += cellSize) {
+            this.gridGraphics.lineBetween(x, 0, x, gridHeight);
+        }
+        
+        // Líneas horizontales
+        for (let y = 0; y < gridHeight; y += cellSize) {
+            this.gridGraphics.lineBetween(0, y, gridWidth, y);
+        }
+        
+        // Líneas más brillantes cada 5 celdas
+        this.gridGraphics.lineStyle(1, this.COLORS.GRID, 0.2);
+        for (let x = 0; x < gridWidth; x += cellSize * 5) {
+            this.gridGraphics.lineBetween(x, 0, x, gridHeight);
+        }
+        for (let y = 0; y < gridHeight; y += cellSize * 5) {
+            this.gridGraphics.lineBetween(0, y, gridWidth, y);
+        }
+        
+        this.gridLayer.add(this.gridGraphics);
+    }
+    
     createPostProcessing() {
-        // Scanlines simuladas
+        // Scanlines
         const scanlines = this.add.graphics();
-        scanlines.lineStyle(1, 0x000000, 0.3);
-        for (let y = 0; y < this.scale.height; y += 4) {
+        scanlines.setScrollFactor(0).setDepth(1000);
+        
+        for (let y = 0; y < this.scale.height; y += 3) {
+            scanlines.lineStyle(1, 0x000000, 0.15);
             scanlines.lineBetween(0, y, this.scale.width, y);
         }
-        scanlines.setScrollFactor(0).setDepth(1000).setAlpha(0.15);
-
-        // Vignette
-        const vignette = this.add.circle(this.scale.width / 2, this.scale.height / 2, 
-            Math.max(this.scale.width, this.scale.height), 0x000000, 0.4);
-        vignette.setScrollFactor(0).setDepth(1001).setScale(1.5);
-        vignette.setBlendMode(Phaser.BlendModes.MULTIPLY);
+        
+        // Vignette corners
+        const vignetteSize = 300;
+        const corners = [
+            { x: 0, y: 0 },
+            { x: this.scale.width, y: 0 },
+            { x: 0, y: this.scale.height },
+            { x: this.scale.width, y: this.scale.height }
+        ];
+        
+        corners.forEach(corner => {
+            const vignette = this.add.circle(corner.x, corner.y, vignetteSize, 0x000000, 0.6);
+            vignette.setScrollFactor(0).setDepth(999);
+            vignette.setBlendMode(Phaser.BlendModes.MULTIPLY);
+        });
+    }
+    
+    createWaitingUI() {
+        // Panel de espera
+        this.waitPanel = this.add.container(this.scale.width / 2, 100);
+        this.waitPanel.setScrollFactor(0).setDepth(200);
+        
+        // Fondo del panel
+        const panelBg = this.add.rectangle(0, 0, 500, 80, 0x000000, 0.7);
+        panelBg.setStrokeStyle(2, this.COLORS.GRID, 0.8);
+        this.waitPanel.add(panelBg);
+        
+        // Texto parpadeante
+        this.waitText = this.add.text(0, 0, '[ WAITING FOR PASSENGERS ]', {
+            font: 'bold 24px "Courier New"',
+            fill: '#00fff9',
+            stroke: '#000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        this.waitPanel.add(this.waitText);
+        
+        // Animación de parpadeo
+        this.tweens.add({
+            targets: this.waitText,
+            alpha: 0.3,
+            duration: 800,
+            yoyo: true,
+            repeat: -1
+        });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🔌 SOCKET LISTENERS
+    // ═══════════════════════════════════════════════════════════════
+    
     setupSocketListeners() {
-        // Evento BUS_START: El bus arrancó
+        // BUS_START: El bus arrancó
         this.socket.on('BUS_START', (data) => {
+            console.log('[BUS_START] Recibido:', data);
+            
             this.busStarted = true;
             this.candleHistory = data.candleHistory || [];
             this.passengers = data.passengers || [];
-            console.log('[BUS_START]', { candleHistory: this.candleHistory.length, passengers: this.passengers.length });
             
-            this.renderCandles();
-            this.spawnPlayers(this.passengers);
-            this.waitText.setVisible(false);
+            console.log('[BUS_START] ' + this.candleHistory.length + ' velas, ' + this.passengers.length + ' pasajeros');
+            
+            // Ocultar UI de espera
+            this.waitPanel.setVisible(false);
+            
+            // Renderizar escena
+            this.renderHolographicCandles();
+            this.renderPriceLine();
+            this.spawnDifferentiatedPlayers(this.passengers);
         });
-
-        // Evento PRICE_UPDATE: Precio en tiempo real
+        
+        // PRICE_UPDATE: Precio en tiempo real
         this.socket.on('PRICE_UPDATE', (data) => {
-            this.animateLiveCandle(data.price);
+            this.updateLiveCandle(data.price);
         });
-
-        // Evento ROUND_RESULT: Resultado de la ronda
+        
+        // ROUND_RESULT: Resultado de la ronda
         this.socket.on('ROUND_RESULT', (data) => {
             console.log('[ROUND_RESULT]', data);
             
             if (data.candleHistory) {
                 this.candleHistory = data.candleHistory;
-                this.renderCandles();
+                this.renderHolographicCandles();
+                this.renderPriceLine();
             }
             
             if (data.passengerStatuses) {
-                this.animatePlayers(data.passengerStatuses);
+                this.animatePlayerResults(data.passengerStatuses);
             }
+        });
+        
+        // PLAYER_JOINED: Nuevo jugador se une
+        this.socket.on('PLAYER_JOINED', (data) => {
+            console.log('[PLAYER_JOINED]', data);
+            this.addPlayerSprite(data);
+        });
+        
+        // PLAYER_LEFT: Jugador se va
+        this.socket.on('PLAYER_LEFT', (data) => {
+            console.log('[PLAYER_LEFT]', data);
+            this.removePlayerSprite(data.id);
         });
     }
 
-    renderCandles() {
+    // ═══════════════════════════════════════════════════════════════
+    // 🕯️ VELAS HOLOGRÁFICAS (Estilo Neon)
+    // ═══════════════════════════════════════════════════════════════
+    
+    renderHolographicCandles() {
         // Limpiar velas anteriores
-        if (this.candleGroup) this.candleGroup.clear(true, true);
-        this.candleGroup = this.add.group();
-
-        const baseX = 200;
-        const spacing = 120;
-        const baseY = this.scale.height / 2 + 40;
-
-        // Calcular rango de precios para normalizar
+        this.candleLayer.removeAll(true);
+        
+        if (!this.candleHistory.length) return;
+        
+        const baseY = this.scale.height / 2 + 100;
+        
+        // Calcular rango de precios para normalización
         let minPrice = Infinity, maxPrice = -Infinity;
         this.candleHistory.forEach(c => {
-            minPrice = Math.min(minPrice, c.low);
-            maxPrice = Math.max(maxPrice, c.high);
+            minPrice = Math.min(minPrice, c.low || c.close);
+            maxPrice = Math.max(maxPrice, c.high || c.close);
         });
         const priceRange = maxPrice - minPrice || 1;
-
+        
         // Dibujar cada vela
         this.candleHistory.forEach((candle, i) => {
-            const x = baseX + i * spacing;
+            const x = this.BASE_X + i * this.CANDLE_SPACING;
             const priceNorm = (candle.close - minPrice) / priceRange;
-            const y = baseY - priceNorm * 220;
+            const y = baseY - priceNorm * 300;
             
-            const color = candle.result === 'LONG' ? 0x00ff88 : 
-                         (candle.result === 'SHORT' ? 0xff0055 : 0x888888);
+            // Determinar color basado en resultado (SERVIDOR = VERDAD)
+            const isLong = candle.result === 'LONG';
+            const color = isLong ? this.COLORS.LONG : 
+                         (candle.result === 'SHORT' ? this.COLORS.SHORT : this.COLORS.NEUTRAL);
+            
+            // Crear vela holográfica
+            const candleContainer = this.createHolographicCandle(x, y, color, i === this.candleHistory.length - 1);
+            this.candleLayer.add(candleContainer);
+        });
+        
+        // Centrar cámara en última vela
+        const lastX = this.BASE_X + (this.candleHistory.length - 1) * this.CANDLE_SPACING;
+        this.cameras.main.pan(lastX, baseY - 50, 800, 'Quad.easeOut');
+    }
+    
+    createHolographicCandle(x, y, color, isLive = false) {
+        const container = this.add.container(x, y);
+        const graphics = this.add.graphics();
+        
+        const width = this.CANDLE_WIDTH;
+        const bodyHeight = 80;
+        const wickHeight = 40;
+        
+        // === GLOW EXTERIOR (Simula resplandor neón) ===
+        graphics.fillStyle(color, 0.1);
+        graphics.fillRoundedRect(-width/2 - 8, -bodyHeight/2 - 8, width + 16, bodyHeight + 16, 8);
+        
+        // === CUERPO HOLOGRÁFICO (Semitransparente) ===
+        graphics.fillStyle(color, 0.2);
+        graphics.fillRoundedRect(-width/2, -bodyHeight/2, width, bodyHeight, 4);
+        
+        // === BORDE NEÓN SÓLIDO ===
+        graphics.lineStyle(2, color, 1);
+        graphics.strokeRoundedRect(-width/2, -bodyHeight/2, width, bodyHeight, 4);
+        
+        // === WICK (Mecha) ===
+        graphics.lineStyle(3, color, 0.8);
+        graphics.lineBetween(0, -bodyHeight/2 - wickHeight, 0, -bodyHeight/2);
+        graphics.lineBetween(0, bodyHeight/2, 0, bodyHeight/2 + wickHeight/2);
+        
+        // === HIGHLIGHT INTERNO (efecto cristal) ===
+        graphics.lineStyle(1, 0xffffff, 0.3);
+        graphics.lineBetween(-width/2 + 4, -bodyHeight/2 + 8, -width/2 + 4, bodyHeight/2 - 8);
+        
+        container.add(graphics);
+        
+        // Si es la vela en vivo, añadir animación de pulso
+        if (isLive) {
+            this.tweens.add({
+                targets: graphics,
+                alpha: 0.6,
+                duration: 600,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            
+            // Partículas de energía
+            this.createEnergyParticles(container, color);
+        }
+        
+        return container;
+    }
+    
+    createEnergyParticles(container, color) {
+        // Partículas flotantes alrededor de la vela en vivo
+        for (let i = 0; i < 4; i++) {
+            const particle = this.add.circle(
+                Phaser.Math.Between(-30, 30),
+                Phaser.Math.Between(-50, 50),
+                3, color, 0.6
+            );
+            container.add(particle);
+            
+            this.tweens.add({
+                targets: particle,
+                y: particle.y - 30,
+                alpha: 0,
+                duration: 1500,
+                repeat: -1,
+                delay: i * 400
+            });
+        }
+    }
+    
+    updateLiveCandle(price) {
+        if (!this.candleHistory.length) return;
+        
+        // Actualizar última vela
+        const last = this.candleHistory[this.candleHistory.length - 1];
+        last.close = price;
+        if (price > (last.high || price)) last.high = price;
+        if (price < (last.low || price)) last.low = price;
+        
+        // Re-renderizar
+        this.renderHolographicCandles();
+        this.renderPriceLine();
+    }
 
-            // Cuerpo de la vela con glow
-            const graphics = this.add.graphics();
-            graphics.lineStyle(8, color, 0.9);
-            graphics.strokeRect(x - 18, y - 60, 36, 120);
-            graphics.fillStyle(color, 0.7);
-            graphics.fillRect(x - 18, y - 10, 36, 70);
-            graphics.setDepth(10);
+    // ═══════════════════════════════════════════════════════════════
+    // 📈 LÍNEA DE PRECIO (Chart Line)
+    // ═══════════════════════════════════════════════════════════════
+    
+    renderPriceLine() {
+        this.lineLayer.removeAll(true);
+        
+        if (this.candleHistory.length < 2) return;
+        
+        const baseY = this.scale.height / 2 + 100;
+        
+        // Calcular rango
+        let minPrice = Infinity, maxPrice = -Infinity;
+        this.candleHistory.forEach(c => {
+            minPrice = Math.min(minPrice, c.close);
+            maxPrice = Math.max(maxPrice, c.close);
+        });
+        const priceRange = maxPrice - minPrice || 1;
+        
+        // Dibujar línea conectando cierres
+        const lineGraphics = this.add.graphics();
+        lineGraphics.lineStyle(2, this.COLORS.GRID, 0.5);
+        
+        const points = this.candleHistory.map((c, i) => {
+            const x = this.BASE_X + i * this.CANDLE_SPACING;
+            const priceNorm = (c.close - minPrice) / priceRange;
+            const y = baseY - priceNorm * 300;
+            return { x, y };
+        });
+        
+        // Dibujar path
+        lineGraphics.beginPath();
+        lineGraphics.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            lineGraphics.lineTo(points[i].x, points[i].y);
+        }
+        lineGraphics.strokePath();
+        
+        // Puntos en cada cierre
+        points.forEach((p, i) => {
+            const isLast = i === points.length - 1;
+            const dot = this.add.circle(p.x, p.y, isLast ? 6 : 3, this.COLORS.GRID, isLast ? 1 : 0.5);
+            this.lineLayer.add(dot);
             
-            // Glow para la última vela (animada en vivo)
-            if (i === this.candleHistory.length - 1) {
-                graphics.setAlpha(1);
+            if (isLast) {
+                // Pulso en el último punto
                 this.tweens.add({
-                    targets: graphics,
-                    alpha: 0.7,
-                    duration: 500,
+                    targets: dot,
+                    scale: 1.5,
+                    alpha: 0.5,
+                    duration: 800,
                     yoyo: true,
                     repeat: -1
                 });
-            } else {
-                graphics.setAlpha(0.8);
             }
-            
-            this.candleGroup.add(graphics);
         });
-
-        // Centrar cámara en la última vela
-        if (this.candleHistory.length) {
-            const lastX = baseX + (this.candleHistory.length - 1) * spacing;
-            this.cameras.main.pan(lastX, baseY, 800, 'Quad.easeOut');
-        }
+        
+        this.lineLayer.add(lineGraphics);
     }
 
-    animateLiveCandle(price) {
-        // Actualizar la última vela con el nuevo precio en tiempo real
-        if (!this.candleHistory.length) return;
-        
-        const last = this.candleHistory[this.candleHistory.length - 1];
-        last.close = price;
-        
-        // Re-renderizar velas para reflejar el cambio
-        this.renderCandles();
-    }
-
-    spawnPlayers(passengers) {
+    // ═══════════════════════════════════════════════════════════════
+    // 👥 JUGADORES DIFERENCIADOS
+    // ═══════════════════════════════════════════════════════════════
+    
+    spawnDifferentiatedPlayers(passengers) {
         // Limpiar sprites previos
-        this.playerSprites.forEach(sprite => sprite.destroy());
-        this.playerSprites.clear();
-
-        if (!this.candleHistory.length) return;
-
-        const baseX = 200 + (this.candleHistory.length - 1) * 120;
-        const baseY = this.scale.height / 2 - 60;
-
-        passengers.forEach(p => {
-            const isLocal = p.userId === this.localUserId;
-            
-            // Crear sprite (círculo de color como fallback)
-            const sprite = this.add.circle(baseX, baseY, 15, isLocal ? 0x00fff9 : 0x888888, 1);
-            sprite.setDepth(isLocal ? 100 : 20);
-            sprite.setAlpha(isLocal ? 1 : 0.5);
-            sprite.userId = p.userId;
-            sprite.integrity = p.integrity;
-            sprite.isBurned = p.isBurned;
-            
-            this.playerSprites.set(p.userId, sprite);
+        this.playerSprites.forEach(data => {
+            if (data.sprite) data.sprite.destroy();
+            if (data.nameTag) data.nameTag.destroy();
+            if (data.container) data.container.destroy();
         });
-
-        // Seguir al jugador local con la cámara
-        const localSprite = Array.from(this.playerSprites.values()).find(s => s.userId === this.localUserId);
-        if (localSprite) {
-            this.cameras.main.startFollow(localSprite, true, 0.1, 0.1);
+        this.playerSprites.clear();
+        this.playerLayer.removeAll(true);
+        
+        if (!this.candleHistory.length) return;
+        
+        // Posición sobre la última vela
+        const lastCandleX = this.BASE_X + (this.candleHistory.length - 1) * this.CANDLE_SPACING;
+        const baseY = this.scale.height / 2; // Encima de las velas
+        
+        passengers.forEach((p, index) => {
+            const odId = p.odId || p.odId;
+            const isLocal = odId === this.localUserId || (odId && odId.endsWith && odId.endsWith(this.localUserId));
+            
+            // Calcular posición (distribuir jugadores)
+            const offsetX = (index - passengers.length / 2) * 40;
+            const x = lastCandleX + offsetX;
+            const y = baseY - 80;
+            
+            // Determinar color de skin
+            let skinColor = p.skinColor || this.SKIN_COLORS[index % this.SKIN_COLORS.length];
+            if (isLocal) skinColor = 0x00fff9; // Jugador local siempre cyan
+            
+            // Crear sprite del jugador
+            const playerData = this.createPlayerSprite(x, y, skinColor, p, isLocal);
+            this.playerSprites.set(odId, playerData);
+        });
+        
+        // Seguir al jugador local
+        const localData = Array.from(this.playerSprites.values()).find(d => d.isLocal);
+        if (localData && localData.container) {
+            this.cameras.main.startFollow(localData.container, true, 0.08, 0.08);
+        }
+    }
+    
+    createPlayerSprite(x, y, color, data, isLocal) {
+        const container = this.add.container(x, y);
+        container.setDepth(isLocal ? 100 : 50);
+        
+        // === CUERPO (Círculo neón con glow) ===
+        // Glow
+        const glow = this.add.circle(0, 0, 22, color, 0.3);
+        container.add(glow);
+        
+        // Cuerpo principal
+        const body = this.add.circle(0, 0, 15, color, isLocal ? 1 : 0.6);
+        container.add(body);
+        
+        // Borde
+        const border = this.add.circle(0, 0, 15, color, 0);
+        border.setStrokeStyle(2, isLocal ? 0xffffff : color, 1);
+        container.add(border);
+        
+        // Core brillante
+        const core = this.add.circle(0, -3, 5, 0xffffff, 0.5);
+        container.add(core);
+        
+        // === NOMBRE FLOTANTE ===
+        const shortName = (data.skinName || 'Anon').slice(0, 8);
+        const nameTag = this.add.text(0, -35, shortName, {
+            font: 'bold 12px "Courier New"',
+            fill: isLocal ? '#00fff9' : '#ffffff',
+            stroke: '#000',
+            strokeThickness: 3
+        }).setOrigin(0.5);
+        container.add(nameTag);
+        
+        // === INDICADOR DE INTEGRIDAD ===
+        const integrityBar = this.add.rectangle(0, 25, 30, 4, 0x333333);
+        container.add(integrityBar);
+        
+        const integrityPercent = (data.integrity || 100) / (data.maxIntegrity || 100);
+        const integrityFill = this.add.rectangle(
+            -15 + (30 * integrityPercent) / 2, 25,
+            30 * integrityPercent, 4,
+            integrityPercent > 0.5 ? 0x00ff88 : (integrityPercent > 0.2 ? 0xffff00 : 0xff0055)
+        );
+        integrityFill.setOrigin(0, 0.5);
+        integrityFill.x = -15;
+        container.add(integrityFill);
+        
+        // Animación de flotar para el jugador local
+        if (isLocal) {
+            this.tweens.add({
+                targets: container,
+                y: y - 5,
+                duration: 1500,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            
+            // Partículas de estela
+            this.time.addEvent({
+                delay: 200,
+                callback: () => this.createTrailParticle(container.x, container.y + 15, color),
+                loop: true
+            });
+        }
+        
+        this.playerLayer.add(container);
+        
+        return {
+            container,
+            body,
+            glow,
+            nameTag,
+            color,
+            isLocal,
+            odId: data.odId
+        };
+    }
+    
+    createTrailParticle(x, y, color) {
+        const particle = this.add.circle(x, y, 4, color, 0.5);
+        particle.setDepth(40);
+        
+        this.tweens.add({
+            targets: particle,
+            y: y + 30,
+            alpha: 0,
+            scale: 0.3,
+            duration: 600,
+            onComplete: () => particle.destroy()
+        });
+    }
+    
+    addPlayerSprite(data) {
+        if (!this.candleHistory.length) return;
+        
+        const lastCandleX = this.BASE_X + (this.candleHistory.length - 1) * this.CANDLE_SPACING;
+        const y = this.scale.height / 2 - 80;
+        
+        const color = data.skinColor || this.SKIN_COLORS[this.playerSprites.size % this.SKIN_COLORS.length];
+        const isLocal = data.id === this.localUserId;
+        
+        const playerData = this.createPlayerSprite(lastCandleX, y, color, {
+            odId: data.id,
+            skinName: data.skin,
+            integrity: 100,
+            maxIntegrity: 100
+        }, isLocal);
+        
+        this.playerSprites.set(data.id, playerData);
+    }
+    
+    removePlayerSprite(odId) {
+        const data = this.playerSprites.get(odId);
+        if (data) {
+            if (data.container) data.container.destroy();
+            this.playerSprites.delete(odId);
         }
     }
 
-    animatePlayers(statuses) {
+    // ═══════════════════════════════════════════════════════════════
+    // 🎬 ANIMACIONES DE RESULTADO
+    // ═══════════════════════════════════════════════════════════════
+    
+    animatePlayerResults(statuses) {
         statuses.forEach(s => {
-            const sprite = this.playerSprites.get(s.userId);
-            if (!sprite) return;
-
+            const data = this.playerSprites.get(s.odId);
+            if (!data || !data.container) return;
+            
+            const container = data.container;
+            
             if (s.status === 'WIN') {
-                // Salto parabólico a la siguiente vela
+                // === VICTORIA: Salto triunfante ===
                 this.tweens.add({
-                    targets: sprite,
-                    x: sprite.x + 120,
-                    y: sprite.y - 80,
-                    duration: 700,
+                    targets: container,
+                    x: container.x + this.CANDLE_SPACING,
+                    y: container.y - 100,
+                    duration: 500,
                     ease: 'Quad.easeOut',
                     onComplete: () => {
                         this.tweens.add({
-                            targets: sprite,
-                            y: sprite.y + 80,
+                            targets: container,
+                            y: container.y + 100,
                             duration: 400,
-                            ease: 'Quad.easeIn'
+                            ease: 'Bounce.easeOut'
                         });
-                        this.createTrailParticles(sprite.x, sprite.y);
+                        this.createVictoryParticles(container.x, container.y, data.color);
+                        this.showFloatingText('+WIN', container.x, container.y - 50, '#00ff88');
                     }
                 });
-            } else if (s.status === 'DAMAGE') {
-                // Parpadeo rojo y deslizamiento a la siguiente vela
-                this.tweens.add({
-                    targets: sprite,
-                    x: sprite.x + 120,
-                    duration: 700,
-                    ease: 'Quad.easeInOut',
-                    onStart: () => {
-                        // Parpadeo rojo
-                        this.tweens.add({
-                            targets: sprite,
-                            alpha: 0.2,
-                            fillColor: 0xff0055,
-                            duration: 100,
-                            yoyo: true,
-                            repeat: 4
-                        });
-                        // Texto flotante "-1 HP"
-                        this.showFloatingText('-1 HP', sprite.x, sprite.y - 60, '#ff0055');
-                    }
-                });
-            } else if (s.status === 'BURNED') {
-                // Explosión y destrucción del sprite
-                this.createExplosionParticles(sprite.x, sprite.y);
-                sprite.destroy();
-                this.playerSprites.delete(s.userId);
                 
-                // Si era el jugador local, detener el seguimiento de cámara
-                if (s.userId === this.localUserId) {
-                    this.cameras.main.stopFollow();
-                    this.showGameOver();
-                }
+            } else if (s.status === 'DAMAGE') {
+                // === DAÑO: Glitch y deslizamiento ===
+                this.createGlitchEffect(container);
+                
+                this.tweens.add({
+                    targets: container,
+                    x: container.x + this.CANDLE_SPACING,
+                    duration: 800,
+                    ease: 'Cubic.easeInOut',
+                    onStart: () => {
+                        // Cambiar color temporalmente a rojo
+                        if (data.body) data.body.setFillStyle(0xff0055);
+                        this.showFloatingText('-1 HP', container.x, container.y - 50, '#ff0055');
+                    },
+                    onComplete: () => {
+                        // Restaurar color
+                        if (data.body) data.body.setFillStyle(data.color, data.isLocal ? 1 : 0.6);
+                    }
+                });
+                
+            } else if (s.status === 'BURNED') {
+                // === QUEMADO: Explosión épica ===
+                this.createExplosion(container.x, container.y);
+                this.showFloatingText('💀 BURNED', container.x, container.y - 60, '#ff0055');
+                
+                // Destruir sprite
+                this.time.delayedCall(500, () => {
+                    container.destroy();
+                    this.playerSprites.delete(s.odId);
+                    
+                    // Si era el jugador local, mostrar Game Over
+                    if (s.odId === this.localUserId) {
+                        this.cameras.main.stopFollow();
+                        this.showGameOver();
+                    }
+                });
             }
         });
     }
-
-    createTrailParticles(x, y) {
-        for (let i = 0; i < 12; i++) {
-            const p = this.add.circle(x, y, 4, 0x00fff9, 0.7);
-            p.setDepth(50);
+    
+    createVictoryParticles(x, y, color) {
+        for (let i = 0; i < 15; i++) {
+            const angle = (i / 15) * Math.PI * 2;
+            const distance = 50;
+            
+            const particle = this.add.circle(x, y, 5, color, 0.8);
+            particle.setDepth(60);
+            
             this.tweens.add({
-                targets: p,
-                x: x + Phaser.Math.Between(-40, 40),
-                y: y + Phaser.Math.Between(20, 60),
+                targets: particle,
+                x: x + Math.cos(angle) * distance,
+                y: y + Math.sin(angle) * distance,
                 alpha: 0,
-                duration: 600,
-                onComplete: () => p.destroy()
+                scale: 0.2,
+                duration: 800,
+                onComplete: () => particle.destroy()
             });
         }
     }
-
-    createExplosionParticles(x, y) {
-        for (let i = 0; i < 18; i++) {
-            const p = this.add.circle(x, y, 6, 0xff0055, 0.8);
-            p.setDepth(50);
+    
+    createGlitchEffect(container) {
+        // Efecto de glitch rápido
+        const originalX = container.x;
+        
+        this.tweens.add({
+            targets: container,
+            x: originalX + Phaser.Math.Between(-10, 10),
+            duration: 50,
+            yoyo: true,
+            repeat: 5
+        });
+    }
+    
+    createExplosion(x, y) {
+        // Onda expansiva
+        const shockwave = this.add.circle(x, y, 10, 0xff0055, 0.8);
+        shockwave.setDepth(70);
+        
+        this.tweens.add({
+            targets: shockwave,
+            scale: 8,
+            alpha: 0,
+            duration: 600,
+            onComplete: () => shockwave.destroy()
+        });
+        
+        // Partículas de explosión
+        for (let i = 0; i < 25; i++) {
+            const particle = this.add.circle(x, y, Phaser.Math.Between(3, 8), 
+                Phaser.Math.RND.pick([0xff0055, 0xff6600, 0xffff00]), 0.9);
+            particle.setDepth(65);
+            
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Phaser.Math.Between(80, 200);
+            
             this.tweens.add({
-                targets: p,
-                x: x + Phaser.Math.Between(-80, 80),
-                y: y + Phaser.Math.Between(-60, 60),
+                targets: particle,
+                x: x + Math.cos(angle) * speed,
+                y: y + Math.sin(angle) * speed,
                 alpha: 0,
-                duration: 900,
-                onComplete: () => p.destroy()
+                duration: Phaser.Math.Between(400, 800),
+                onComplete: () => particle.destroy()
             });
         }
+        
+        // Screen shake
+        this.cameras.main.shake(300, 0.01);
     }
-
-    showFloatingText(text, x, y, color = '#fff') {
+    
+    showFloatingText(text, x, y, color) {
+        color = color || '#fff';
         const t = this.add.text(x, y, text, {
-            font: 'bold 24px Courier New', fill: color, stroke: '#000', strokeThickness: 4
-        }).setOrigin(0.5).setDepth(200);
+            font: 'bold 28px "Courier New"',
+            fill: color,
+            stroke: '#000',
+            strokeThickness: 5
+        }).setOrigin(0.5).setDepth(500);
         
         this.tweens.add({
             targets: t,
-            y: y - 40,
+            y: y - 60,
             alpha: 0,
-            duration: 1200,
+            scale: 1.3,
+            duration: 1500,
+            ease: 'Quad.easeOut',
             onComplete: () => t.destroy()
         });
     }
-
+    
     showGameOver() {
-        const text = this.add.text(this.scale.width / 2, this.scale.height / 2, 
-            '[💀 SKIN BURNED 💀]\n\nGAME OVER', {
-            font: 'bold 48px Courier New',
+        // Panel de Game Over
+        const panel = this.add.container(this.scale.width / 2, this.scale.height / 2);
+        panel.setScrollFactor(0).setDepth(2000);
+        
+        // Fondo oscuro
+        const bg = this.add.rectangle(0, 0, 500, 250, 0x000000, 0.9);
+        bg.setStrokeStyle(3, 0xff0055);
+        panel.add(bg);
+        
+        // Título
+        const title = this.add.text(0, -60, '[ 💀 SKIN BURNED 💀 ]', {
+            font: 'bold 36px "Courier New"',
             fill: '#ff0055',
             stroke: '#000',
-            strokeThickness: 6,
-            align: 'center'
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(2000);
-
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        panel.add(title);
+        
+        // Subtítulo
+        const subtitle = this.add.text(0, 10, 'GAME OVER', {
+            font: 'bold 48px "Courier New"',
+            fill: '#ffffff',
+            stroke: '#ff0055',
+            strokeThickness: 6
+        }).setOrigin(0.5);
+        panel.add(subtitle);
+        
+        // Instrucción
+        const instruction = this.add.text(0, 80, 'Repair your skin to continue', {
+            font: '18px "Courier New"',
+            fill: '#888888'
+        }).setOrigin(0.5);
+        panel.add(instruction);
+        
+        // Animación de pulso
         this.tweens.add({
-            targets: text,
-            scale: 1.1,
-            duration: 500,
+            targets: subtitle,
+            scale: 1.05,
+            duration: 600,
             yoyo: true,
             repeat: -1
         });
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // 🔄 UPDATE LOOP
+    // ═══════════════════════════════════════════════════════════════
+    
+    update(time, delta) {
+        // Parallax del grid
+        if (this.gridGraphics) {
+            this.gridScrollX += delta * 0.01;
+            // El scrollFactor ya maneja el parallax
+        }
     }
 }
