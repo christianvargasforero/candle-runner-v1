@@ -241,6 +241,13 @@ io.on('connection', async (socket) => {
             return;
         }
 
+        // 🛡️ OBTENER USUARIO (CRÍTICO: debe definirse antes de usarse)
+        const user = userManager.getUser(socket.id);
+        if (!user) {
+            socket.emit('GAME_ERROR', { message: 'User not found' });
+            return;
+        }
+
         // Salir de la sala actual si existe
         if (user.currentRoom) {
             socket.leave(user.currentRoom);

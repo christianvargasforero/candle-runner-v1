@@ -1145,6 +1145,113 @@
         }
 
         /* ===================================
+           🚌 BUS LOBBY OVERLAY
+           =================================== */
+
+        #bus-lobby-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9998;
+            /* Debajo de profile pero encima del juego */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        #bus-lobby-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .bus-lobby-container {
+            width: 100%;
+            max-width: 900px;
+            max-height: 85dvh;
+            background: rgba(10, 10, 20, 0.98);
+            border: 2px solid #00fff9;
+            box-shadow: 0 0 50px rgba(0, 255, 249, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .bus-lobby-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            background: rgba(0, 255, 249, 0.05);
+            border-bottom: 2px solid #00fff9;
+        }
+
+        .bus-lobby-header h2 {
+            font-size: 1.5rem;
+            color: #fff;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .bus-lobby-header h2 i {
+            color: #00fff9;
+            font-size: 1.8rem;
+        }
+
+        .bus-lobby-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+
+        .lobby-subtitle {
+            text-align: center;
+            color: #888;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .lobby-subtitle i {
+            color: #00fff9;
+            margin-right: 8px;
+        }
+
+        .buses-lobby-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .bus-lobby-container {
+                max-width: 95%;
+                max-height: 90dvh;
+            }
+
+            .bus-lobby-header h2 {
+                font-size: 1.2rem;
+            }
+
+            .buses-lobby-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .bus-lobby-content {
+                padding: 20px 15px;
+            }
+        }
+
+        /* ===================================
            📱 RESPONSIVE DESIGN (MOBILE)
            =================================== */
 
@@ -1265,6 +1372,33 @@
             <p>Inicializando Sistemas...</p>
         </div>
         <!-- El canvas de Phaser se generará dinámicamente y ocupará todo el contenedor -->
+    </div>
+
+    <!-- 🚌 BUS LOBBY OVERLAY (Vista Principal después del Login) -->
+    <div id="bus-lobby-overlay" class="hidden">
+        <div class="bus-lobby-container">
+            <div class="bus-lobby-header">
+                <h2><i class="fa-solid fa-bus"></i> BUS TERMINAL</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="close-btn" id="open-profile-from-lobby" title="Open Profile">
+                        <i class="fa-solid fa-user"></i>
+                    </button>
+                    <button class="close-btn" id="close-lobby-btn" title="Close Lobby">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="bus-lobby-content">
+                <p class="lobby-subtitle">
+                    <i class="fa-solid fa-info-circle"></i> Select a bus to join a trading session
+                </p>
+
+                <div id="buses-lobby-grid" class="buses-lobby-grid">
+                    <!-- Buses rendered here by JavaScript -->
+                </div>
+            </div>
+        </div>
     </div>
 
 
@@ -1569,8 +1703,32 @@
 
     <!-- 🧠 LÓGICA DEL CENTRO DE COMANDO -->
     <script>
-        // 🚌 RENDERIZAR LISTA DE BUSES DISPONIBLES
+        // 🎮 FUNCIONES GLOBALES DEL BUS LOBBY
+        window.showBusLobby = function () {
+            const lobbyOverlay = document.getElementById('bus-lobby-overlay');
+            if (lobbyOverlay) {
+                lobbyOverlay.classList.remove('hidden');
+                console.log('[LOBBY] 📋 Bus lobby mostrado');
+
+                // Solicitar lista de buses actualizada
+                if (window.globalSocket) {
+                    window.globalSocket.emit('GET_AVAILABLE_BUSES');
+                }
+            }
+        };
+
+        window.hideBusLobby = function () {
+            const lobbyOverlay = document.getElementById('bus-lobby-overlay');
+            if (lobbyOverlay) {
+                lobbyOverlay.classList.add('hidden');
+                console.log('[LOBBY] 🚪 Bus lobby ocultado');
+            }
+        };
+
+        // 🚌 RENDERIZAR LISTA DE BUSES EN EL LOBBY
         function renderBusList(buses) {
+            // Renderizar en AMBOS sitios: lobby y profile panel
+            const busesLobbyGrid = document.getElementById('buses-lobby-grid');
             const busesGrid = document.getElementById('buses-grid');
 
             // 🐛 DEBUG: Log completo de buses recibidos
@@ -1659,9 +1817,28 @@
                 }
 
                 busesGrid.appendChild(card);
+
+                // 🚌 RENDERIZAR TAMBIÉN EN EL LOBBY
+                if (busesLobbyGrid) {
+                    const cardClone = card.cloneNode(true);
+
+                    // Re-añadir event listener al clon
+                    const clonedBtn = cardClone.querySelector('.bus-join-btn');
+                    if (clonedBtn && !clonedBtn.disabled) {
+                        clonedBtn.addEventListener('click', () => {
+                            const busId = clonedBtn.getAttribute('data-bus-id');
+                            if (window.globalSocket) {
+                                window.globalSocket.emit('JOIN_ROOM', { roomId: busId });
+                                showToast(`Joining bus...`, 'info');
+                            }
+                        });
+                    }
+
+                    busesLobbyGrid.appendChild(cardClone);
+                }
             });
 
-            console.log(`[BUSES] Renderizados ${buses.length} buses`);
+            console.log(`[BUSES] Renderizados ${buses.length} buses en ambos grids`);
         }
 
         // Mock para evitar error si busModalOverlay no existe
@@ -1715,6 +1892,23 @@
 
             // Hacer showToast accesible globalmente
             window.showToast = showToast;
+
+            // 🚌 BUS LOBBY EVENT LISTENERS
+            const closeLobbyBtn = document.getElementById('close-lobby-btn');
+            const openProfileFromLobby = document.getElementById('open-profile-from-lobby');
+
+            if (closeLobbyBtn) {
+                closeLobbyBtn.addEventListener('click', () => {
+                    window.hideBusLobby();
+                });
+            }
+
+            if (openProfileFromLobby) {
+                openProfileFromLobby.addEventListener('click', () => {
+                    window.hideBusLobby();
+                    overlay.classList.add('active'); // Abrir profile
+                });
+            }
 
             // Manual Elements
             const manualToggle = document.getElementById('manual-toggle');
