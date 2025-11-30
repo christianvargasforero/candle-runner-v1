@@ -68,8 +68,14 @@ export default class GameScene extends Phaser.Scene {
         // 🏗️ GRUPO FÍSICO DE VELAS (Plataformas Estáticas)
         this.candlesGroup = this.physics.add.staticGroup();
         
+        // 🎯 GRUPO FÍSICO DEDICADO PARA COLISIONES (Invisible)
+        this.physicsCandles = this.physics.add.staticGroup();
+        
         // Mapeo: índice de vela -> objeto físico
         this.candlePhysicsBodies = new Map();
+        
+        // Referencia al jugador local
+        this.myPlayer = null;
         
         console.log('[⚙️ PHYSICS] Sistema Arcade activado');
         
@@ -327,8 +333,9 @@ export default class GameScene extends Phaser.Scene {
         // ============================================
         this.candleLayer.removeAll(true);
         
-        // Limpiar grupo físico anterior
+        // Limpiar grupos físicos anteriores
         this.candlesGroup.clear(true, true);
+        this.physicsCandles.clear(true, true);
         this.candlePhysicsBodies.clear();
         
         if (!this.candleHistory.length) return;
@@ -365,6 +372,9 @@ export default class GameScene extends Phaser.Scene {
             
             // Añadir al grupo físico estático
             this.candlesGroup.add(physicsBody);
+            
+            // 🎯 TAMBIÉN añadir a physicsCandles para colisiones
+            this.physicsCandles.add(physicsBody);
             
             // Guardar referencia
             this.candlePhysicsBodies.set(i, physicsBody);
@@ -689,9 +699,13 @@ export default class GameScene extends Phaser.Scene {
         // ============================================
         // 🔗 COLISIONADOR CON VELAS
         // ============================================
-        this.physics.add.collider(sprite, this.candlesGroup);
+        this.physics.add.collider(sprite, this.physicsCandles);
+        
+        // Establecer referencia global al jugador local
+        this.myPlayer = sprite;
         
         console.log('[🎮 PLAYER] Jugador local spawneado con física en', x, y);
+        console.log('[🔗 COLLIDER] Colisión jugador-velas activada');
         
         return {
             sprite,
@@ -822,13 +836,35 @@ export default class GameScene extends Phaser.Scene {
             if (s.status === 'WIN') {
                 // === VICTORIA: Salto a siguiente vela ===
                 if (data.isLocal) {
-                    // Jugador local: usar física para saltar
-                    sprite.setVelocityY(-600); // Salto fuerte
-                    sprite.setVelocityX(200);  // Impulso hacia adelante
+                    // 🎯 DESACTIVAR FÍSICA durante animación
+                    if (sprite.body) sprite.body.enable = false;
                     
-                    this.time.delayedCall(300, () => {
-                        this.createVictoryParticles(sprite.x, sprite.y, data.color);
-                        this.showFloatingText('+WIN', sprite.x, sprite.y - 50, '#00ff88');
+                    // Tween controlado (no interferencia con gravedad)
+                    this.tweens.add({
+                        targets: sprite,
+                        x: sprite.x + this.CANDLE_SPACING,
+                        y: sprite.y - 120,
+                        duration: 400,
+                        ease: 'Quad.easeOut',
+                        onComplete: () => {
+                            // Caída con rebote
+                            this.tweens.add({
+                                targets: sprite,
+                                y: sprite.y + 120,
+                                duration: 500,
+                                ease: 'Bounce.easeOut',
+                                onComplete: () => {
+                                    // 🎯 REACTIVAR FÍSICA al aterrizar
+                                    if (sprite.body) {
+                                        sprite.body.enable = true;
+                                        sprite.setVelocity(0, 0); // Reset velocidad
+                                    }
+                                }
+                            });
+                            
+                            this.createVictoryParticles(sprite.x, sprite.y, data.color);
+                            this.showFloatingText('+WIN', sprite.x, sprite.y - 50, '#00ff88');
+                        }
                     });
                 } else {
                     // Jugador remoto: tween visual
@@ -854,8 +890,23 @@ export default class GameScene extends Phaser.Scene {
                 this.createGlitchEffect(sprite);
                 
                 if (data.isLocal) {
-                    // Jugador local: impulso horizontal
-                    sprite.setVelocityX(150);
+                    // 🎯 DESACTIVAR FÍSICA durante animación
+                    if (sprite.body) sprite.body.enable = false;
+                    
+                    // Tween horizontal suave
+                    this.tweens.add({
+                        targets: sprite,
+                        x: sprite.x + this.CANDLE_SPACING,
+                        duration: 600,
+                        ease: 'Cubic.easeInOut',
+                        onComplete: () => {
+                            // 🎯 REACTIVAR FÍSICA
+                            if (sprite.body) {
+                                sprite.body.enable = true;
+                                sprite.setVelocity(0, 0);
+                            }
+                        }
+                    });
                     
                     // Flash rojo en el sprite
                     this.tweens.add({
@@ -1064,6 +1115,40 @@ export default class GameScene extends Phaser.Scene {
             }
             if (data.integrityFill) {
                 data.integrityFill.setPosition(sprite.x - 15, sprite.y + 25);
+            }
+        });
+        
+        // ============================================
+        // 🗑️ GARBAGE COLLECTION: Limpiar objetos fuera de cámara
+        // ============================================
+        const cameraLeft = this.cameras.main.scrollX - 500;
+        
+        // 1. Limpiar velas físicas antiguas
+        this.candlePhysicsBodies.forEach((body, index) => {
+            if (body && body.x < cameraLeft) {
+                body.destroy();
+                this.candlePhysicsBodies.delete(index);
+            }
+        });
+        
+        // 2. Limpiar gráficos de velas visuales
+        if (this.candleLayer) {
+            const candlesToRemove = [];
+            this.candleLayer.list.forEach(container => {
+                if (container.x < cameraLeft) {
+                    candlesToRemove.push(container);
+                }
+            });
+            candlesToRemove.forEach(c => {
+                this.candleLayer.remove(c, true);
+            });
+        }
+        
+        // 3. Limpiar jugadores remotos fuera de cámara (no el local)
+        this.playerSprites.forEach((data, id) => {
+            if (!data.isLocal && data.sprite && data.sprite.x < cameraLeft) {
+                console.log(`[🗑️ GC] Limpiando jugador remoto fuera de cámara: ${id}`);
+                this.removePlayerSprite(id);
             }
         });
     }
