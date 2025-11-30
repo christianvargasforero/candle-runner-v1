@@ -223,6 +223,14 @@ io.on('connection', async (socket) => {
         return;
     }
 
+
+    // 🚌 Evento: Obtener lista de buses disponibles (PÚBLICO para jugadores)
+    socket.on('GET_AVAILABLE_BUSES', () => {
+        const buses = roomManager.getRoomsInfo();
+        socket.emit('BUS_LIST_UPDATE', buses);
+        console.log(`📋 [GET_BUSES] Enviando lista de ${buses.length} buses a ${socket.id}`);
+    });
+
     // 🚌 Evento: Unirse a una sala (elegir el "Bus")
     socket.on('JOIN_ROOM', async (data) => {
         // Ahora esperamos un ID específico de bus (ej: 'bus_training_1')
@@ -281,8 +289,11 @@ io.on('connection', async (socket) => {
             socket.emit('CURRENT_PLAYERS', currentPlayers);
 
             io.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
-            // También actualizar la lista de buses para todos (admin y clientes)
-            io.emit('ADMIN_BUSES', roomManager.getRoomsInfo());
+
+            // Actualizar lista de buses para todos (admin y jugadores)
+            const busesInfo = roomManager.getRoomsInfo();
+            io.emit('ADMIN_BUSES', busesInfo);
+            io.emit('BUS_LIST_UPDATE', busesInfo); // Para jugadores en MenuScene
 
             console.log(`🚌 [JOIN] Usuario ${user.id} subió al bus ${roomId} (${room.name})`);
             console.log(`👥 [PRESENCE] ${currentPlayers.length} jugadores ya en el bus`);
@@ -459,8 +470,10 @@ io.on('connection', async (socket) => {
             roomManager.removeUserFromRoom(socket.id, roomId);
         });
 
-        // Actualizar conteos a todos
+        // Actualizar conteos y lista de buses para todos
         io.emit('ROOM_COUNTS_UPDATE', roomManager.getRoomCounts());
+        const busesInfo = roomManager.getRoomsInfo();
+        io.emit('BUS_LIST_UPDATE', busesInfo); // Actualizar ocupación en MenuScene
     });
 });
 
