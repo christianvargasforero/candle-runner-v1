@@ -24,6 +24,12 @@ export default class UIScene extends Phaser.Scene {
         // Estado de Skin
         this.skinIntegrity = 100;
         this.maxIntegrity = 100;
+
+        // ============================================
+        // 📡 LIVE FEED MONITORING
+        // ============================================
+        this.lastPriceUpdateTime = null;
+        this.liveFeedStatus = 'disconnected'; // 'live', 'reconnecting', 'disconnected'
     }
 
     create() {
@@ -214,6 +220,19 @@ export default class UIScene extends Phaser.Scene {
             // Actualizar el precio del ticket en la UI
             if (this.ticketPriceText) {
                 this.ticketPriceText.setText(`TICKET: $${data.ticketPrice.toFixed(2)}`);
+            }
+        });
+
+        // ============================================
+        // 📡 LIVE FEED: Monitorear actualizaciones de precio
+        // ============================================
+        this.socket.on('PRICE_UPDATE', (data) => {
+            if (data.price) {
+                this.currentPrice = data.price;
+                this.lastPriceUpdateTime = Date.now();
+                this.liveFeedStatus = 'live';
+                this.updatePriceDisplay();
+                this.updateLiveFeedIndicator();
             }
         });
     }
@@ -483,15 +502,91 @@ export default class UIScene extends Phaser.Scene {
     createPriceDisplay() {
         const x = this.cameras.main.width - 20;
         const y = 20;
-        this.priceBackground = this.add.rectangle(x, y, 250, 80, 0x000000, 0.7).setOrigin(1, 0);
+        this.priceBackground = this.add.rectangle(x, y, 250, 110, 0x000000, 0.7).setOrigin(1, 0);
         this.priceLabelText = this.add.text(x - 10, y + 10, 'BTC PRICE', { font: '12px Courier New', fill: '#888888' }).setOrigin(1, 0);
         this.priceValueText = this.add.text(x - 10, y + 35, '-', { font: 'bold 24px Courier New', fill: '#00ff88' }).setOrigin(1, 0);
+
+        // ============================================
+        // 📡 LIVE FEED INDICATOR
+        // ============================================
+        const feedY = y + 75;
+
+        // Punto indicador (parpadeante)
+        this.liveFeedDot = this.add.circle(x - 10, feedY, 6, 0xff0000).setOrigin(1, 0.5);
+
+        // Texto de estado
+        this.liveFeedText = this.add.text(x - 25, feedY, 'DISCONNECTED', {
+            font: 'bold 11px Courier New',
+            fill: '#ff0000'
+        }).setOrigin(1, 0.5);
+
+        // Animación de parpadeo inicial (desconectado)
+        this.liveFeedPulse = this.tweens.add({
+            targets: this.liveFeedDot,
+            alpha: 0.3,
+            duration: 800,
+            yoyo: true,
+            repeat: -1,
+            paused: true
+        });
     }
 
     updatePriceDisplay() {
         if (this.currentPrice) {
             this.priceValueText.setText(`$${this.currentPrice.toFixed(2)}`);
             this.tweens.add({ targets: this.priceValueText, scale: 1.1, duration: 150, yoyo: true });
+        }
+    }
+
+    // ============================================
+    // 📡 ACTUALIZAR INDICADOR DE LIVE FEED
+    // ============================================
+
+    updateLiveFeedIndicator() {
+        if (!this.liveFeedDot || !this.liveFeedText) return;
+
+        const now = Date.now();
+        const timeSinceUpdate = this.lastPriceUpdateTime ? now - this.lastPriceUpdateTime : Infinity;
+
+        // Determinar estado según tiempo transcurrido
+        if (timeSinceUpdate < 2000) {
+            // LIVE: Verde parpadeante (actualización reciente)
+            this.liveFeedStatus = 'live';
+            this.liveFeedDot.setFillStyle(0x00ff00);
+            this.liveFeedText.setText('LIVE FEED');
+            this.liveFeedText.setColor('#00ff00');
+
+            // Activar parpadeo rápido
+            if (this.liveFeedPulse.paused) {
+                this.liveFeedPulse.resume();
+                this.liveFeedPulse.timeScale = 1.5; // Más rápido
+            }
+
+        } else if (timeSinceUpdate < 5000) {
+            // RECONNECTING: Ámbar (advertencia)
+            this.liveFeedStatus = 'reconnecting';
+            this.liveFeedDot.setFillStyle(0xffaa00);
+            this.liveFeedText.setText('RECONNECTING');
+            this.liveFeedText.setColor('#ffaa00');
+
+            // Parpadeo medio
+            if (this.liveFeedPulse.paused) {
+                this.liveFeedPulse.resume();
+            }
+            this.liveFeedPulse.timeScale = 1;
+
+        } else {
+            // DISCONNECTED: Rojo (error)
+            this.liveFeedStatus = 'disconnected';
+            this.liveFeedDot.setFillStyle(0xff0000);
+            this.liveFeedText.setText('DISCONNECTED');
+            this.liveFeedText.setColor('#ff0000');
+
+            // Parpadeo lento
+            if (this.liveFeedPulse.paused) {
+                this.liveFeedPulse.resume();
+            }
+            this.liveFeedPulse.timeScale = 0.5;
         }
     }
 
@@ -555,6 +650,11 @@ export default class UIScene extends Phaser.Scene {
                 this.progressBar.setSize(280 * progress, 8);
             }
         }
+
+        // ============================================
+        // 📡 MONITOREAR LIVE FEED CADA FRAME
+        // ============================================
+        this.updateLiveFeedIndicator();
     }
 
     createLogo() {

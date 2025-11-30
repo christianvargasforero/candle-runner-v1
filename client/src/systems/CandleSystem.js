@@ -18,8 +18,10 @@ export class CandleSystem {
         // 🎬 AMPLIFICACIÓN VISUAL (DRAMA FACTOR)
         // ============================================
         this.VISUAL_MULTIPLIER = 25; // Exagerar movimientos de precio para emoción
-        this.SHAKE_THRESHOLD = 0.5; // % de cambio para activar shake
+        this.MAX_CANDLE_HEIGHT = Math.min(300, window.innerHeight * 0.4); // Límite visual (40% pantalla)
+        this.SHAKE_THRESHOLD = 2.0; // % de cambio para activar shake (reducido para menos mareo)
         this.lastPriceForShake = null;
+        this.extremeForceActive = false; // Indicador de fuerza extrema
 
         // Paleta de colores
         this.COLORS = {
@@ -362,14 +364,25 @@ export class CandleSystem {
         this.liveCandleGraphics.lineBetween(x, yHigh, x, yLow);
 
         // ============================================
-        // 2️⃣ CUERPO (open → current) - AMPLIFICADO
+        // 2️⃣ CUERPO (open → current) - AMPLIFICADO CON CLAMPING
         // ============================================
         const bodyTop = Math.min(yOpen, yCurrent);
         const bodyBottom = Math.max(yOpen, yCurrent);
-        const bodyHeight = Math.max(8, bodyBottom - bodyTop); // Mínimo 8px para visibilidad
+        let bodyHeight = Math.max(8, bodyBottom - bodyTop); // Mínimo 8px para visibilidad
+
+        // 🛡️ CLAMPING: Limitar altura para evitar velas infinitas
+        const isExtremeForce = bodyHeight > this.MAX_CANDLE_HEIGHT;
+        if (isExtremeForce) {
+            bodyHeight = this.MAX_CANDLE_HEIGHT;
+            this.extremeForceActive = true;
+            console.log(`[⚡ EXTREME FORCE] Vela alcanzó límite visual: ${this.MAX_CANDLE_HEIGHT}px`);
+        } else {
+            this.extremeForceActive = false;
+        }
 
         // Glow exterior INTENSO (resplandor pulsante)
-        this.liveCandleGraphics.fillStyle(glowColor, 0.25);
+        const glowIntensity = isExtremeForce ? 0.4 : 0.25; // Más intenso si hay fuerza extrema
+        this.liveCandleGraphics.fillStyle(glowColor, glowIntensity);
         this.liveCandleGraphics.fillRoundedRect(
             x - this.CANDLE_WIDTH / 2 - 10,
             bodyTop - 10,
@@ -397,6 +410,34 @@ export class CandleSystem {
             bodyHeight,
             4
         );
+
+        // ⚡ EFECTO DE FUERZA EXTREMA: Partículas en el borde superior
+        if (isExtremeForce) {
+            // Línea pulsante en el límite
+            this.liveCandleGraphics.lineStyle(4, 0xffffff, 0.8);
+            this.liveCandleGraphics.lineBetween(
+                x - this.CANDLE_WIDTH / 2 - 15,
+                bodyTop,
+                x + this.CANDLE_WIDTH / 2 + 15,
+                bodyTop
+            );
+
+            // Partículas de energía
+            for (let i = 0; i < 3; i++) {
+                const particleX = x + Phaser.Math.Between(-this.CANDLE_WIDTH / 2, this.CANDLE_WIDTH / 2);
+                const particle = this.scene.add.circle(particleX, bodyTop, 3, 0xffffff, 0.9);
+                particle.setDepth(25);
+
+                this.scene.tweens.add({
+                    targets: particle,
+                    y: bodyTop - 30,
+                    alpha: 0,
+                    duration: 800,
+                    delay: i * 100,
+                    onComplete: () => particle.destroy()
+                });
+            }
+        }
 
         // ============================================
         // 3️⃣ GLOW DOT PULSANTE (punto brillante en precio actual)

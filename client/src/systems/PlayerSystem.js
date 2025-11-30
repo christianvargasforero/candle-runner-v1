@@ -431,73 +431,111 @@ export class PlayerSystem {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🤷 ANIMACIÓN DE EMPATE (DRAW)
+    // 🤷 ANIMACIÓN DE EMPATE (DRAW) - CORREGIDA
     // ═══════════════════════════════════════════════════════════════
 
     animateDraw(sprite, data, candleSystem) {
-        // El jugador se queda en la vela actual y hace animación de confusión
+        // ⚠️ CORRECCIÓN CRÍTICA: El jugador NO puede quedarse atrás
+        // Debe saltar a la nueva vela (currentIndex + 1) para no perderse en el scroll
 
         if (data.isLocal) {
-            // Desactivar física temporalmente
+            // 🎯 DESACTIVAR FÍSICA durante animación
             if (sprite.body) sprite.body.enable = false;
+
+            // Salto a siguiente vela (igual que WIN pero sin celebración)
+            this.scene.tweens.add({
+                targets: sprite,
+                x: sprite.x + candleSystem.CANDLE_SPACING,
+                y: sprite.y - 80, // Salto más bajo que victoria
+                duration: 500,
+                ease: 'Quad.easeOut',
+                onComplete: () => {
+                    // Caída suave
+                    this.scene.tweens.add({
+                        targets: sprite,
+                        y: sprite.y + 80,
+                        duration: 400,
+                        ease: 'Quad.easeInOut',
+                        onComplete: () => {
+                            // 🎯 REACTIVAR FÍSICA al aterrizar
+                            if (sprite.body) {
+                                sprite.body.enable = true;
+                                sprite.setVelocity(0, 0);
+                            }
+
+                            // Emote de confusión al aterrizar
+                            this.showConfusionEmote(sprite.x, sprite.y);
+                        }
+                    });
+                }
+            });
+        } else {
+            // Jugador remoto: salto visual simple
+            this.scene.tweens.add({
+                targets: sprite,
+                x: sprite.x + candleSystem.CANDLE_SPACING,
+                y: sprite.y - 60,
+                duration: 500,
+                ease: 'Quad.easeOut',
+                onComplete: () => {
+                    this.scene.tweens.add({
+                        targets: sprite,
+                        y: sprite.y + 60,
+                        duration: 400,
+                        ease: 'Quad.easeInOut',
+                        onComplete: () => {
+                            this.showConfusionEmote(sprite.x, sprite.y);
+                        }
+                    });
+                }
+            });
         }
 
-        const originalX = sprite.x;
+        // Texto flotante NEUTRO (blanco/gris)
+        this.showFloatingText('DRAW', sprite.x, sprite.y - 50, '#cccccc');
 
-        // Animación de sacudida lateral (confusión)
-        this.scene.tweens.add({
-            targets: sprite,
-            x: originalX - 10,
-            duration: 100,
-            yoyo: true,
-            repeat: 3,
-            ease: 'Sine.easeInOut',
-            onComplete: () => {
-                // Reactivar física
-                if (data.isLocal && sprite.body) {
-                    sprite.body.enable = true;
-                    sprite.setVelocity(0, 0);
-                }
-            }
-        });
+        console.log(`[🤷 PlayerSystem] Animación de empate (salto a nueva vela) para jugador ${data.isLocal ? 'local' : 'remoto'}`);
+    }
 
-        // Pequeño salto de confusión
-        this.scene.tweens.add({
-            targets: sprite,
-            y: sprite.y - 20,
-            duration: 200,
-            yoyo: true,
-            ease: 'Quad.easeOut'
-        });
+    // ═══════════════════════════════════════════════════════════════
+    // 🤔 EMOTE DE CONFUSIÓN
+    // ═══════════════════════════════════════════════════════════════
 
-        // Mostrar signo de interrogación
-        const questionMark = this.scene.add.text(
-            sprite.x,
-            sprite.y - 60,
-            '?',
+    showConfusionEmote(x, y) {
+        // Mostrar "..." sobre la cabeza del jugador
+        const emote = this.scene.add.text(
+            x,
+            y - 50,
+            '...',
             {
-                font: 'bold 48px Arial',
+                font: 'bold 32px Arial',
                 fill: '#ffffff',
                 stroke: '#000',
-                strokeThickness: 4
+                strokeThickness: 3
             }
         ).setOrigin(0.5).setDepth(500);
 
-        // Animación del signo de interrogación
+        // Animación de aparición y desaparición
+        emote.setAlpha(0);
         this.scene.tweens.add({
-            targets: questionMark,
-            y: questionMark.y - 30,
-            alpha: 0,
-            scale: 1.5,
-            duration: 1500,
-            ease: 'Quad.easeOut',
-            onComplete: () => questionMark.destroy()
+            targets: emote,
+            alpha: 1,
+            y: y - 60,
+            duration: 300,
+            ease: 'Back.easeOut',
+            onComplete: () => {
+                // Mantener visible 1 segundo
+                this.scene.time.delayedCall(1000, () => {
+                    this.scene.tweens.add({
+                        targets: emote,
+                        alpha: 0,
+                        y: y - 70,
+                        duration: 300,
+                        onComplete: () => emote.destroy()
+                    });
+                });
+            }
         });
-
-        // Texto flotante
-        this.showFloatingText('DRAW', sprite.x, sprite.y - 50, '#888888');
-
-        console.log(`[🤷 PlayerSystem] Animación de empate para jugador ${data.isLocal ? 'local' : 'remoto'}`);
     }
 
     // ═══════════════════════════════════════════════════════════════

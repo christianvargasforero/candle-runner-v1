@@ -46,12 +46,15 @@ class UserManager {
                 include: { skins: true }
             });
             console.log(`🎁 [DB] Nuevo usuario creado con Welcome Bonus: ${dbUser.id} (${walletAddress})`);
+            console.log(`💰 [DB DEBUG] Balance en DB: $${dbUser.balanceUSDT} USDT, ${dbUser.balanceWICK} WICK`);
 
             // Instanciar User y persistir skins iniciales
             user = new User(dbUser.id, socketId);
             user.wallet = dbUser.walletAddress; // 🦊 Guardar wallet address
             user.balanceUSDT = dbUser.balanceUSDT;
             user.balanceWICK = dbUser.balanceWICK;
+
+            console.log(`💰 [USER DEBUG] Balance asignado: $${user.balanceUSDT} USDT, ${user.balanceWICK} WICK`);
 
             // Limpiar inventario mock
             user.inventory = [];

@@ -9,8 +9,10 @@ export default class User {
     constructor(id, socketId) {
         this.id = id;
         this.socketId = socketId;
-        this.balanceUSDT = 10000; // Demo balance (Testing)
-        this.balanceWICK = 500;   // Demo WICK for repairs (Testing)
+
+        // ⚠️ NO HARDCODEAR BALANCES - Se asignan desde DB en userManager.js
+        this.balanceUSDT = 0; // Se sobrescribe con valor de DB
+        this.balanceWICK = 0; // Se sobrescribe con valor de DB
 
         // 🎒 INVENTARIO DE SKINS
         this.inventory = [];

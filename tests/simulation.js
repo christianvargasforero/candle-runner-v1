@@ -3,16 +3,15 @@
 // 🧪 CANDLE RUNNER - Script de Simulación de Mecánicas
 // Valida que el juego cumple las reglas del White Paper
 
-const io = require('socket.io-client');
-const crypto = require('crypto');
+import { io } from 'socket.io-client';
+import crypto from 'crypto';
 
 // ============================================
 // 🎯 CONFIGURACIÓN
 // ============================================
 
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3000';
-const ROOM_NAME = 'bus_satoshi_test';
-const NUM_BOTS = 3;
+const NUM_BOTS = 5; // Llenar bus TRAINING (capacidad 5)
 
 // Colores para output
 const colors = {
@@ -41,7 +40,10 @@ class Bot {
     }
 
     generateWallet() {
-        return '0x' + crypto.randomBytes(20).toString('hex');
+        // Generar wallet única con timestamp para recibir welcome bonus cada vez
+        const timestamp = Date.now();
+        const random = crypto.randomBytes(16).toString('hex');
+        return '0x' + crypto.createHash('sha256').update(`${timestamp}_${random}`).digest('hex').slice(0, 40);
     }
 
     connect() {
@@ -74,7 +76,7 @@ class Bot {
     setupListeners() {
         // USER_PROFILE
         this.socket.on('USER_PROFILE', (profile) => {
-            this.balance = profile.balance || 0;
+            this.balance = profile.balanceUSDT || 0; // Usar balanceUSDT en lugar de balance
             this.initialBalance = this.balance;
             console.log(`${colors.cyan}[${this.name}]${colors.reset} Perfil recibido. Balance: $${this.balance}`);
             this.logEvent('USER_PROFILE', profile);
@@ -122,7 +124,7 @@ class Bot {
         // BALANCE_UPDATE
         this.socket.on('BALANCE_UPDATE', (data) => {
             const oldBalance = this.balance;
-            this.balance = data.balance;
+            this.balance = data.balanceUSDT || data.balance || 0; // Soportar ambos formatos
             const change = this.balance - oldBalance;
             const symbol = change >= 0 ? '+' : '';
             const color = change >= 0 ? colors.green : colors.red;
@@ -135,12 +137,40 @@ class Bot {
             console.error(`${colors.red}❌ [${this.name}]${colors.reset} Error:`, data.message);
             this.logEvent('ERROR', data);
         });
+
+        // BUS_LIST_UPDATE (evento correcto del servidor)
+        this.socket.on('BUS_LIST_UPDATE', (buses) => {
+            console.log(`${colors.cyan}[${this.name}]${colors.reset} Buses disponibles:`, buses?.length || 0);
+            this.logEvent('BUS_LIST_UPDATE', { buses });
+            this.availableBuses = buses || [];
+        });
     }
 
-    joinRoom() {
+    async getBuses() {
         return new Promise((resolve) => {
-            console.log(`${colors.cyan}[${this.name}]${colors.reset} Uniéndose a sala: ${ROOM_NAME}`);
-            this.socket.emit('JOIN_ROOM', { roomName: ROOM_NAME });
+            console.log(`${colors.cyan}[${this.name}]${colors.reset} Solicitando lista de buses...`);
+            this.socket.emit('GET_AVAILABLE_BUSES'); // Evento correcto
+
+            // Esperar respuesta
+            const checkBuses = setInterval(() => {
+                if (this.availableBuses && this.availableBuses.length > 0) {
+                    clearInterval(checkBuses);
+                    resolve(this.availableBuses);
+                }
+            }, 100);
+
+            // Timeout de 5 segundos
+            setTimeout(() => {
+                clearInterval(checkBuses);
+                resolve(this.availableBuses || []);
+            }, 5000);
+        });
+    }
+
+    joinRoom(roomName) {
+        return new Promise((resolve) => {
+            console.log(`${colors.cyan}[${this.name}]${colors.reset} Uniéndose a sala: ${roomName}`);
+            this.socket.emit('JOIN_ROOM', { roomId: roomName }); // Usar roomId en lugar de roomName
             setTimeout(resolve, 500);
         });
     }
@@ -254,7 +284,9 @@ class GameSimulator {
         this.bots = [
             new Bot('Bot A', 'LONG'),
             new Bot('Bot B', 'SHORT'),
-            new Bot('Bot C', 'IDLE')
+            new Bot('Bot C', 'IDLE'),
+            new Bot('Bot D', 'LONG'),
+            new Bot('Bot E', 'SHORT')
         ];
 
         for (const bot of this.bots) {
@@ -266,14 +298,51 @@ class GameSimulator {
     }
 
     async step2_joinRoom() {
-        console.log(`\n${colors.bright}📋 PASO 2: Unirse a la Sala${colors.reset}`);
+        console.log(`\n${colors.bright}📋 PASO 2: Obtener Buses y Unirse${colors.reset}`);
         console.log('─'.repeat(55));
 
+        // Obtener lista de buses disponibles (solo el primer bot)
+        const buses = await this.bots[0].getBuses();
+
+        if (!buses || buses.length === 0) {
+            console.error(`${colors.red}❌ No hay buses disponibles${colors.reset}`);
+            this.validate('Buses disponibles', false);
+            throw new Error('No hay buses disponibles');
+        }
+
+        console.log(`\n${colors.cyan}🚌 Buses disponibles:${colors.reset}`);
+        buses.forEach(bus => {
+            const status = bus.isFull ? '🔴 LLENO' : '🟢 DISPONIBLE';
+            console.log(`   ${status} ${bus.name} (ID: ${bus.id}) | Ticket: $${bus.ticketPrice} | ${bus.connectedUsers}/${bus.capacity}`);
+        });
+
+        // Seleccionar el bus más apropiado (Satoshi o Training - gratis o barato)
+        let selectedBus = buses.find(b =>
+            !b.isFull && (b.id.includes('training') || b.id.includes('satoshi'))
+        );
+
+        // Si no hay bus Satoshi/Training disponible, usar el primero disponible
+        if (!selectedBus) {
+            selectedBus = buses.find(b => !b.isFull);
+        }
+
+        if (!selectedBus) {
+            console.error(`${colors.red}❌ Todos los buses están llenos${colors.reset}`);
+            this.validate('Bus disponible encontrado', false);
+            throw new Error('Todos los buses están llenos');
+        }
+
+        console.log(`\n${colors.green}✅ Bus seleccionado: ${selectedBus.name} (ID: ${selectedBus.id})${colors.reset}`);
+        console.log(`   Ticket: $${selectedBus.ticketPrice} | Capacidad: ${selectedBus.capacity}`);
+
+        // Todos los bots se unen al mismo bus usando el ID correcto
         for (const bot of this.bots) {
-            await bot.joinRoom();
+            await bot.joinRoom(selectedBus.id); // Usar ID en lugar de nombre
         }
 
         this.validate('Bots unidos a sala', true);
+        this.selectedBusName = selectedBus.name;
+        this.selectedBusCapacity = selectedBus.capacity;
     }
 
     async step3_waitForBusStart() {
@@ -449,12 +518,11 @@ class GameSimulator {
 // 🚀 EJECUTAR SIMULACIÓN
 // ============================================
 
-if (require.main === module) {
-    const simulator = new GameSimulator();
-    simulator.run().catch(error => {
-        console.error(`${colors.red}❌ Error fatal:${colors.reset}`, error);
-        process.exit(1);
-    });
-}
+const simulator = new GameSimulator();
+simulator.run().catch(error => {
+    console.error(`${colors.red}❌ Error fatal:${colors.reset}`, error);
+    process.exit(1);
+});
 
-module.exports = { GameSimulator, Bot };
+export { GameSimulator, Bot };
+

@@ -1,11 +1,12 @@
 {
   "name": "candle-runner",
   "version": "1.0.0",
+  "type": "module",
   "description": "Survival Trading & Decentralized Creative Economy",
-  "main": "server/index.js",
+  "main": "server/server.js",
   "scripts": {
-    "dev": "node server/index.js",
-    "start": "node server/index.js",
+    "dev": "node server/server.js",
+    "start": "node server/server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "simulate": "node tests/simulation.js",
     "simulate:verbose": "DEBUG=* node tests/simulation.js"
@@ -20,11 +21,14 @@
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^5.22.0",
+    "axios": "^1.13.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
+    "redis": "^5.10.0",
     "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "prisma": "^5.22.0"
