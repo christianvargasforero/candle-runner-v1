@@ -521,6 +521,201 @@ export class PlayerSystem {
         this.scene.cameras.main.shake(300, 0.01);
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🔔 NOTIFICACIONES DE RONDA (Trading Decision UI)
+    // ═══════════════════════════════════════════════════════════════
+
+    showWinNotification() {
+        const width = this.scene.scale.width;
+        const height = this.scene.scale.height;
+
+        const container = this.scene.add.container(width / 2, height / 2);
+        container.setScrollFactor(0).setDepth(2000);
+        container.setAlpha(0);
+
+        // Fondo oscuro
+        const bg = this.scene.add.rectangle(0, 0, 500, 220, 0x000000, 0.95);
+        bg.setStrokeStyle(3, 0x00ff88);
+        container.add(bg);
+
+        // Título
+        const title = this.scene.add.text(0, -70, '💰 PROFIT SECURED', {
+            font: 'bold 32px "Courier New"',
+            fill: '#00ff88',
+            stroke: '#000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        container.add(title);
+
+        // Monto ganado (placeholder - se actualizará con datos reales)
+        const profitText = this.scene.add.text(0, -30, '+$1.90', {
+            font: 'bold 28px "Courier New"',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+        container.add(profitText);
+
+        // Botón CASH OUT (Izquierda)
+        const cashOutBtn = this.scene.add.container(-120, 40);
+        const cashOutBg = this.scene.add.rectangle(0, 0, 180, 50, 0xff0055, 0.2);
+        cashOutBg.setStrokeStyle(2, 0xff0055);
+        cashOutBg.setInteractive({ useHandCursor: true });
+        const cashOutText = this.scene.add.text(0, 0, '💰 CASH OUT', {
+            font: 'bold 16px "Courier New"',
+            fill: '#ff0055'
+        }).setOrigin(0.5);
+
+        cashOutBtn.add([cashOutBg, cashOutText]);
+        container.add(cashOutBtn);
+
+        // Hover effect
+        cashOutBg.on('pointerover', () => {
+            cashOutBg.setFillStyle(0xff0055, 0.5);
+        });
+        cashOutBg.on('pointerout', () => {
+            cashOutBg.setFillStyle(0xff0055, 0.2);
+        });
+        cashOutBg.on('pointerdown', () => {
+            // Emit decision to server
+            if (window.globalSocket) {
+                window.globalSocket.emit('PLAYER_DECISION', { action: 'CASHOUT' });
+                window.showToast('Cashing out...', 'success');
+            }
+            container.destroy();
+        });
+
+        // Botón COMPOUND (Derecha)
+        const compoundBtn = this.scene.add.container(120, 40);
+        const compoundBg = this.scene.add.rectangle(0, 0, 180, 50, 0x00ff88, 0.2);
+        compoundBg.setStrokeStyle(2, 0x00ff88);
+        compoundBg.setInteractive({ useHandCursor: true });
+        const compoundText = this.scene.add.text(0, 0, '🚀 CONTINUE', {
+            font: 'bold 16px "Courier New"',
+            fill: '#00ff88'
+        }).setOrigin(0.5);
+
+        compoundBtn.add([compoundBg, compoundText]);
+        container.add(compoundBtn);
+
+        // Hover effect
+        compoundBg.on('pointerover', () => {
+            compoundBg.setFillStyle(0x00ff88, 0.5);
+        });
+        compoundBg.on('pointerout', () => {
+            compoundBg.setFillStyle(0x00ff88, 0.2);
+        });
+        compoundBg.on('pointerdown', () => {
+            // Emit decision to server
+            if (window.globalSocket) {
+                window.globalSocket.emit('PLAYER_DECISION', { action: 'CONTINUE' });
+                window.showToast('Continuing to next round!', 'success');
+            }
+            container.destroy();
+        });
+
+        // Timer bar
+        const timerBg = this.scene.add.rectangle(0, 90, 400, 8, 0x333333);
+        const timerFill = this.scene.add.rectangle(-200, 90, 400, 8, 0xffaa00);
+        timerFill.setOrigin(0, 0.5);
+        container.add([timerBg, timerFill]);
+
+        // Animación de entrada
+        this.scene.tweens.add({
+            targets: container,
+            alpha: 1,
+            duration: 300,
+            ease: 'Back.easeOut'
+        });
+
+        // Timer countdown (8 segundos)
+        this.scene.tweens.add({
+            targets: timerFill,
+            scaleX: 0,
+            duration: 8000,
+            ease: 'Linear',
+            onComplete: () => {
+                // Auto-continue si no elige
+                if (window.globalSocket) {
+                    window.globalSocket.emit('PLAYER_DECISION', { action: 'CONTINUE' });
+                }
+                container.destroy();
+            }
+        });
+    }
+
+    showLossNotification() {
+        const width = this.scene.scale.width;
+        const height = this.scene.scale.height;
+
+        const container = this.scene.add.container(width / 2, height / 2);
+        container.setScrollFactor(0).setDepth(2000);
+        container.setAlpha(0);
+
+        // Fondo oscuro
+        const bg = this.scene.add.rectangle(0, 0, 450, 180, 0x000000, 0.95);
+        bg.setStrokeStyle(3, 0xff0055);
+        container.add(bg);
+
+        // Título
+        const title = this.scene.add.text(0, -50, '❌ TRADE REKT', {
+            font: 'bold 32px "Courier New"',
+            fill: '#ff0055',
+            stroke: '#000',
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        container.add(title);
+
+        // Subtítulo
+        const subtitle = this.scene.add.text(0, -10, 'Integrity damaged!', {
+            font: '16px "Arial"',
+            fill: '#ffffff'
+        }).setOrigin(0.5);
+        container.add(subtitle);
+
+        // Botón RE-BUY
+        const rebuyBtn = this.scene.add.container(0, 50);
+        const rebuyBg = this.scene.add.rectangle(0, 0, 200, 50, 0x00fff9, 0.2);
+        rebuyBg.setStrokeStyle(2, 0x00fff9);
+        rebuyBg.setInteractive({ useHandCursor: true });
+        const rebuyText = this.scene.add.text(0, 0, '🔄 RE-BUY ($0.10)', {
+            font: 'bold 16px "Courier New"',
+            fill: '#00fff9'
+        }).setOrigin(0.5);
+
+        rebuyBtn.add([rebuyBg, rebuyText]);
+        container.add(rebuyBtn);
+
+        // Hover effect
+        rebuyBg.on('pointerover', () => {
+            rebuyBg.setFillStyle(0x00fff9, 0.5);
+        });
+        rebuyBg.on('pointerout', () => {
+            rebuyBg.setFillStyle(0x00fff9, 0.2);
+        });
+        rebuyBg.on('pointerdown', () => {
+            // TODO: Implement re-buy logic via socket
+            window.showToast('Re-buy not yet implemented', 'warning');
+            container.destroy();
+        });
+
+        // Animación de entrada
+        this.scene.tweens.add({
+            targets: container,
+            alpha: 1,
+            duration: 300,
+            ease: 'Back.easeOut',
+            onComplete: () => {
+                // Auto-hide después de 4 segundos
+                this.scene.tweens.add({
+                    targets: container,
+                    alpha: 0,
+                    delay: 4000,
+                    duration: 500,
+                    onComplete: () => container.destroy()
+                });
+            }
+        });
+    }
+
     showFloatingText(text, x, y, color) {
         const t = this.scene.add.text(x, y, text, {
             font: 'bold 28px "Courier New"',

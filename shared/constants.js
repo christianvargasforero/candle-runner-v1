@@ -7,7 +7,7 @@ export const GOLDEN_RATIO = 1.618;
 export const ROUND_DURATION = 30000; // 30 segundos por ronda
 export const PHASE_BET_TIME = 10000; // 10s - Fase de Posicionamiento
 export const PHASE_LOCK_TIME = 15000; // 15s - Fase de Lockdown
-export const PHASE_RESOLVE_TIME = 5000; // 5s - Fase de Liquidación
+export const PHASE_RESOLVE_TIME = 8000; // 8s - Fase de Liquidación (extendido para decisiones)
 
 // 🚌 MODELO "BUS CON SILLAS" - CAPACIDADES FIBONACCI
 export const FIBONACCI_CAPACITIES = [2, 3, 5, 8, 13, 21, 34, 55, 89, 144]; // Secuencia permitida

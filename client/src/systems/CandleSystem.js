@@ -1,5 +1,5 @@
-// 🕯️ CANDLE SYSTEM - Sistema de Gestión de Velas y Física
-// Responsabilidad: Dibujar velas holográficas y gestionar el suelo físico
+// 🕯️ CANDLE SYSTEM - Professional Trading Chart (TradingView Style)
+// Responsabilidad: Renderizar velas japonesas reales con auto-escalado
 
 export class CandleSystem {
     constructor(scene) {
@@ -10,28 +10,20 @@ export class CandleSystem {
         this.CANDLE_WIDTH = 50;
         this.BASE_X = 300;
 
-        // Coordenadas absolutas y escala de precios
-        this.baseY = window.innerHeight / 2 + 100;
-        this.priceScale = 300; // px range for price normalization
+        // Auto-scaling viewport
+        this.viewportPadding = 0.20; // 20% margin
+        this.screenHeight = window.innerHeight * 0.6; // Use 60% of screen for chart
+        this.baseY = window.innerHeight / 2;
 
-        // ============================================
-        // 🎬 AMPLIFICACIÓN VISUAL (DRAMA FACTOR)
-        // ============================================
-        this.VISUAL_MULTIPLIER = 25; // Exagerar movimientos de precio para emoción
-        this.MAX_CANDLE_HEIGHT = Math.min(300, window.innerHeight * 0.4); // Límite visual (40% pantalla)
-        this.SHAKE_THRESHOLD = 2.0; // % de cambio para activar shake (reducido para menos mareo)
-        this.lastPriceForShake = null;
-        this.extremeForceActive = false; // Indicador de fuerza extrema
-
-        // Paleta de colores
+        // Paleta de colores (TradingView style)
         this.COLORS = {
-            LONG: 0x00ff88,      // Cyan/Verde neón
-            SHORT: 0xff0055,     // Magenta/Rojo neón
-            NEUTRAL: 0x888888,   // Gris
-            GRID: 0x00fff9,      // Cyan brillante
-            // Colores INTENSOS para vela en vivo
-            LONG_INTENSE: 0x00ffaa,   // Verde más brillante
-            SHORT_INTENSE: 0xff0077   // Rojo más brillante
+            BULL: 0x00ff88,      // Green candles (Close > Open)
+            BEAR: 0xff0055,      // Red candles (Close < Open)
+            NEUTRAL: 0x888888,
+            GRID: 0x00fff9,
+            WICK: 0xcccccc,
+            PRICE_LINE: 0xffaa00,
+            TEXT: 0xffffff
         };
 
         // Estado de velas
@@ -43,30 +35,68 @@ export class CandleSystem {
         this.liveStartPrice = null;
         this.liveCandleHigh = null;
         this.liveCandleLow = null;
-        this.currentPhase = 'BETTING'; // Default phase
+        this.currentPhase = 'BETTING';
 
         // Capas de renderizado
         this.candleLayer = this.scene.add.container(0, 0).setDepth(10);
         this.liveCandleLayer = this.scene.add.container(0, 0).setDepth(20);
-        this.lineLayer = this.scene.add.container(0, 0).setDepth(15);
+        this.priceAxisLayer = this.scene.add.container(0, 0).setDepth(25);
+        this.currentPriceLayer = this.scene.add.container(0, 0).setDepth(30);
 
         // Graphics para vela activa
         this.liveCandleGraphics = this.scene.add.graphics();
         this.liveCandleGraphics.setDepth(21);
-        this.liveCandleLayer.add(this.liveCandleGraphics);
 
-        // Graphics para línea elástica
-        this.liveLineGraphics = this.scene.add.graphics();
-        this.liveLineGraphics.setDepth(16);
-        this.lineLayer.add(this.liveLineGraphics);
+        // Graphics para línea de precio actual
+        this.currentPriceGraphics = this.scene.add.graphics();
+        this.currentPriceGraphics.setDepth(31);
 
-        // ============================================
-        // 🏗️ GRUPOS FÍSICOS (SOLUCIÓN AL PROBLEMA DE FLOTAR)
-        // ============================================
+        // Grupos físicos
         this.physicsGroup = this.scene.physics.add.staticGroup();
-        this.candlePhysicsBodies = new Map(); // índice -> cuerpo físico invisible
+        this.candlePhysicsBodies = new Map();
 
-        console.log('[🕯️ CandleSystem] Inicializado con VISUAL_MULTIPLIER:', this.VISUAL_MULTIPLIER);
+        // Current price for live updates
+        this.currentLivePrice = null;
+
+        console.log('[🕯️ CandleSystem] Inicializado con Auto-Scaling');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 📊 AUTO-SCALING: Calcular rango de precios visible
+    // ═══════════════════════════════════════════════════════════════
+
+    calculatePriceRange() {
+        if (this.candleHistory.length === 0) {
+            return { minPrice: 0, maxPrice: 100, range: 100, pixelsPerDollar: 1 };
+        }
+
+        let minPrice = Infinity;
+        let maxPrice = -Infinity;
+
+        // Incluir historial visible
+        this.candleHistory.forEach(c => {
+            minPrice = Math.min(minPrice, c.low || c.close);
+            maxPrice = Math.max(maxPrice, c.high || c.close);
+        });
+
+        // Incluir vela en vivo
+        if (this.liveCandleHigh !== null && this.liveCandleLow !== null) {
+            minPrice = Math.min(minPrice, this.liveCandleLow);
+            maxPrice = Math.max(maxPrice, this.liveCandleHigh);
+        }
+
+        // 20% padding arriba y abajo
+        const rawRange = maxPrice - minPrice;
+        const paddedRange = rawRange * (1 + this.viewportPadding * 2);
+        const padding = (paddedRange - rawRange) / 2;
+
+        minPrice = minPrice - padding;
+        maxPrice = maxPrice + padding;
+
+        const range = maxPrice - minPrice || 1; // Prevent division by zero
+        const pixelsPerDollar = this.screenHeight / range;
+
+        return { minPrice, maxPrice, range, pixelsPerDollar };
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -87,150 +117,99 @@ export class CandleSystem {
         this.lastHistoricalIndex = this.candleHistory.length - 1;
         this.liveTickerIndex = this.lastHistoricalIndex + 1;
 
+        const { minPrice, maxPrice, pixelsPerDollar } = this.calculatePriceRange();
+
         // Renderizar cada vela
         this.candleHistory.forEach((candle, i) => {
-            this.createCandleWithPhysics(candle, i);
+            this.createCandleWithPhysics(candle, i, minPrice, pixelsPerDollar);
         });
 
-        // Renderizar línea de precio
-        this.renderPriceLine();
-
-        // NO panear cámara automáticamente - solo seguir al jugador
-        // La cámara está configurada para seguir this.myPlayer en GameScene.spawnMyPlayer
+        // Renderizar eje de precios
+        this.renderPriceAxis(minPrice, maxPrice);
 
         console.log(`[🏗️ CandleSystem] ${this.candleHistory.length} velas creadas`);
-
-        // 🛡️ FORZAR REDIBUJADO INMEDIATO
-        if (this.candleHistory.length > 0) {
-            const last = this.candleHistory[this.candleHistory.length - 1];
-            // Si no hay liveStartPrice, usar el último close
-            const startPrice = this.liveStartPrice !== null ? this.liveStartPrice : last.close;
-            const currentPrice = last.close;
-
-            // Inicializar high/low si es necesario
-            const high = this.liveCandleHigh !== null ? this.liveCandleHigh : currentPrice;
-            const low = this.liveCandleLow !== null ? this.liveCandleLow : currentPrice;
-
-            this.renderLiveCandleTicker(
-                this.liveTickerIndex,
-                startPrice,
-                currentPrice,
-                high,
-                low
-            );
-            console.log('[🏗️ CHART] Ticker forzado inicializado');
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════
     // 🏗️ CREACIÓN DE VELA CON FÍSICA (DUAL SYSTEM)
     // ═══════════════════════════════════════════════════════════════
 
-    createCandleWithPhysics(candle, index) {
-        const { x, y } = this.getCandleSpot(index);
+    createCandleWithPhysics(candle, index, minPrice, pixelsPerDollar) {
+        const x = this.BASE_X + index * this.CANDLE_SPACING;
 
-        // Determinar color
-        const isLong = candle.result === 'LONG';
-        const color = isLong ? this.COLORS.LONG :
-            (candle.result === 'SHORT' ? this.COLORS.SHORT : this.COLORS.NEUTRAL);
+        // Convertir precios a coordenadas Y
+        const yOpen = this.priceToY(candle.open, minPrice, pixelsPerDollar);
+        const yClose = this.priceToY(candle.close, minPrice, pixelsPerDollar);
+        const yHigh = this.priceToY(candle.high, minPrice, pixelsPerDollar);
+        const yLow = this.priceToY(candle.low, minPrice, pixelsPerDollar);
 
+        // Determinar color (TradingView style)
+        const isBull = candle.close >= candle.open;
+        const color = isBull ? this.COLORS.BULL : this.COLORS.BEAR;
+
+        // Cuerpo físico invisible (plataforma)
         const bodyHeight = 80;
-
-        // ============================================
-        // A. CUERPO FÍSICO INVISIBLE (LA PLATAFORMA REAL)
-        // ============================================
-        // CRÍTICO: Este rectángulo invisible es el suelo real donde colisionan los jugadores
-        const physicsBody = this.scene.add.rectangle(x, y, this.CANDLE_WIDTH, bodyHeight, 0xffffff);
-        physicsBody.setAlpha(0); // INVISIBLE
+        const yCenterPhysics = (yOpen + yClose) / 2;
+        const physicsBody = this.scene.add.rectangle(x, yCenterPhysics, this.CANDLE_WIDTH, bodyHeight, 0xffffff);
+        physicsBody.setAlpha(0);
         physicsBody.setOrigin(0.5, 0.5);
-
-        // Añadir al grupo físico estático
         this.physicsGroup.add(physicsBody);
-
-        // Guardar referencia para actualizaciones dinámicas
         this.candlePhysicsBodies.set(index, physicsBody);
 
-        // ============================================
-        // B. GRÁFICO VISUAL (LO QUE SE VE)
-        // ============================================
-        const candleContainer = this.createHolographicCandle(x, y, color, index === this.candleHistory.length - 1);
+        // Gráfico visual (vela real)
+        const candleContainer = this.createJapaneseCandlestick(x, yOpen, yClose, yHigh, yLow, color);
         this.candleLayer.add(candleContainer);
-
-        // DEBUG: Descomentar para ver hitboxes
-        // physicsBody.setAlpha(0.3);
-        // physicsBody.setFillStyle(0xff0000);
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🎨 VELA HOLOGRÁFICA (VISUAL)
+    // 🎨 VELA JAPONESA REAL (Professional Style)
     // ═══════════════════════════════════════════════════════════════
 
-    createHolographicCandle(x, y, color, isLive = false) {
-        const container = this.scene.add.container(x, y);
+    createJapaneseCandlestick(x, yOpen, yClose, yHigh, yLow, color) {
+        const container = this.scene.add.container(0, 0);
         const graphics = this.scene.add.graphics();
 
-        const width = this.CANDLE_WIDTH;
-        const bodyHeight = 80;
-        const wickHeight = 40;
+        const bodyTop = Math.min(yOpen, yClose);
+        const bodyBottom = Math.max(yOpen, yClose);
+        const bodyHeight = Math.max(2, bodyBottom - bodyTop); // Minimum 2px height
 
-        // Glow exterior (resplandor neón)
-        graphics.fillStyle(color, 0.1);
-        graphics.fillRoundedRect(-width / 2 - 8, -bodyHeight / 2 - 8, width + 16, bodyHeight + 16, 8);
+        // 1. Mecha (Wick) - Línea fina desde High a Low
+        graphics.lineStyle(2, this.COLORS.WICK, 0.8);
+        graphics.lineBetween(x, yHigh, x, yLow);
 
-        // Cuerpo holográfico (semitransparente)
-        graphics.fillStyle(color, 0.2);
-        graphics.fillRoundedRect(-width / 2, -bodyHeight / 2, width, bodyHeight, 4);
+        // 2. Cuerpo (Body) - Rectángulo desde Open a Close
+        // Glow exterior
+        graphics.fillStyle(color, 0.15);
+        graphics.fillRoundedRect(
+            x - this.CANDLE_WIDTH / 2 - 4,
+            bodyTop - 4,
+            this.CANDLE_WIDTH + 8,
+            bodyHeight + 8,
+            3
+        );
 
-        // Borde neón sólido
+        // Cuerpo principal
+        graphics.fillStyle(color, 0.5);
+        graphics.fillRoundedRect(
+            x - this.CANDLE_WIDTH / 2,
+            bodyTop,
+            this.CANDLE_WIDTH,
+            bodyHeight,
+            2
+        );
+
+        // Borde sólido
         graphics.lineStyle(2, color, 1);
-        graphics.strokeRoundedRect(-width / 2, -bodyHeight / 2, width, bodyHeight, 4);
-
-        // Mechas (wicks)
-        graphics.lineStyle(3, color, 0.8);
-        graphics.lineBetween(0, -bodyHeight / 2 - wickHeight, 0, -bodyHeight / 2);
-        graphics.lineBetween(0, bodyHeight / 2, 0, bodyHeight / 2 + wickHeight / 2);
-
-        // Highlight interno (efecto cristal)
-        graphics.lineStyle(1, 0xffffff, 0.3);
-        graphics.lineBetween(-width / 2 + 4, -bodyHeight / 2 + 8, -width / 2 + 4, bodyHeight / 2 - 8);
+        graphics.strokeRoundedRect(
+            x - this.CANDLE_WIDTH / 2,
+            bodyTop,
+            this.CANDLE_WIDTH,
+            bodyHeight,
+            2
+        );
 
         container.add(graphics);
-
-        // Animación de pulso para vela en vivo
-        if (isLive) {
-            this.scene.tweens.add({
-                targets: graphics,
-                alpha: 0.6,
-                duration: 600,
-                yoyo: true,
-                repeat: -1,
-                ease: 'Sine.easeInOut'
-            });
-
-            this.createEnergyParticles(container, color);
-        }
-
         return container;
-    }
-
-    createEnergyParticles(container, color) {
-        for (let i = 0; i < 4; i++) {
-            const particle = this.scene.add.circle(
-                Phaser.Math.Between(-30, 30),
-                Phaser.Math.Between(-50, 50),
-                3, color, 0.6
-            );
-            container.add(particle);
-
-            this.scene.tweens.add({
-                targets: particle,
-                y: particle.y - 30,
-                alpha: 0,
-                duration: 1500,
-                repeat: -1,
-                delay: i * 400
-            });
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -239,16 +218,10 @@ export class CandleSystem {
 
     setPhase(phase) {
         this.currentPhase = phase;
-        // Forzar actualización visual si es necesario
-        if (this.liveStartPrice !== null && this.candleHistory.length > 0) {
-            const lastIndex = this.candleHistory.length - 1;
-            const last = this.candleHistory[lastIndex];
-            this.renderLiveCandleTicker(lastIndex, this.liveStartPrice, last.close, this.liveCandleHigh, this.liveCandleLow);
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🔴 ACTUALIZAR VELA EN VIVO (CRÍTICO PARA FÍSICA DINÁMICA)
+    // 🔴 ACTUALIZAR VELA EN VIVO
     // ═══════════════════════════════════════════════════════════════
 
     updateLiveCandle(price) {
@@ -257,445 +230,216 @@ export class CandleSystem {
         const lastIndex = this.candleHistory.length - 1;
         const last = this.candleHistory[lastIndex];
 
-        // Inicializar open si es la primera actualización
-        // 🛡️ FALLBACK: Inicializar precio base si es null (Anti-Invisible Glitch)
+        // Inicializar precio de apertura si es null
         if (this.liveStartPrice === null) {
-            this.liveStartPrice = last.open || price;
+            this.liveStartPrice = last.close || price;
             this.liveCandleHigh = price;
             this.liveCandleLow = price;
-            console.log('[🕯️ TICKER] Inicializando liveStartPrice:', this.liveStartPrice);
         }
 
-        // Actualizar precio actual
-        last.close = price;
-
-        // Actualizar high/low dinámicos
+        // Actualizar precio actual y extremos
+        this.currentLivePrice = price;
         if (price > this.liveCandleHigh) this.liveCandleHigh = price;
         if (price < this.liveCandleLow) this.liveCandleLow = price;
 
+        // Actualizar datos de la última vela
+        last.close = price;
         last.high = this.liveCandleHigh;
         last.low = this.liveCandleLow;
 
-        // Renderizar vela en tiempo real
-        this.renderLiveCandleTicker(lastIndex, this.liveStartPrice, price, this.liveCandleHigh, this.liveCandleLow);
+        // Renderizar vela en vivo
+        this.renderLiveCandleTicker();
 
-        // Actualizar línea elástica
-        this.renderElasticPriceLine(lastIndex, price);
+        // Renderizar línea de precio actual
+        this.renderCurrentPriceLine(price);
 
-        // ============================================
-        // 🔄 CRÍTICO: REDIMENSIONAR CUERPO FÍSICO
-        // ============================================
-        // Esto hace que el suelo suba/baje con el precio en tiempo real
+        // Actualizar cuerpo físico
         const physicsBody = this.candlePhysicsBodies.get(lastIndex);
         if (physicsBody && physicsBody.body) {
-            const { x, y } = this.getCandleSpot(lastIndex);
-            const bodyHeight = 80;
+            const { minPrice, pixelsPerDollar } = this.calculatePriceRange();
+            const yOpen = this.priceToY(this.liveStartPrice, minPrice, pixelsPerDollar);
+            const yClose = this.priceToY(price, minPrice, pixelsPerDollar);
+            const yCenter = (yOpen + yClose) / 2;
 
-            // Actualizar posición y tamaño
-            physicsBody.setPosition(x, y);
-            physicsBody.setSize(this.CANDLE_WIDTH, bodyHeight);
-
-            // CRÍTICO: Refrescar física estática
+            physicsBody.setPosition(this.BASE_X + this.liveTickerIndex * this.CANDLE_SPACING, yCenter);
             physicsBody.body.updateFromGameObject();
         }
-
-        // NO ajustar cámara automáticamente - solo sigue al jugador
     }
 
     // ═══════════════════════════════════════════════════════════════
     // 🔴 RENDERIZAR VELA EN VIVO (TICKER DINÁMICO)
     // ═══════════════════════════════════════════════════════════════
 
-    renderLiveCandleTicker(index, open, current, high, low) {
+    renderLiveCandleTicker() {
         this.liveCandleGraphics.clear();
 
-        // Dibujar en PRÓXIMA posición
+        if (this.liveStartPrice === null || this.currentLivePrice === null) return;
+
         const x = this.BASE_X + this.liveTickerIndex * this.CANDLE_SPACING;
+        const { minPrice, pixelsPerDollar } = this.calculatePriceRange();
 
-        // ============================================
-        // 🎬 AMPLIFICACIÓN VISUAL DRAMÁTICA
-        // ============================================
-        // Calcular el cambio de precio como porcentaje
-        const priceChange = current - open;
-        const priceChangePercent = Math.abs(priceChange / open) * 100;
+        // Convertir precios a coordenadas Y
+        const yOpen = this.priceToY(this.liveStartPrice, minPrice, pixelsPerDollar);
+        const yCurrent = this.priceToY(this.currentLivePrice, minPrice, pixelsPerDollar);
+        const yHigh = this.priceToY(this.liveCandleHigh, minPrice, pixelsPerDollar);
+        const yLow = this.priceToY(this.liveCandleLow, minPrice, pixelsPerDollar);
 
-        // Aplicar multiplicador visual para exagerar movimientos
-        const visualPriceChange = priceChange * this.VISUAL_MULTIPLIER;
-
-        // ============================================
-        // 📊 CONVERTIR PRECIOS A COORDENADAS Y (AMPLIFICADAS)
-        // ============================================
-        let minPrice = Infinity, maxPrice = -Infinity;
-        this.candleHistory.forEach(c => {
-            minPrice = Math.min(minPrice, c.low || c.close);
-            maxPrice = Math.max(maxPrice, c.high || c.close);
-        });
-
-        // 🛡️ ANTI-FLATLINE: Padding de seguridad
-        minPrice -= 10;
-        maxPrice += 10;
-        const priceRange = Math.max(10, maxPrice - minPrice); // Mínimo 10
-
-        // Función auxiliar con amplificación
-        const priceToY = (price) => {
-            const basePrice = open; // Usar open como referencia
-            const delta = (price - basePrice) * this.VISUAL_MULTIPLIER;
-
-            // Calcular Y base del open
-            const openNorm = (open - minPrice) / priceRange;
-            const yBase = this.baseY - openNorm * this.priceScale;
-
-            // Aplicar delta amplificado
-            return yBase - delta;
-        };
-
-        const yOpen = priceToY(open);
-        const yCurrent = priceToY(current);
-        const yHigh = priceToY(high);
-        const yLow = priceToY(low);
-
-
-
-        // ============================================
-        // 🎨 COLOR DINÁMICO INTENSO
-        // ============================================
-        const isGreen = current >= open;
-        const isFlat = Math.abs(priceChange) < 0.01;
-
-        let color, glowColor, borderColor;
-
-        // TAREA 3: Visualización por Fase
-        if (this.currentPhase === 'BETTING') {
-            // Fase de Apuestas: Borde Blanco/Amarillo
-            borderColor = 0xffff00; // Amarillo eléctrico
-            color = isGreen ? this.COLORS.LONG : this.COLORS.SHORT; // Cuerpo normal
-            glowColor = 0xffffff;
-        } else {
-            // Fase Locked/Resolving: Borde del color de la tendencia
-            borderColor = isGreen ? this.COLORS.LONG_INTENSE : this.COLORS.SHORT_INTENSE;
-            color = isGreen ? this.COLORS.LONG_INTENSE : this.COLORS.SHORT_INTENSE;
-            glowColor = isGreen ? this.COLORS.LONG : this.COLORS.SHORT;
-        }
-
-        if (isFlat) {
-            color = this.COLORS.NEUTRAL;
-            glowColor = 0xffffff;
-            borderColor = 0xcccccc;
-        }
-
-        // ============================================
-        // 🎬 EFECTOS DRAMÁTICOS DE CÁMARA
-        // ============================================
-        if (this.lastPriceForShake !== null) {
-            const changeFromLast = Math.abs((current - this.lastPriceForShake) / this.lastPriceForShake) * 100;
-
-            // Shake si el cambio es significativo
-            if (changeFromLast > this.SHAKE_THRESHOLD) {
-                const intensity = Math.min(0.008, changeFromLast * 0.001);
-                this.scene.cameras.main.shake(200, intensity);
-                console.log(`[🎬 DRAMA] Shake activado! Cambio: ${changeFromLast.toFixed(2)}%`);
-            }
-
-            // Zoom out suave si la vela crece mucho
-            if (priceChangePercent > 1.0 && this.scene.cameras.main.zoom > 0.7) {
-                this.scene.tweens.add({
-                    targets: this.scene.cameras.main,
-                    zoom: this.scene.cameras.main.zoom - 0.05,
-                    duration: 300,
-                    ease: 'Sine.easeOut'
-                });
-            }
-        }
-        this.lastPriceForShake = current;
-
-        // ============================================
-        // 1️⃣ MECHAS (Sombras high/low) - MÁS GRUESAS
-        // ============================================
-        this.liveCandleGraphics.lineStyle(4, color, 0.8);
-        this.liveCandleGraphics.lineBetween(x, yHigh, x, yLow);
-
-        // ============================================
-        // 2️⃣ CUERPO (open → current) - AMPLIFICADO CON CLAMPING
-        // ============================================
         const bodyTop = Math.min(yOpen, yCurrent);
         const bodyBottom = Math.max(yOpen, yCurrent);
-        let bodyHeight = Math.max(8, bodyBottom - bodyTop); // Mínimo 8px para visibilidad
+        const bodyHeight = Math.max(3, bodyBottom - bodyTop);
 
-        console.log('[TICKER] Price:', current, 'Y:', yCurrent, 'Height:', bodyHeight);
+        // Determinar color
+        const isBull = this.currentLivePrice >= this.liveStartPrice;
+        const color = isBull ? this.COLORS.BULL : this.COLORS.BEAR;
 
-        // 🛡️ CLAMPING: Limitar altura para evitar velas infinitas
-        const isExtremeForce = bodyHeight > this.MAX_CANDLE_HEIGHT;
-        if (isExtremeForce) {
-            bodyHeight = this.MAX_CANDLE_HEIGHT;
-            this.extremeForceActive = true;
-            console.log(`[⚡ EXTREME FORCE] Vela alcanzó límite visual: ${this.MAX_CANDLE_HEIGHT}px`);
-        } else {
-            this.extremeForceActive = false;
-        }
+        // Color especial en fase BETTING
+        const borderColor = this.currentPhase === 'BETTING' ? 0xffff00 : color;
 
-        // Glow exterior INTENSO (resplandor pulsante)
-        const glowIntensity = isExtremeForce ? 0.4 : 0.25; // Más intenso si hay fuerza extrema
-        this.liveCandleGraphics.fillStyle(glowColor, glowIntensity);
+        // 1. Mecha
+        this.liveCandleGraphics.lineStyle(3, this.COLORS.WICK, 0.9);
+        this.liveCandleGraphics.lineBetween(x, yHigh, x, yLow);
+
+        // 2. Glow exterior (pulsante)
+        this.liveCandleGraphics.fillStyle(color, 0.2);
         this.liveCandleGraphics.fillRoundedRect(
-            x - this.CANDLE_WIDTH / 2 - 10,
-            bodyTop - 10,
-            this.CANDLE_WIDTH + 20,
-            bodyHeight + 20,
-            8
+            x - this.CANDLE_WIDTH / 2 - 6,
+            bodyTop - 6,
+            this.CANDLE_WIDTH + 12,
+            bodyHeight + 12,
+            4
         );
 
-        // Cuerpo principal (MÁS OPACO para visibilidad)
-        this.liveCandleGraphics.fillStyle(color, 0.6);
+        // 3. Cuerpo principal
+        this.liveCandleGraphics.fillStyle(color, 0.7);
         this.liveCandleGraphics.fillRoundedRect(
             x - this.CANDLE_WIDTH / 2,
             bodyTop,
             this.CANDLE_WIDTH,
             bodyHeight,
-            4
+            2
         );
 
-        // Borde sólido BRILLANTE
+        // 4. Borde brillante
         this.liveCandleGraphics.lineStyle(3, borderColor, 1);
         this.liveCandleGraphics.strokeRoundedRect(
             x - this.CANDLE_WIDTH / 2,
             bodyTop,
             this.CANDLE_WIDTH,
             bodyHeight,
-            4
+            2
         );
 
-        // ⚡ EFECTO DE FUERZA EXTREMA: Partículas en el borde superior
-        if (isExtremeForce) {
-            // Línea pulsante en el límite
-            this.liveCandleGraphics.lineStyle(4, 0xffffff, 0.8);
-            this.liveCandleGraphics.lineBetween(
-                x - this.CANDLE_WIDTH / 2 - 15,
-                bodyTop,
-                x + this.CANDLE_WIDTH / 2 + 15,
-                bodyTop
-            );
+        // 5. Dot pulsante en precio actual
+        this.liveCandleGraphics.fillStyle(color, 0.5);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 15, yCurrent, 12);
+        this.liveCandleGraphics.fillStyle(color, 1);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 15, yCurrent, 8);
+        this.liveCandleGraphics.fillStyle(0xffffff, 1);
+        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 15, yCurrent, 4);
+    }
 
-            // Partículas de energía
-            for (let i = 0; i < 3; i++) {
-                const particleX = x + Phaser.Math.Between(-this.CANDLE_WIDTH / 2, this.CANDLE_WIDTH / 2);
-                const particle = this.scene.add.circle(particleX, bodyTop, 3, 0xffffff, 0.9);
-                particle.setDepth(25);
+    // ═══════════════════════════════════════════════════════════════
+    // 💹 LÍNEA DE PRECIO ACTUAL (Horizontal Dashed Line)
+    // ═══════════════════════════════════════════════════════════════
 
-                this.scene.tweens.add({
-                    targets: particle,
-                    y: bodyTop - 30,
-                    alpha: 0,
-                    duration: 800,
-                    delay: i * 100,
-                    onComplete: () => particle.destroy()
-                });
-            }
+    renderCurrentPriceLine(price) {
+        this.currentPriceGraphics.clear();
+
+        const { minPrice, pixelsPerDollar } = this.calculatePriceRange();
+        const yPrice = this.priceToY(price, minPrice, pixelsPerDollar);
+
+        const screenWidth = this.scene.scale.width;
+        const isBull = price >= this.liveStartPrice;
+        const color = isBull ? this.COLORS.BULL : this.COLORS.BEAR;
+
+        // Línea punteada
+        this.currentPriceGraphics.lineStyle(2, color, 0.8);
+        for (let x = 0; x < screenWidth; x += 15) {
+            this.currentPriceGraphics.lineBetween(x, yPrice, x + 8, yPrice);
         }
 
-        // ============================================
-        // 3️⃣ GLOW DOT PULSANTE (punto brillante en precio actual)
-        // ============================================
-        // Círculo exterior (glow grande)
-        this.liveCandleGraphics.fillStyle(color, 0.4);
-        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 20, yCurrent, 16);
-
-        // Círculo medio
-        this.liveCandleGraphics.fillStyle(color, 0.8);
-        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 20, yCurrent, 10);
-
-        // Círculo brillante
-        this.liveCandleGraphics.fillStyle(color, 1);
-        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 20, yCurrent, 7);
-
-        // Core blanco pulsante
-        this.liveCandleGraphics.fillStyle(0xffffff, 1);
-        this.liveCandleGraphics.fillCircle(x + this.CANDLE_WIDTH / 2 + 20, yCurrent, 4);
-
-        // ============================================
-        // 4️⃣ PRECIO NUMÉRICO CON INDICADOR DE CAMBIO
-        // ============================================
-        const priceText = current.toFixed(2);
-        const changeText = priceChange >= 0 ? `+${priceChange.toFixed(2)}` : priceChange.toFixed(2);
-        const displayText = `${priceText}\n${changeText}`;
-
+        // Etiqueta de precio en el lado derecho
         const priceLabel = this.scene.add.text(
-            x + this.CANDLE_WIDTH / 2 + 40,
-            yCurrent,
-            displayText,
+            screenWidth - 120,
+            yPrice,
+            `$${price.toFixed(2)}`,
             {
                 font: 'bold 16px "Courier New"',
-                fill: isFlat ? '#ffffff' : (isGreen ? '#00ffaa' : '#ff0077'),
-                stroke: '#000',
-                strokeThickness: 4,
-                align: 'left'
+                fill: isBull ? '#00ff88' : '#ff0055',
+                backgroundColor: '#000000',
+                padding: { x: 8, y: 4 }
             }
-        ).setOrigin(0, 0.5).setDepth(22);
+        ).setOrigin(0, 0.5).setDepth(32).setScrollFactor(0);
 
-        // Autodestrucción
+        // Auto-destruir en el próximo frame
         this.scene.time.delayedCall(50, () => {
             if (priceLabel) priceLabel.destroy();
         });
+    }
 
-        // ============================================
-        // 5️⃣ INDICADOR VISUAL DE DIRECCIÓN (Flecha)
-        // ============================================
-        if (!isFlat) {
-            const arrowY = isGreen ? bodyTop - 20 : bodyBottom + 20;
-            const arrowSymbol = isGreen ? '▲' : '▼';
+    // ═══════════════════════════════════════════════════════════════
+    // 📏 EJE DE PRECIOS (Price Axis - Right Side)
+    // ═══════════════════════════════════════════════════════════════
 
-            const arrow = this.scene.add.text(
-                x,
-                arrowY,
-                arrowSymbol,
+    renderPriceAxis(minPrice, maxPrice) {
+        this.priceAxisLayer.removeAll(true);
+
+        const screenWidth = this.scene.scale.width;
+        const numLabels = 8;
+        const priceStep = (maxPrice - minPrice) / (numLabels - 1);
+
+        for (let i = 0; i < numLabels; i++) {
+            const price = minPrice + i * priceStep;
+            const { pixelsPerDollar } = this.calculatePriceRange();
+            const y = this.priceToY(price, minPrice, pixelsPerDollar);
+
+            // Línea horizontal de grid
+            const gridLine = this.scene.add.graphics();
+            gridLine.lineStyle(1, this.COLORS.GRID, 0.1);
+            gridLine.lineBetween(0, y, screenWidth, y);
+            gridLine.setScrollFactor(0);
+            this.priceAxisLayer.add(gridLine);
+
+            // Etiqueta de precio
+            const label = this.scene.add.text(
+                screenWidth - 100,
+                y,
+                `$${price.toFixed(2)}`,
                 {
-                    font: 'bold 24px Arial',
-                    fill: isGreen ? '#00ffaa' : '#ff0077',
-                    stroke: '#000',
-                    strokeThickness: 3
+                    font: '12px "Courier New"',
+                    fill: '#888888',
+                    backgroundColor: '#0a0a12',
+                    padding: { x: 6, y: 2 }
                 }
-            ).setOrigin(0.5).setDepth(22);
+            ).setOrigin(0, 0.5).setScrollFactor(0);
 
-            // Animación de pulso
-            this.scene.tweens.add({
-                targets: arrow,
-                scale: 1.3,
-                alpha: 0.5,
-                duration: 300,
-                yoyo: true,
-                repeat: 0,
-                onComplete: () => arrow.destroy()
-            });
+            this.priceAxisLayer.add(label);
         }
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 📈 LÍNEA ELÁSTICA DE PRECIO
+    // 🧮 HELPER: Convertir precio a coordenada Y
     // ═══════════════════════════════════════════════════════════════
 
-    renderElasticPriceLine(liveIndex, currentPrice) {
-        this.liveLineGraphics.clear();
-
-        if (this.candleHistory.length < 1) return;
-
-        const historicalX = this.BASE_X + this.lastHistoricalIndex * this.CANDLE_SPACING;
-        const liveX = this.BASE_X + this.liveTickerIndex * this.CANDLE_SPACING;
-
-        const lastCandle = this.candleHistory[this.lastHistoricalIndex];
-        if (!lastCandle) return;
-
-        // Normalización de precios
-        let minPrice = Infinity, maxPrice = -Infinity;
-        this.candleHistory.forEach(c => {
-            minPrice = Math.min(minPrice, c.low || c.close);
-            maxPrice = Math.max(maxPrice, c.high || c.close);
-        });
-        const priceRange = Math.max(1, maxPrice - minPrice);
-
-        const priceToY = (price) => {
-            const priceNorm = (price - minPrice) / priceRange;
-            return this.baseY - priceNorm * this.priceScale;
-        };
-
-        const historicalY = priceToY(lastCandle.close);
-        const currentY = priceToY(currentPrice);
-
-        // Color dinámico
-        const isGreen = currentPrice >= lastCandle.close;
-        const color = isGreen ? this.COLORS.LONG : this.COLORS.SHORT;
-
-        // Línea animada
-        this.liveLineGraphics.lineStyle(3, color, 0.8);
-        this.liveLineGraphics.lineBetween(historicalX, historicalY, liveX, currentY);
-
-        // Punto pulsante
-        this.liveLineGraphics.fillStyle(color, 0.6);
-        this.liveLineGraphics.fillCircle(liveX, currentY, 5);
+    priceToY(price, minPrice, pixelsPerDollar) {
+        const priceNorm = (price - minPrice) * pixelsPerDollar;
+        return this.baseY + this.screenHeight / 2 - priceNorm;
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 📈 LÍNEA DE PRECIO HISTÓRICA
-    // ═══════════════════════════════════════════════════════════════
-
-    renderPriceLine() {
-        this.lineLayer.removeAll(true);
-
-        if (this.candleHistory.length < 2) return;
-
-        // Calcular rango
-        let minPrice = Infinity, maxPrice = -Infinity;
-        this.candleHistory.forEach(c => {
-            minPrice = Math.min(minPrice, c.close);
-            maxPrice = Math.max(maxPrice, c.close);
-        });
-        const priceRange = maxPrice - minPrice || 1;
-
-        // Dibujar línea
-        const lineGraphics = this.scene.add.graphics();
-        lineGraphics.lineStyle(2, this.COLORS.GRID, 0.5);
-
-        const points = this.candleHistory.map((c, i) => {
-            const x = this.BASE_X + i * this.CANDLE_SPACING;
-            const priceNorm = (c.close - minPrice) / priceRange;
-            const y = this.baseY - priceNorm * 300;
-            return { x, y };
-        });
-
-        // Dibujar path
-        lineGraphics.beginPath();
-        lineGraphics.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-            lineGraphics.lineTo(points[i].x, points[i].y);
-        }
-        lineGraphics.strokePath();
-
-        // Puntos en cada cierre
-        points.forEach((p, i) => {
-            const isLast = i === points.length - 1;
-            const dot = this.scene.add.circle(p.x, p.y, isLast ? 6 : 3, this.COLORS.GRID, isLast ? 1 : 0.5);
-            this.lineLayer.add(dot);
-
-            if (isLast) {
-                this.scene.tweens.add({
-                    targets: dot,
-                    scale: 1.5,
-                    alpha: 0.5,
-                    duration: 800,
-                    yoyo: true,
-                    repeat: -1
-                });
-            }
-        });
-
-        this.lineLayer.add(lineGraphics);
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // 📷 CÁMARA FIJA AL JUGADOR
-    // ═══════════════════════════════════════════════════════════════
-    // La cámara SOLO sigue al jugador local (configurado en GameScene)
-    // NO se manipula desde CandleSystem
-
-    // ═══════════════════════════════════════════════════════════════
-    // 📍 OBTENER POSICIÓN DE VELA (FUENTE DE VERDAD)
+    // 📍 OBTENER POSICIÓN DE VELA
     // ═══════════════════════════════════════════════════════════════
 
     getCandleSpot(index) {
-        // Devuelve la posición EXACTA de la cima visual de la vela index
         const i = Math.max(0, Math.min(index, this.candleHistory.length - 1));
         const x = this.BASE_X + i * this.CANDLE_SPACING;
-        let minPrice = Infinity, maxPrice = -Infinity;
-        this.candleHistory.forEach(c => {
-            minPrice = Math.min(minPrice, c.low || c.close);
-            maxPrice = Math.max(maxPrice, c.high || c.close);
-        });
-        const priceRange = Math.max(1, maxPrice - minPrice);
-        const price = this.candleHistory[i].close || (minPrice + priceRange / 2);
-        const priceNorm = (price - minPrice) / priceRange;
-        // Y de la cima visual: la parte superior del rectángulo de la vela
-        const yCandleBase = this.baseY - priceNorm * this.priceScale;
-        // La altura visual de la vela es 80px (ver createHolographicCandle)
-        const yTop = yCandleBase - 40; // 40 = 80/2
-        return { x, y: yTop };
+
+        const { minPrice, pixelsPerDollar } = this.calculatePriceRange();
+        const candle = this.candleHistory[i];
+        const price = candle.close || candle.open;
+        const y = this.priceToY(price, minPrice, pixelsPerDollar) - 40; // Top of candle body
+
+        return { x, y };
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -706,9 +450,10 @@ export class CandleSystem {
         this.liveStartPrice = null;
         this.liveCandleHigh = null;
         this.liveCandleLow = null;
+        this.currentLivePrice = null;
 
         if (this.liveCandleGraphics) this.liveCandleGraphics.clear();
-        if (this.liveLineGraphics) this.liveLineGraphics.clear();
+        if (this.currentPriceGraphics) this.currentPriceGraphics.clear();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -717,15 +462,9 @@ export class CandleSystem {
 
     solidifyLiveCandle(newCandleHistory) {
         this.candleHistory = newCandleHistory;
-
-        // Actualizar índices
         this.lastHistoricalIndex = this.candleHistory.length - 1;
         this.liveTickerIndex = this.lastHistoricalIndex + 1;
-
-        // Re-renderizar escena completa
         this.buildChart(this.candleHistory);
-
-        console.log(`[🎯 CandleSystem] Vela solidificada. Nueva histórica: ${this.lastHistoricalIndex}`);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -733,7 +472,12 @@ export class CandleSystem {
     // ═══════════════════════════════════════════════════════════════
 
     update(delta) {
-        // Parallax u otras animaciones si es necesario
+        // Update price axis if needed
+        if (this.candleHistory.length > 0) {
+            const { minPrice, maxPrice } = this.calculatePriceRange();
+            // Re-render axis occasionally (could be throttled)
+            // this.renderPriceAxis(minPrice, maxPrice);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════

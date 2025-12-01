@@ -253,7 +253,7 @@ io.on('connection', async (socket) => {
                     passengers: state.passengers,
                     state: state.status
                 });
-                
+
                 if (room.gameLoopInstance.lastPrice) {
                     socket.emit('PRICE_UPDATE', {
                         price: room.gameLoopInstance.lastPrice,
@@ -488,6 +488,48 @@ io.on('connection', async (socket) => {
             // Enviar error
             socket.emit('GAME_ERROR', { message: result.error });
         }
+    });
+
+    // 💰 Evento: Decisión del Jugador (Cash Out / Continue)
+    socket.on('PLAYER_DECISION', async (data) => {
+        const { action } = data; // 'CASHOUT' | 'CONTINUE'
+        const user = userManager.getUser(socket.id);
+
+        if (!user) {
+            socket.emit('GAME_ERROR', { message: 'Usuario no encontrado' });
+            return;
+        }
+
+        console.log(`💰 [DECISION] Usuario ${user.id} eligió: ${action}`);
+
+        if (action === 'CASHOUT') {
+            // Sacar al jugador del bus actual
+            if (user.currentRoom && roomManager) {
+                const roomId = user.currentRoom;
+                roomManager.removeUserFromRoom(socket.id, roomId);
+
+                console.log(`💸 [CASHOUT] Usuario ${user.id} se retiró del bus ${roomId}`);
+
+                socket.emit('GAME_MESSAGE', {
+                    type: 'success',
+                    message: `Successfully cashed out! Balance: $${user.balanceUSDT.toFixed(2)}`
+                });
+
+                // Redirigir al lobby
+                socket.emit('RETURN_TO_LOBBY');
+            }
+        } else if (action === 'CONTINUE') {
+            // El jugador permanece en el bus para la siguiente ronda
+            console.log(`🚀 [CONTINUE] Usuario ${user.id} continúa jugando`);
+
+            socket.emit('GAME_MESSAGE', {
+                type: 'info',
+                message: 'Continuing to next round! Good luck!'
+            });
+        }
+
+        // Enviar perfil actualizado
+        socket.emit('USER_PROFILE', user.getProfile());
     });
 
     // Evento: Reparar Skin
